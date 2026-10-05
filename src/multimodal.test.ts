@@ -8,6 +8,13 @@ import {
 import { capabilitiesSchema, effectiveCapabilities } from "./capabilities";
 
 describe("image request lifecycle", () => {
+  it('intersects all-app and selected access without expanding older selected tasks', () => {
+    const all = capabilitiesSchema.parse({ allApps: true, allowedApps: ['B'] });
+    const selected = capabilitiesSchema.parse({ allApps: false, allowedApps: ['A'] });
+    expect(effectiveCapabilities(all, selected)).toMatchObject({ allApps: false, allowedApps: ['A'] });
+    expect(effectiveCapabilities(selected, all)).toMatchObject({ allApps: false, allowedApps: ['A'] });
+    expect(effectiveCapabilities(all, all).allApps).toBe(true);
+  });
   it("builds multimodal input without an external image upload service", () => {
     const content = imageMessage("", ["data:image/png;base64,abc"]);
     expect(content).toEqual([
@@ -38,10 +45,12 @@ describe("image request lifecycle", () => {
   });
   it("revokes live capabilities without expanding an existing task", () => {
     const saved = capabilitiesSchema.parse({
+      allApps: false,
       allowedApps: ["C:\\A.exe"],
       controlScreen: false,
     });
     const current = capabilitiesSchema.parse({
+      allApps: false,
       allowedApps: ["C:\\A.exe", "C:\\B.exe"],
     });
     expect(effectiveCapabilities(saved, current)).toMatchObject({
@@ -51,7 +60,7 @@ describe("image request lifecycle", () => {
     expect(
       effectiveCapabilities(
         current,
-        capabilitiesSchema.parse({ controlScreen: false, allowedApps: [] }),
+        capabilitiesSchema.parse({ allApps: false, controlScreen: false, allowedApps: [] }),
       ),
     ).toMatchObject({ controlScreen: false, allowedApps: [] });
   });

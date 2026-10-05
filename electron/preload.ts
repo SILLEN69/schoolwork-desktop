@@ -12,6 +12,15 @@ contextBridge.exposeInMainWorld("schoolwork", {
   desktopApps: () => ipcRenderer.invoke("desktop:apps"),
   chooseApplication: () => ipcRenderer.invoke("desktop:choose-app"),
   desktopWindows: () => ipcRenderer.invoke("desktop:windows"),
+  desktopDisplays: () => ipcRenderer.invoke("desktop:displays"),
+  desktopLessons: () => ipcRenderer.invoke("desktop:lessons"),
+  forgetDesktopLessons: () => ipcRenderer.invoke("desktop:forget-lessons"),
+  telegramConfigure: (input: unknown) =>
+    ipcRenderer.invoke("telegram:configure", input),
+  telegramPair: () => ipcRenderer.invoke("telegram:pair"),
+  telegramStatus: () => ipcRenderer.invoke("telegram:status"),
+  telegramDisconnect: () => ipcRenderer.invoke("telegram:disconnect"),
+  telegramTest: () => ipcRenderer.invoke("telegram:test"),
   captureScreen: (input: unknown) =>
     ipcRenderer.invoke("desktop:capture", input),
   stopDesktop: () => ipcRenderer.invoke("desktop:stop"),
@@ -31,6 +40,7 @@ contextBridge.exposeInMainWorld("schoolwork", {
   listModels: () => ipcRenderer.invoke("models:list"),
   listChats: () => ipcRenderer.invoke("chat:list"),
   getChat: (id: string) => ipcRenderer.invoke("chat:get", id),
+  taskStatus: (id: string) => ipcRenderer.invoke("chat:status", id),
   getActivity: (id: string) => ipcRenderer.invoke("chat:activity", id),
   deleteChat: (id: string) => ipcRenderer.invoke("chat:delete", id),
   openPath: (path: string) => ipcRenderer.invoke("app:open-path", path),

@@ -1,6 +1,11 @@
 import { useEffect, useState } from "react";
 import { Monitor, RefreshCw, Square } from "lucide-react";
-import type { Attachment, Capabilities, DesktopWindow } from "../capabilities";
+import type {
+  Attachment,
+  Capabilities,
+  DesktopWindow,
+  DesktopDisplay,
+} from "../capabilities";
 
 export default function DesktopPanel({
   conversationId,
@@ -19,10 +24,16 @@ export default function DesktopPanel({
     [image, setImage] = useState(""),
     [error, setError] = useState(""),
     [busy, setBusy] = useState(false);
+  const [displays, setDisplays] = useState<DesktopDisplay[]>([]);
   const t = (en: string, sv: string) => (swedish ? sv : en);
   const refresh = async () => {
     try {
       setWindows(await window.schoolwork.desktopWindows());
+      setDisplays(
+        capabilities?.viewScreen
+          ? await window.schoolwork.desktopDisplays()
+          : [],
+      );
       setError("");
     } catch (e: any) {
       setError(e.message);
@@ -38,14 +49,21 @@ export default function DesktopPanel({
       )
         setImage(event.imageData);
     });
-  }, [conversationId, capabilities?.allowedApps.join("|")]);
-  const capture = async (windowId?: string) => {
+  }, [
+    conversationId,
+    capabilities?.allApps,
+    capabilities?.viewScreen,
+    capabilities?.controlScreen,
+    capabilities?.allowedApps.join("|"),
+  ]);
+  const capture = async (windowId?: string, displayId?: string) => {
     setBusy(true);
     setError("");
     try {
       const attachment = await window.schoolwork.captureScreen({
         conversationId,
         windowId,
+        displayId,
       });
       onCapture(attachment);
       setImage(
@@ -71,10 +89,15 @@ export default function DesktopPanel({
         </span>
       </div>
       <p className="panel-hint">
-        {t(
-          "Select a window to capture it and attach it to your message. The agent can use applications selected in Settings.",
-          "Välj ett fönster för att ta en bild och bifoga den. AI:n kan använda appar valda i Inställningar.",
-        )}
+        {capabilities?.allApps
+          ? t(
+              "All ordinary Windows apps are available. Select a monitor or a window to attach a screenshot. OS security and focus limits still apply.",
+              "Alla vanliga Windows-appar är tillgängliga. Välj en skärm eller ett fönster för att bifoga en bild. Windows säkerhets- och fokusbegränsningar gäller.",
+            )
+          : t(
+              "Select a window to capture it and attach it to your message. The agent can use applications selected in Settings.",
+              "Välj ett fönster för att ta en bild och bifoga den. AI:n kan använda appar valda i Inställningar.",
+            )}
       </p>
       <button
         className="panel-action"
@@ -93,6 +116,22 @@ export default function DesktopPanel({
           {error}
         </p>
       )}
+      {displays.map((display, index) => (
+        <button
+          className="desktop-window"
+          key={display.displayId}
+          disabled={busy || !capabilities?.viewScreen}
+          onClick={() => void capture(undefined, display.displayId)}
+        >
+          <strong>
+            {t("Monitor", "Skärm")} {index + 1}
+            {display.primary ? t(" · primary", " · huvudskärm") : ""}
+          </strong>
+          <small>
+            {display.width} × {display.height} · ({display.left}, {display.top})
+          </small>
+        </button>
+      ))}
       {windows.map((window) => (
         <button
           key={window.windowId}

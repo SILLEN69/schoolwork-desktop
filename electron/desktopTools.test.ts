@@ -44,12 +44,54 @@ function setup() {
   const tools = new DesktopTools({ request, stop } as unknown as DesktopBridge);
   const ctx = {
     owner: "task",
-    capabilities: capabilitiesSchema.parse({ allowedApps: [window.appId] }),
+    capabilities: capabilitiesSchema.parse({
+      allApps: false,
+      allowedApps: [window.appId],
+    }),
     signal: new AbortController().signal,
   };
   return { tools, ctx, request, stop };
 }
 describe("desktop action boundaries", () => {
+  it("allows every accessible app in all-app mode and honors live revocation", async () => {
+    const { tools, ctx } = setup();
+    const all = {
+      ...ctx,
+      capabilities: { ...ctx.capabilities, allApps: true },
+    };
+    expect((await tools.execute("list_windows", {}, all)).data).toHaveLength(2);
+    await expect(
+      tools.execute("focus_window", { windowId: "456" }, all),
+    ).resolves.toMatchObject({ ok: true });
+    await expect(
+      tools.execute("focus_window", { windowId: "456" }, ctx),
+    ).rejects.toThrow("not selected");
+  });
+  it("passes exact monitor identity to capture/movement and rejects mixed targets", async () => {
+    const { tools, ctx, request } = setup();
+    await tools.execute("capture_screen", { displayId: "DISPLAY2" }, ctx);
+    expect(request).toHaveBeenCalledWith(
+      "capture_screen",
+      { displayId: "DISPLAY2" },
+      ctx.signal,
+    );
+    await tools.execute(
+      "move_window",
+      { windowId: "123", displayId: "DISPLAY2" },
+      ctx,
+    );
+    expect(request).toHaveBeenLastCalledWith(
+      "move_window",
+      expect.objectContaining({ windowId: "123", displayId: "DISPLAY2" }),
+      ctx.signal,
+    );
+    expect(() =>
+      desktopInputs.capture_screen.parse({
+        windowId: "123",
+        displayId: "DISPLAY2",
+      }),
+    ).toThrow("not both");
+  });
   it("registers validated schemas and filters application windows", async () => {
     expect(desktopToolSchemas.map((t) => t.function.name)).toEqual(
       Object.keys(desktopInputs),
@@ -116,7 +158,7 @@ describe("desktop action boundaries", () => {
       ctx,
     );
     const now = Date.now();
-    vi.spyOn(Date, "now").mockReturnValue(now + 31000);
+    vi.spyOn(Date, "now").mockReturnValue(now + 181000);
     await expect(
       tools.execute(
         "type_text",

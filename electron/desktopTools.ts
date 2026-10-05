@@ -21,13 +21,24 @@ export const desktopInputs = {
   list_apps: z.object({}),
   launch_app: z.object({ appId: z.string().min(1).max(4096) }),
   list_windows: z.object({}),
+  list_displays: z.object({}),
+  move_window: z.object({ windowId, displayId: z.string().min(1).max(80) }),
   focus_window: z.object({ windowId }),
   inspect_window: z.object({ windowId }),
-  capture_screen: z.object({ windowId: windowId.optional() }),
+  capture_screen: z
+    .object({
+      windowId: windowId.optional(),
+      displayId: z.string().min(1).max(80).optional(),
+    })
+    .refine(
+      (a) => !(a.windowId && a.displayId),
+      "Choose a window or a display, not both.",
+    ),
   click: z.object({
     ...snapshot,
     ...point,
     button: z.enum(["left", "right"]).default("left"),
+    count: z.number().int().min(1).max(2).default(1),
   }),
   type_text: z.object({ ...snapshot, text: z.string().min(1).max(4000) }),
   key_press: z.object({ ...snapshot, keys: z.string().min(1).max(100) }),
@@ -38,8 +49,12 @@ export const desktopInputs = {
   }),
 };
 const descriptions: Record<string, string> = {
+  list_displays:
+    "List every connected monitor with physical pixel bounds, including negative origins. Use exact displayId for capture or moving a window. Refresh after a monitor change.",
+  move_window:
+    "Move and fit a normal application window into a monitor's work area. Then focus, capture and inspect it again. Does not elevate permissions.",
   list_apps:
-    "List applications selected in Settings. Use these exact appId values to launch.",
+    "List running and configured applications. In all-app mode any accessible absolute .exe path can be launched; use project/shell tools to discover installed paths.",
   launch_app:
     "Launch a selected application. Returns a PID; then list_windows to find its window. Does not prove readiness.",
   list_windows:
@@ -49,9 +64,9 @@ const descriptions: Record<string, string> = {
   inspect_window:
     "Read bounded Windows UI Automation controls. Password fields are omitted. Does not provide pixels.",
   capture_screen:
-    "Capture the primary screen, or a focused selected window. Sends actual pixels to the next model request. Returns screenshotId, image dimensions and window bounds. Window capture is needed before input.",
+    "Capture a monitor using displayId from list_displays (primary by default), or a focused window using windowId. Sends pixels when vision is supported. Window capture is needed before input. Coordinates are image-relative, not global monitor pixels.",
   click:
-    "Click image-relative x/y on a recent window screenshot. One-use screenshotId. Capture again after every action.",
+    "Click image-relative x/y on a recent window screenshot; count=2 double-clicks. One-use screenshotId. Capture again after every action.",
   type_text:
     "Type Unicode into the focused selected window using a recent screenshotId. Never guess focus. Capture again after input.",
   key_press:
@@ -73,7 +88,7 @@ export function desktopToolAvailable(name: string, cap: Capabilities) {
   if (["list_apps", "list_windows"].includes(name))
     return cap.launchApps || cap.viewScreen || cap.controlScreen;
   if (name === "launch_app") return cap.launchApps;
-  if (["capture_screen", "inspect_window"].includes(name))
+  if (["capture_screen", "inspect_window", "list_displays"].includes(name))
     return cap.viewScreen;
   return cap.controlScreen && cap.viewScreen;
 }
@@ -118,6 +133,10 @@ export class DesktopTools {
     this.observations.clear();
     this.bridge.stop();
   }
+  forgetOwner(owner: string) {
+    for (const [id, observation] of this.observations)
+      if (observation.owner === owner) this.observations.delete(id);
+  }
   async windows(signal?: AbortSignal): Promise<DesktopWindow[]> {
     return this.bridge.request("list_windows", {}, signal);
   }
@@ -131,11 +150,24 @@ export class DesktopTools {
     ctx.signal.throwIfAborted();
     if (!desktopToolAvailable(name, cap))
       throw new Error("This desktop capability is disabled in Settings.");
+    if (name === "list_displays")
+      return {
+        ok: true,
+        summary: "Connected monitors (physical pixels).",
+        data: await this.bridge.request(name, {}, ctx.signal),
+      };
     if (name === "list_apps")
       return {
         ok: true,
         summary: "Selected applications.",
-        data: cap.allowedApps.map((appId) => ({
+        data: [
+          ...new Set([
+            ...cap.allowedApps,
+            ...(cap.allApps
+              ? (await this.windows(ctx.signal)).map((w) => w.appId)
+              : []),
+          ]),
+        ].map((appId) => ({
           appId,
           name: path.basename(appId, ".exe"),
         })),
@@ -182,7 +214,7 @@ export class DesktopTools {
       if (
         !observation ||
         observation.owner !== ctx.owner ||
-        Date.now() - observation.createdAt > 30000
+        Date.now() - observation.createdAt > 180000
       )
         throw new Error(
           "Screenshot expired or belongs to another task. Capture a fresh window image.",
@@ -225,7 +257,7 @@ export class DesktopTools {
     if (name === "capture_screen") {
       const capture = await this.bridge.request(
         name,
-        { ...target },
+        { ...target, ...(args.displayId ? { displayId: args.displayId } : {}) },
         ctx.signal,
       );
       const source = nativeImage.createFromBuffer(
@@ -238,7 +270,7 @@ export class DesktopTools {
       const imageSize = image.getSize();
       const screenshotId = crypto.randomUUID();
       for (const [id, old] of this.observations)
-        if (Date.now() - old.createdAt > 30000) this.observations.delete(id);
+        if (Date.now() - old.createdAt > 180000) this.observations.delete(id);
       if (capture.window)
         this.observations.set(screenshotId, {
           owner: ctx.owner,
@@ -258,6 +290,8 @@ export class DesktopTools {
           width: imageSize.width,
           height: imageSize.height,
           window: capture.window,
+          displayId: capture.displayId,
+          capturedAt: Date.now(),
           imageData,
         },
       };
@@ -267,8 +301,14 @@ export class DesktopTools {
       summary:
         name === "focus_window"
           ? "Window focused."
-          : "Window controls observed.",
-      data: await this.bridge.request(name, { ...target }, ctx.signal),
+          : name === "move_window"
+            ? "Window moved. Capture it again before input."
+            : "Window controls observed.",
+      data: await this.bridge.request(
+        name,
+        { ...target, ...(args.displayId ? { displayId: args.displayId } : {}) },
+        ctx.signal,
+      ),
     };
   }
 }

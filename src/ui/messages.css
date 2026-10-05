@@ -307,3 +307,19 @@
     font-size: 12px;
   }
 }
+.telegram-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: 12px 0;
+}
+.telegram-settings input {
+  width: 100%;
+  box-sizing: border-box;
+  border: 1px solid #383b3b;
+  background: #131516;
+  color: #eee;
+  padding: 10px;
+  border-radius: 6px;
+  font: inherit;
+}

@@ -25,9 +25,21 @@ interface Window {
       import("./capabilities").Capabilities | null
     >;
     desktopWindows: () => Promise<import("./capabilities").DesktopWindow[]>;
+    desktopDisplays: () => Promise<import("./capabilities").DesktopDisplay[]>;
+    desktopLessons: () => Promise<any[]>;
+    forgetDesktopLessons: () => Promise<boolean>;
+    telegramConfigure: (input: {
+      token?: string;
+      enabled: boolean;
+    }) => Promise<any>;
+    telegramPair: () => Promise<{ url: string; expiresAt: number }>;
+    telegramStatus: () => Promise<any>;
+    telegramDisconnect: () => Promise<any>;
+    telegramTest: () => Promise<boolean>;
     captureScreen: (input: {
       conversationId: string;
       windowId?: string;
+      displayId?: string;
     }) => Promise<import("./capabilities").Attachment>;
     stopDesktop: () => Promise<import("./capabilities").Capabilities>;
     testVision: (
@@ -49,6 +61,7 @@ interface Window {
     listModels: () => Promise<string[]>;
     listChats: () => Promise<any[]>;
     getChat: (id: string) => Promise<any>;
+    taskStatus: (id: string) => Promise<{ text: string; state: string }>;
     deleteChat: (id: string) => Promise<void>;
     openPath: (p: string) => Promise<void>;
     send: (payload: {

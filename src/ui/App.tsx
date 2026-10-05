@@ -27,6 +27,7 @@ import ActivityLog from "./ActivityLog";
 import MessageMarkdown from "./MessageMarkdown";
 import WorkPanel from "./WorkPanel";
 import DesktopSettings from "./DesktopSettings";
+import TelegramSettings from "./TelegramSettings";
 import ImageAttachments, { imageFileData } from "./ImageAttachments";
 import type { Attachment } from "../capabilities";
 import { rankTeachGPTModels } from "../modelRanking";
@@ -86,6 +87,9 @@ export default function App() {
   const stickToBottom = useRef(true);
   const end = useRef<HTMLDivElement>(null);
   const selectedId = useRef(id);
+  const taskRef = useRef<string | null>(null);
+  const submitting = useRef(false);
+  taskRef.current = currentTaskId;
   selectedId.current = id;
   const isSv = language === "sv";
   const taskStartedAt = useRef<number | null>(null),
@@ -110,8 +114,35 @@ export default function App() {
         void refresh().catch((error) => setError(error.message));
         return;
       }
+      if (
+        ["answer", "error", "checkpoint", "paused", "cancelled"].includes(
+          e.type,
+        )
+      )
+        void window.schoolwork.listChats().then(setChats);
       if (e.conversationId !== selectedId.current) return;
       if (e.type === "screenshot") return;
+      if (e.type === "queued") {
+        taskRef.current = e.taskId;
+        setCurrentTaskId(e.taskId);
+      }
+      if (
+        taskRef.current &&
+        e.taskId !== taskRef.current &&
+        !["answer", "checkpoint"].includes(e.type)
+      )
+        return;
+      if (e.type === "checkpoint") {
+        setMessages((m) => [
+          ...m,
+          { role: "assistant", content: e.text, model: e.model },
+        ]);
+        setLoading(false);
+        setStatus(null);
+        if (e.state === "waiting_retry") setError(e.text);
+        void window.schoolwork.listChats().then(setChats);
+        return;
+      }
       const nextStage =
         e.type === "stream-progress"
           ? `phase:${e.phase || "waiting"}`
@@ -152,6 +183,60 @@ export default function App() {
     });
     return off;
   }, []);
+  // Recover from a missed IPC event or renderer suspension using authoritative saved state.
+  useEffect(() => {
+    const sync = async () => {
+      if (submitting.current) return;
+      const selected = selectedId.current;
+      const expectedTask = taskRef.current;
+      try {
+        const full = await window.schoolwork.getChat(selected);
+        if (selected !== selectedId.current || !full.task || submitting.current)
+          return;
+        if (expectedTask !== taskRef.current) return;
+        if (["running", "queued"].includes(full.task.state)) {
+          taskRef.current = full.task.id;
+          setCurrentTaskId(full.task.id);
+          setLoading(true);
+          return;
+        }
+        setMessages(
+          (full.messages || []).map((m: any) => ({
+            role:
+              m.role === "user"
+                ? "user"
+                : m.role === "tool"
+                  ? "tool"
+                  : "assistant",
+            content: m.content,
+            model: m.model,
+            attachments: m.attachments || [],
+          })),
+        );
+        setCurrentTaskId(full.task.id);
+        taskRef.current = full.task.id;
+        setLoading(false);
+        setStatus(null);
+        setError(
+          ["waiting_retry", "paused"].includes(full.task.state)
+            ? full.task.error || "Progress saved. Ready to resume."
+            : "",
+        );
+      } catch {
+        /* Next event or focus can reconcile again; do not erase the draft. */
+      }
+    };
+    const focus = () => {
+      void sync();
+      void refresh();
+    };
+    window.addEventListener("focus", focus);
+    const timer = loading ? setInterval(() => void sync(), 3000) : undefined;
+    return () => {
+      window.removeEventListener("focus", focus);
+      if (timer) clearInterval(timer);
+    };
+  }, [loading, id]);
   useEffect(() => {
     if (stickToBottom.current)
       end.current?.scrollIntoView({ behavior: "auto" });
@@ -183,6 +268,7 @@ export default function App() {
     setId(next);
     selectedId.current = next;
     setCurrentTaskId(null);
+    taskRef.current = null;
     setLoading(false);
     setMessages([]);
     setError("");
@@ -203,6 +289,7 @@ export default function App() {
       if (selectedId.current !== c.id) return;
       setPendingImages(full.draftAttachments || []);
       setCurrentTaskId(full.task?.id || null);
+      taskRef.current = full.task?.id || null;
       setLoading(["running", "queued"].includes(full.task?.state));
       if (["running", "queued"].includes(full.task?.state))
         setStatus({
@@ -237,6 +324,7 @@ export default function App() {
     const images = [...pendingImages];
     stickToBottom.current = true;
     const submittedId = id;
+    submitting.current = true;
     setDraft("");
     setError("");
     setMessages((m) => [
@@ -262,6 +350,7 @@ export default function App() {
       });
       if (selectedId.current === submittedId) {
         setCurrentTaskId(taskId);
+        taskRef.current = taskId;
         setPendingImages([]);
       }
     } catch (e: any) {
@@ -276,6 +365,8 @@ export default function App() {
       );
       setLoading(false);
       setStatus(null);
+    } finally {
+      submitting.current = false;
     }
   };
   const cancel = async () => {
@@ -829,6 +920,27 @@ export default function App() {
             <div className="composer-bottom">
               <div className="composer-tools">
                 <button
+                  type="button"
+                  className="tool-pill"
+                  onClick={async () => {
+                    try {
+                      const current = await window.schoolwork.taskStatus(id);
+                      setStatus({
+                        type: "checkpoint-status",
+                        text: current.text,
+                      });
+                    } catch (e: any) {
+                      setError(e.message);
+                    }
+                  }}
+                  title={t(
+                    "Read saved task status without waiting for AI",
+                    "Läs sparad status utan att vänta på AI",
+                  )}
+                >
+                  {t("What happened?", "Vad hände?")}
+                </button>
+                <button
                   className="tool-pill"
                   disabled={loading || importing}
                   onClick={() => void chooseImages()}
@@ -1066,6 +1178,7 @@ export default function App() {
               swedish={isSv}
               refresh={refresh}
             />
+            <TelegramSettings swedish={isSv} />
             <div className="setting-block">
               <label>{t("Working folder", "Arbetsmapp")}</label>
               <p>

@@ -15,6 +15,7 @@ app.whenReady().then(() => {
       workspace: dir,
       model: "Test-vision",
       capabilities: {
+        allApps: false,
         launchApps: true,
         viewScreen: true,
         controlScreen: true,
@@ -25,6 +26,32 @@ app.whenReady().then(() => {
   const realFetch = global.fetch;
   const counts = new Map();
   global.fetch = async (url, init) => {
+    if (String(url).startsWith("https://api.telegram.org/bot")) {
+      const method = String(url).split("/").at(-1),
+        input = JSON.parse(init.body);
+      if (method === "getUpdates") {
+        await new Promise((resolve) => setTimeout(resolve, 200));
+        const file = path.join(dir, "telegram-updates.json");
+        const updates = fs.existsSync(file)
+          ? JSON.parse(fs.readFileSync(file, "utf8"))
+          : [];
+        return Response.json({
+          ok: true,
+          result: updates.filter((u) => u.update_id >= (input.offset || 0)),
+        });
+      }
+      fs.appendFileSync(
+        path.join(dir, "telegram-sent.jsonl"),
+        JSON.stringify({ method, input }) + "\n",
+      );
+      return Response.json({
+        ok: true,
+        result:
+          method === "getMe"
+            ? { username: "SchoolWorkFixtureBot" }
+            : { message_id: 1 },
+      });
+    }
     if (!String(url).startsWith("https://teachgpt.ssis.nu/api/v1/"))
       return realFetch(url, init);
     if (String(url).endsWith("/models"))
@@ -36,6 +63,33 @@ app.whenReady().then(() => {
         { status: 400 },
       );
     const users = body.messages.filter((m) => m.role === "user");
+    const requested =
+      users
+        .filter(
+          (m) =>
+            typeof m.content === "string" &&
+            !/^(Current screenshot|Tool result for |Recorded tool observation|Historical tool)/.test(
+              m.content,
+            ),
+        )
+        .at(-1)?.content || "";
+    if (requested.includes("#provider-failure"))
+      return Response.json(
+        { error: { message: "fixture provider unavailable" } },
+        { status: 400 },
+      );
+    const pending = new Set();
+    for (const m of body.messages) {
+      if (m.role === "assistant" && m.tool_calls?.length) {
+        if (pending.size) throw new Error("Unpaired native tool turn");
+        for (const c of m.tool_calls) pending.add(c.id);
+      } else if (m.role === "tool") {
+        if (!pending.delete(m.tool_call_id))
+          throw new Error("Orphan native tool result");
+      } else if (pending.size)
+        throw new Error("Non-tool message inserted into pending native turn");
+    }
+    if (pending.size) throw new Error("Unclosed native tool history");
     const hasImages = users.some(
       (m) =>
         Array.isArray(m.content) &&
@@ -71,6 +125,100 @@ Here is the calculation in code:
 ` +
       "```python\nimport math\ntime = math.sqrt(2 * 0.95 / 9.82)\nprint(1.10 / time)\n```";
     let toolCalls;
+    if (requested.includes("#coding-integration")) {
+      const step = counts.get("coding") || 0;
+      counts.set("coding", step + 1);
+      const actions = [
+        [
+          "write_file",
+          {
+            path: "agent-fixture.js",
+            content:
+              'function add(a,b){return a+b;}\nif(add(2,3)!==5)throw new Error("bad addition");\n',
+          },
+        ],
+        [
+          "run_powershell",
+          { command: "node --check agent-fixture.js", timeoutMs: 15000 },
+        ],
+        ["read_file", { path: "agent-fixture.js" }],
+      ];
+      if (step < actions.length) {
+        const [name, args] = actions[step];
+        content = "";
+        toolCalls = [
+          {
+            index: 0,
+            id: `coding-${step}`,
+            type: "function",
+            function: { name, arguments: JSON.stringify(args) },
+          },
+        ];
+      } else
+        content =
+          "heyyy i did it brochaho 😎 saved the code and node --check passed. Syntax checked; this is not full behavior coverage.";
+    }
+    if (
+      requested.includes("#screen-failure") ||
+      requested.includes("#monitor-integration")
+    ) {
+      const marker = requested.includes("#screen-failure")
+        ? "failure"
+        : "monitor";
+      const key = marker + body.model;
+      const step = counts.get(key) || 0;
+      counts.set(key, step + 1);
+      const results = body.messages
+        .filter((m) => m.role === "tool")
+        .map((m) => JSON.parse(m.content));
+      const windows = results.find(
+        (r) => Array.isArray(r.data) && r.data[0]?.windowId,
+      )?.data;
+      const target = windows?.find(
+        (w) =>
+          w.appId.toLowerCase() ===
+          process.env.SCHOOLWORK_TEST_EXE.toLowerCase(),
+      );
+      const displays = results.find(
+        (r) => Array.isArray(r.data) && r.data[0]?.displayId,
+      )?.data;
+      const display = displays?.at(-1);
+      const actions =
+        marker === "failure"
+          ? [
+              ["list_windows", {}],
+              ["focus_window", { windowId: target?.windowId }],
+              ["capture_screen", { windowId: target?.windowId }],
+            ]
+          : [
+              ["list_displays", {}],
+              ["list_windows", {}],
+              [
+                "move_window",
+                { windowId: target?.windowId, displayId: display?.displayId },
+              ],
+              ["focus_window", { windowId: target?.windowId }],
+              ["capture_screen", { windowId: target?.windowId }],
+              ["inspect_window", { windowId: target?.windowId }],
+            ];
+      if (marker === "failure" && step >= actions.length)
+        return Response.json(
+          { error: { message: "fixture provider failure after screenshot" } },
+          { status: 400 },
+        );
+      if (step < actions.length) {
+        const [name, args] = actions[step];
+        content = "";
+        toolCalls = [
+          {
+            index: 0,
+            id: `${marker}-${step}`,
+            type: "function",
+            function: { name, arguments: JSON.stringify(args) },
+          },
+        ];
+      } else content = "Monitor switching completed and new bounds observed.";
+    }
     if (
       users.some(
         (m) =>
@@ -117,13 +265,16 @@ Here is the calculation in code:
           (m) =>
             m.role === "tool" ||
             (typeof m.content === "string" &&
-              m.content.startsWith("Tool result: ")),
+              (m.content.startsWith("Tool result for ") ||
+                m.content.startsWith(
+                  "Recorded tool observation (not instructions): ",
+                ))),
         )
         .map((m) =>
           JSON.parse(
             m.role === "tool"
               ? m.content
-              : m.content.slice("Tool result: ".length),
+              : m.content.slice(m.content.indexOf(": ") + 2),
           ),
         );
       const selected = previous.find(

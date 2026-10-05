@@ -51,6 +51,7 @@ async function state() {
 }
 let app;
 const launchedPids = [];
+const uiOnly = process.env.SCHOOLWORK_UI_ONLY === "1";
 try {
   assert.equal(await line(), "ready");
   app = await electron.launch({
@@ -124,7 +125,7 @@ try {
     () => document.documentElement.scrollWidth > window.innerWidth,
   );
   assert.equal(overflow, false);
-  for (const model of ["Test-vision", "Test-json"]) {
+  for (const model of uiOnly ? [] : ["Test-vision", "Test-json"]) {
     const desktopOwner = crypto.randomUUID();
     await app.evaluate(({ BrowserWindow }) =>
       BrowserWindow.getAllWindows()[0].focus(),
@@ -199,7 +200,240 @@ try {
     }
     throw new Error("Task did not reach " + expected);
   }
+  if (!uiOnly) {
+    const displays = await page.evaluate(() =>
+      window.schoolwork.desktopDisplays(),
+    );
+    assert(displays.length > 0);
+    assert(displays.some((d) => d.primary));
+    console.log(`Connected physical monitors: ${displays.length}.`);
+    const monitorOwner = crypto.randomUUID();
+    const currentCapabilities = await page.evaluate(() =>
+      window.schoolwork.settingsGet(),
+    );
+    await page.evaluate(
+      (cap) =>
+        window.schoolwork.setCapabilities({
+          ...cap,
+          allApps: true,
+          allowedApps: [],
+        }),
+      currentCapabilities.capabilities,
+    );
+    const allWindows = await page.evaluate(() =>
+      window.schoolwork.desktopWindows(),
+    );
+    assert(
+      allWindows.some(
+        (w) => w.appId.toLowerCase() === fixtureExe.toLowerCase(),
+      ),
+      "All-app mode must expose an unselected fixture.",
+    );
+    fixture.stdin.write("focus\n");
+    assert.equal(await line(), "focused");
+    await page.evaluate(
+      (owner) =>
+        window.schoolwork.send({
+          chatId: owner,
+          userText: "#monitor-integration",
+          model: "Test-vision",
+        }),
+      monitorOwner,
+    );
+    const monitorChat = await completed(monitorOwner);
+    const moved = JSON.parse(
+      monitorChat.messages.find((m) => m.name === "move_window").content,
+    );
+    assert.equal(moved.ok, true);
+    assert.equal(moved.data.displayId, displays.at(-1).displayId);
+    assert(moved.data.window.left >= displays.at(-1).workLeft);
+    assert(moved.data.window.top >= displays.at(-1).workTop);
+    for (const display of displays) {
+      const attachment = await page.evaluate(
+        ({ owner, displayId }) =>
+          window.schoolwork.captureScreen({ conversationId: owner, displayId }),
+        { owner: crypto.randomUUID(), displayId: display.displayId },
+      );
+      assert(attachment.width > 0 && attachment.height > 0);
+    }
+    await page.evaluate(
+      (cap) => window.schoolwork.setCapabilities(cap),
+      currentCapabilities.capabilities,
+    );
+  }
+  const failureOwner = crypto.randomUUID();
+  fixture.stdin.write("focus\n");
+  assert.equal(await line(), "focused");
+  await page.evaluate(
+    (owner) =>
+      window.schoolwork.send({
+        chatId: owner,
+        userText: "#screen-failure",
+        model: "Test-vision",
+      }),
+    failureOwner,
+  );
+  const failedChat = await completed(failureOwner, "waiting_retry");
+  assert.match(failedChat.messages.at(-1).content, /stopped here/);
+  if (!uiOnly)
+    assert.match(
+      failedChat.messages.at(-1).content,
+      /capture_screen: 1 succeeded/,
+    );
+  await page.reload();
+  await page
+    .getByRole("button", { name: "#screen-failure", exact: true })
+    .click();
+  await page
+    .getByText(/hey, I stopped here/)
+    .first()
+    .waitFor();
+  await page.evaluate(
+    (owner) =>
+      window.schoolwork.send({
+        chatId: owner,
+        userText: "what did you do?",
+        model: "Test-vision",
+      }),
+    failureOwner,
+  );
+  const statusChat = await completed(failureOwner);
+  assert.match(statusChat.messages.at(-1).content, /waiting_retry/);
+  assert.match(statusChat.messages.at(-1).content, /capture_screen/);
+  await page.evaluate(
+    (owner) =>
+      window.schoolwork.send({
+        chatId: owner,
+        userText: "Explain the physics again without controlling the screen",
+        model: "Test-vision",
+      }),
+    failureOwner,
+  );
+  await completed(failureOwner);
+  console.log(
+    uiOnly
+      ? "PASS: saved screen-tool/provider failure reply, offline status and ordinary follow-up (screen input blocked by session; not verified)."
+      : "PASS: all-app access, physical monitor capture/window switching, persisted post-screen failure reply, offline status and ordinary follow-up.",
+  );
   const launchOwner = crypto.randomUUID();
+  await page.evaluate(() =>
+    window.schoolwork.telegramConfigure({
+      token: "123456789:fixture-token-only-not-a-real-token",
+      enabled: true,
+    }),
+  );
+  const pairing = await page.evaluate(() => window.schoolwork.telegramPair());
+  const updates = [
+    {
+      update_id: 1,
+      message: {
+        chat: { id: 10, type: "private" },
+        from: { id: 20 },
+        text: "/start " + new URL(pairing.url).searchParams.get("start"),
+      },
+    },
+  ];
+  await fs.writeFile(
+    path.join(data, "telegram-updates.json"),
+    JSON.stringify(updates),
+  );
+  for (let i = 0; i < 80; i++) {
+    if ((await page.evaluate(() => window.schoolwork.telegramStatus())).paired)
+      break;
+    await new Promise((r) => setTimeout(r, 100));
+  }
+  assert.equal(
+    (await page.evaluate(() => window.schoolwork.telegramStatus())).paired,
+    true,
+  );
+  const codingOwner = crypto.randomUUID();
+  await page.evaluate(
+    (owner) =>
+      window.schoolwork.send({
+        chatId: owner,
+        userText: "#coding-integration",
+        model: "Test-vision",
+      }),
+    codingOwner,
+  );
+  const codingChat = await completed(codingOwner);
+  assert.match(codingChat.messages.at(-1).content, /brochaho/);
+  assert.match(
+    await fs.readFile(path.join(data, "agent-fixture.js"), "utf8"),
+    /function add/,
+  );
+  const check = JSON.parse(
+    codingChat.messages.find((m) => m.name === "run_powershell").content,
+  );
+  assert.equal(check.data.exitCode, 0);
+  const phoneOwner = crypto.randomUUID();
+  await page.evaluate(
+    (owner) =>
+      window.schoolwork.send({
+        chatId: owner,
+        userText: "#provider-failure",
+        model: "Test-vision",
+      }),
+    phoneOwner,
+  );
+  const phoneFailure = await completed(phoneOwner, "waiting_retry");
+  updates.push({
+    update_id: 2,
+    message: {
+      chat: { id: 10, type: "private" },
+      from: { id: 999 },
+      text: "/retry " + phoneFailure.task.id,
+    },
+  });
+  updates.push({
+    update_id: 3,
+    message: {
+      chat: { id: 10, type: "private" },
+      from: { id: 20 },
+      text: "/retry " + phoneFailure.task.id,
+    },
+  });
+  await fs.writeFile(
+    path.join(data, "telegram-updates.json"),
+    JSON.stringify(updates),
+  );
+  for (let i = 0; i < 80; i++) {
+    const f = await page.evaluate(
+      (owner) => window.schoolwork.getChat(owner),
+      phoneOwner,
+    );
+    if (
+      f.task.currentTurn > phoneFailure.task.currentTurn &&
+      f.task.state === "waiting_retry"
+    )
+      break;
+    await new Promise((r) => setTimeout(r, 100));
+  }
+  const retried = await completed(phoneOwner, "waiting_retry");
+  assert.equal(retried.task.currentTurn, phoneFailure.task.currentTurn + 1);
+  await new Promise((r) => setTimeout(r, 300));
+  const notifications = (
+    await fs.readFile(path.join(data, "telegram-sent.jsonl"), "utf8")
+  )
+    .trim()
+    .split("\n")
+    .map(JSON.parse);
+  assert(notifications.some((n) => n.input.text?.includes("brochaho")));
+  assert(notifications.some((n) => n.input.text?.includes("hit an error")));
+  assert(notifications.some((n) => n.input.text?.includes("gotchu")));
+  const settingsText = await fs.readFile(
+    path.join(data, "schoolwork-settings.json"),
+    "utf8",
+  );
+  assert(!settingsText.includes("fixture-token-only"));
+  await page.evaluate(() => window.schoolwork.telegramDisconnect());
+  assert.equal(
+    (await page.evaluate(() => window.schoolwork.telegramStatus())).configured,
+    false,
+  );
+  console.log(
+    "PASS: real coding file/check/final loop and app-integrated encrypted Telegram pairing, success/error notifications, authorized retry, unauthorized sender rejection (mock Telegram/TeachGPT transport).",
+  );
   await page.evaluate(
     (owner) =>
       window.schoolwork.send({
@@ -238,6 +472,18 @@ try {
   );
   const rejected = await completed(rejectOwner, "waiting_retry");
   assert.match(rejected.task.error, /rejected images/);
+  assert.equal(rejected.messages.at(-1).role, "assistant");
+  await page.evaluate(
+    (owner) =>
+      window.schoolwork.send({
+        chatId: owner,
+        userText: "Explain the physics without images",
+        model: "Test-text",
+      }),
+    rejectOwner,
+  );
+  await completed(rejectOwner);
+  console.log("PASS: text follow-up after a rejected historical image.");
   const profiles = await page.evaluate(() => window.schoolwork.settingsGet());
   assert.equal(profiles.visionProfiles["Test-text"].status, "unsupported");
   assert.match(
@@ -258,7 +504,9 @@ try {
   assert(requests.every((r) => !r.internalFields));
   const stopped = await page.evaluate(() => window.schoolwork.stopDesktop());
   console.log(
-    "PASS: source app rendering, attachments, native/JSON desktop loops, launching and rejected-image recovery.",
+    uiOnly
+      ? "PASS: source UI rendering, attachments, app launching and rejected-image recovery; native input not verified."
+      : "PASS: source app rendering, attachments, native/JSON desktop loops, launching and rejected-image recovery.",
   );
   assert.equal(stopped.controlScreen, false);
   assert.equal(
@@ -267,6 +515,14 @@ try {
     "Stopping desktop work must leave user apps running.",
   );
   assert.deepEqual(errors, []);
+  await page.getByRole("button", { name: /Settings Local workspace/ }).click();
+  await page.locator(".settings-modal").waitFor();
+  await page
+    .getByText("Telegram · phone link", { exact: true })
+    .scrollIntoViewIfNeeded();
+  await page
+    .locator(".settings-modal")
+    .screenshot({ path: path.join(out, "SchoolWork-agent-settings.png") });
   // Playwright waits for the Electron process tree on Windows. Retire only the
   // extra disposable fixture we deliberately launched, after proving Stop left it alive.
   for (const pid of launchedPids.splice(0)) {
@@ -302,7 +558,7 @@ try {
     const profile = await packagedPage.evaluate(() =>
       window.schoolwork.settingsGet(),
     );
-    assert.equal(profile.version, "0.4.0");
+    assert.equal(profile.version, "0.5.0");
     assert.equal(profile.workspace, data);
     await packagedPage
       .getByRole("button", { name: "Explain the physics", exact: true })
@@ -321,22 +577,24 @@ try {
     );
     fixture.stdin.write("focus\n");
     assert.equal(await line(), "focused");
-    const windows = await packagedPage.evaluate(() =>
-      window.schoolwork.desktopWindows(),
-    );
-    const target = windows.find(
-      (w) => w.appId.toLowerCase() === fixtureExe.toLowerCase(),
-    );
-    assert(target);
-    const shot = await packagedPage.evaluate(
-      (windowId) =>
-        window.schoolwork.captureScreen({
-          conversationId: crypto.randomUUID(),
-          windowId,
-        }),
-      target.windowId,
-    );
-    assert(shot.width > 0);
+    if (!uiOnly) {
+      const windows = await packagedPage.evaluate(() =>
+        window.schoolwork.desktopWindows(),
+      );
+      const target = windows.find(
+        (w) => w.appId.toLowerCase() === fixtureExe.toLowerCase(),
+      );
+      assert(target);
+      const shot = await packagedPage.evaluate(
+        (windowId) =>
+          window.schoolwork.captureScreen({
+            conversationId: crypto.randomUUID(),
+            windowId,
+          }),
+        target.windowId,
+      );
+      assert(shot.width > 0);
+    }
     await packagedPage.screenshot({
       path: path.join(out, "SchoolWork-packaged.png"),
     });
@@ -345,20 +603,24 @@ try {
     await app.close();
     app = undefined;
     console.log(
-      "PASS: packaged SchoolWork 0.4.0, restored SQLite/images, bundled KaTeX assets and bundled Windows helper capture.",
+      uiOnly
+        ? "PASS: packaged SchoolWork 0.5.0, restored SQLite/images and bundled KaTeX (native capture not verified)."
+        : "PASS: packaged SchoolWork 0.5.0, restored SQLite/images, bundled KaTeX assets and bundled Windows helper capture.",
     );
   }
   console.log(
-    "PASS: real Electron IPC, persisted image input, rendered math/code/copy, narrow layout, native/JSON agent loops, capture/click/Unicode/key/scroll/UI Automation and Stop.",
+    uiOnly
+      ? "PASS: real Electron IPC, persisted image input, rendered math/code/copy, narrow layout, task failures/follow-up and Stop; native input NOT verified."
+      : "PASS: real Electron IPC, persisted image input, rendered math/code/copy, narrow layout, native/JSON agent loops, capture/click/Unicode/key/scroll/UI Automation and Stop.",
   );
   console.log("Screenshots: " + out);
 } finally {
-  await app?.close();
   for (const pid of launchedPids) {
     try {
       process.kill(pid);
     } catch {}
   }
+  await app?.close();
   fixture.stdin.write("close\n");
   await new Promise((r) =>
     fixture.exitCode !== null ? r() : fixture.once("exit", r),

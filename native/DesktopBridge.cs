@@ -31,6 +31,7 @@ static class DesktopBridge {
     [DllImport("user32.dll")] static extern IntPtr GetForegroundWindow();
     [DllImport("user32.dll")] static extern bool SetForegroundWindow(IntPtr h);
     [DllImport("user32.dll")] static extern bool ShowWindow(IntPtr h, int command);
+    [DllImport("user32.dll")] static extern bool SetWindowPos(IntPtr h, IntPtr after, int x, int y, int width, int height, uint flags);
     [DllImport("user32.dll")] static extern uint SendInput(uint n, Input[] input, int size);
     [DllImport("user32.dll")] static extern bool SetCursorPos(int x, int y);
     [DllImport("user32.dll")] static extern bool GetCursorPos(out CursorPoint p);
@@ -49,7 +50,7 @@ static class DesktopBridge {
     static void CheckDesktop() {
         IntPtr desktop = OpenInputDesktop(0, false, 1);
         if (desktop == IntPtr.Zero) throw new Exception("Desktop is locked or a secure UAC desktop is active. Unlock Windows first.");
-        try { var name=new StringBuilder(256); int needed; if (!GetUserObjectInformation(desktop,2,name,512,out needed) || name.ToString()!="Default") throw new Exception("The interactive desktop is unavailable."); }
+        try { var name=new StringBuilder(256); int needed; if (!GetUserObjectInformation(desktop,2,name,512,out needed) || name.ToString()!="Default") throw new Exception("Interactive desktop unavailable: unlock Windows or dismiss the screen saver; secure/UAC desktops cannot be controlled."); }
         finally { CloseDesktop(desktop); }
     }
     static Dictionary<string, object> WindowInfo(IntPtr h) {
@@ -93,15 +94,27 @@ static class DesktopBridge {
     }
     static object Dispatch(Dictionary<string,object> a) {
         CheckDesktop(); string action=Str(a,"action");
+        if (action=="list_displays") {
+            var displays=new List<object>(); foreach(var display in Screen.AllScreens) { var b=display.Bounds; var w=display.WorkingArea; displays.Add(Obj("displayId",display.DeviceName,"primary",display.Primary,"left",b.Left,"top",b.Top,"width",b.Width,"height",b.Height,"workLeft",w.Left,"workTop",w.Top,"workWidth",w.Width,"workHeight",w.Height)); } return displays;
+        }
         if (action=="list_windows") {
             var windows=new List<object>(); EnumWindows(delegate(IntPtr h,IntPtr p) { try { if (IsWindowVisible(h)) { var w=WindowInfo(h); if ((string)w["title"]!="") windows.Add(w); } } catch { } return windows.Count<200; },IntPtr.Zero); return windows;
         }
         if (action=="capture_screen" && !a.ContainsKey("windowId")) {
-            var r=Screen.PrimaryScreen.Bounds; return Capture(r, null);
+            Screen display=Screen.PrimaryScreen;
+            if(a.ContainsKey("displayId")) { display=null; foreach(var candidate in Screen.AllScreens) if(candidate.DeviceName==Str(a,"displayId")) display=candidate; if(display==null) throw new Exception("Monitor disconnected. List displays again."); }
+            var result=(Dictionary<string,object>)Capture(display.Bounds, null); result["displayId"]=display.DeviceName; return result;
         }
         IntPtr target=Target(a,false);
         if (action=="focus_window") { if (IsIconic(target)) ShowWindow(target,9); SetForegroundWindow(target); Thread.Sleep(150); if (GetForegroundWindow()!=target) throw new Exception("Windows refused foreground focus. Select the app manually and retry."); return WindowInfo(target); }
         if (action=="inspect_window") return Obj("window",WindowInfo(target),"controls",Controls(target));
+        if (action=="move_window") {
+            Screen display=null; foreach(var candidate in Screen.AllScreens) if(candidate.DeviceName==Str(a,"displayId")) display=candidate;
+            if(display==null) throw new Exception("Monitor disconnected. List displays again.");
+            ShowWindow(target,9); var area=display.WorkingArea; var info=WindowInfo(target);
+            if(!SetWindowPos(target,IntPtr.Zero,area.Left,area.Top,Math.Min(Num(info,"width"),area.Width),Math.Min(Num(info,"height"),area.Height),0x14)) throw new Exception("Windows refused window movement (possibly elevated).");
+            Thread.Sleep(150); return Obj("window",WindowInfo(target),"displayId",display.DeviceName);
+        }
         target=Target(a,true);
         if (action=="capture_screen") { var w=WindowInfo(target); return Capture(new Rectangle(Num(w,"left"),Num(w,"top"),Num(w,"width"),Num(w,"height")),w); }
         Unmodified();
@@ -111,7 +124,7 @@ static class DesktopBridge {
             if (!SetCursorPos(x,y)) throw new Exception("Pointer movement failed.");
             CursorPoint p; GetCursorPos(out p); if (GetAncestor(WindowFromPoint(p),2)!=target) throw new Exception("Point is covered by another window. Capture again.");
             if(action=="scroll") { int amount=Num(a,"amount"); if (Math.Abs(amount)>2400) throw new Exception("Scroll amount is too large."); Send(MouseEvent(0x0800,unchecked((uint)amount))); }
-            else { string button=Str(a,"button","left"); uint down=button=="right"?8u:2u; Send(MouseEvent(down),MouseEvent(down*2)); }
+            else { string button=Str(a,"button","left"); uint down=button=="right"?8u:2u; int count=Num(a,"count",1); if(count<1 || count>2) throw new Exception("Invalid click count."); for(int i=0;i<count;i++) { Target(a,true); Send(MouseEvent(down),MouseEvent(down*2)); if(i+1<count) Thread.Sleep(60); } }
         } else if(action=="type_text") {
             string text=Str(a,"text"); if(text.Length>4000) throw new Exception("Text is too long.");
             text=text.Replace("\r\n","\n").Replace("\r","\n");

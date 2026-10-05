@@ -7,14 +7,51 @@ import "./ui/messages.css";
 if (!window.schoolwork) {
   const key = "schoolwork-preview-chats";
   window.schoolwork = {
-    chooseImages: async () => { throw new Error('Image attachments require the desktop app.'); },
-    importImage: async () => { throw new Error('Image attachments require the desktop app.'); },
-    readImage: async () => '', removeImage: async () => {},
-    setCapabilities: async () => { throw new Error('Desktop control requires the Windows app.'); },
-    desktopApps: async () => [], chooseApplication: async () => null,
-    desktopWindows: async () => [], captureScreen: async () => { throw new Error('Screen capture requires the Windows app.'); },
-    stopDesktop: async () => ({ launchApps: false, viewScreen: false, controlScreen: false, allowedApps: [] }),
-    testVision: async () => ({ status: 'unknown', checkedAt: Date.now(), detail: 'Use the Windows app to test TeachGPT vision.' }),
+    chooseImages: async () => {
+      throw new Error("Image attachments require the desktop app.");
+    },
+    importImage: async () => {
+      throw new Error("Image attachments require the desktop app.");
+    },
+    readImage: async () => "",
+    removeImage: async () => {},
+    setCapabilities: async () => {
+      throw new Error("Desktop control requires the Windows app.");
+    },
+    desktopApps: async () => [],
+    chooseApplication: async () => null,
+    desktopWindows: async () => [],
+    captureScreen: async () => {
+      throw new Error("Screen capture requires the Windows app.");
+    },
+    desktopDisplays: async () => [],
+    desktopLessons: async () => [],
+    forgetDesktopLessons: async () => true,
+    telegramStatus: async () => ({
+      configured: false,
+      enabled: false,
+      paired: false,
+    }),
+    telegramConfigure: async () => {
+      throw new Error("Telegram requires the Windows app.");
+    },
+    telegramPair: async () => {
+      throw new Error("Telegram requires the Windows app.");
+    },
+    telegramDisconnect: async () => ({}),
+    telegramTest: async () => false,
+    stopDesktop: async () => ({
+      allApps: false,
+      launchApps: false,
+      viewScreen: false,
+      controlScreen: false,
+      allowedApps: [],
+    }),
+    testVision: async () => ({
+      status: "unknown",
+      checkedAt: Date.now(),
+      detail: "Use the Windows app to test TeachGPT vision.",
+    }),
     setFileAccess: async () => {
       throw new Error("Open the desktop application to change file access.");
     },
@@ -25,6 +62,10 @@ if (!window.schoolwork) {
       window.open(url, "_blank", "noopener,noreferrer");
     },
     getActivity: async () => [],
+    taskStatus: async () => ({
+      state: "idle",
+      text: "Task status is available in the desktop app.",
+    }),
     settingsGet: async () => ({
       model: "Qwen3.8-27B",
       workspace: "Browser preview · desktop bridge unavailable",
