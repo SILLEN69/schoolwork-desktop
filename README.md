@@ -34,6 +34,8 @@ npm run package:win
 
 The installer and portable executable are written to `release/`.
 
+For an isolated test profile, launch with `--user-data-dir=<existing absolute directory>`; the default SchoolWork profile is not changed. After packaging, run the desktop test with `SCHOOLWORK_TEST_PACKAGED=1` to additionally verify the packaged executable and bundled native helper.
+
 ## Current features
 
 - Chat and multi-step tasks using TeachGPT models.
@@ -47,6 +49,33 @@ The installer and portable executable are written to `release/`.
 - Local SQLite conversation/task storage and an Obsidian-compatible Markdown memory vault.
 - Pause, cancel, and retry/resume controls, persistent project plans, and completion checks tied to real test commands.
 - Swedish and English interface.
+- Rendered LaTeX maths, syntax-highlighted fenced code with Copy, tables and clearer message spacing.
+- PNG/JPEG image attachments: file picker, paste/drop, thumbnail previews and saved conversation images.
+- Selected Windows applications: launch, list/focus/inspect windows, capture screenshots, mouse clicks, Unicode typing, shortcuts and scrolling.
+- A Desktop panel and immediate Stop control (`Ctrl+Alt+Escape`). No per-action confirmation dialogs.
+
+## Applications, screen and images
+
+In Settings, select the executables the desktop tools may use and enable app launching, screen viewing and input control. Add an executable with **Add application**, or select an already running application. Windows' modern packaged applications may use a different executable than their launcher; select the running executable in that case. Existing tasks retain their original capability snapshot; turning a capability off revokes it immediately. Start a new task to expand access.
+
+Ask the agent to use an application normally. Each input requires a fresh, one-use window screenshot; moving the window, switching focus, revoking access or stopping the task invalidates input. Windows may refuse foreground focus; manually activate the window if that happens. The helper stays unelevated: it cannot control secure/UAC/locked desktops or reliably inject input into elevated applications. Visible screen capture may include occluding windows and protected video may appear black. This is point-in-time capture, not continuous recording.
+
+Attach PNG/JPEG images with the composer, clipboard or drop. Limits: 10 MB original, 32 megapixels, six images and 8 MB normalized images per message. Images are resized to a maximum 1600-pixel side and re-encoded locally as PNG. Saved images stay in the app's user-data attachment directory until conversation deletion; unsent images expire after 24 hours at next startup. Tool screenshots are ephemeral and are not written into memory or diagnostic logs. Capture buttons create normal persistent attachments; **sending** them uploads them to TeachGPT. A screenshot requested by the agent is sent to TeachGPT at its next step. Do not use these features with secrets visible on screen.
+
+Image reasoning requires a vision-capable model on your school's TeachGPT endpoint. Model names alone are not proof. Settings includes a synthetic-image vision test, showing verified/unknown/unsupported separately from streaming support. Unknown models may be tried; rejected image input produces a recoverable error without silently changing models or dropping images. The latest two image-bearing messages are included in inference, with a notice for older omitted images.
+
+PowerShell and process tools already execute with your Windows account's permissions and can bypass the desktop allowlist. Capability switches are application-level controls, **not** a security sandbox. Pausing/cancelling stops the helper and invalidates observations; applications you opened remain running. An interrupted input can have partial effects: inspect it before repeating it.
+
+The bundled x64 helper uses Windows .NET Framework, Win32 `SendInput`, UI Automation and GDI; no Node native addon, background service, network listener or elevation is required. Building it requires the Windows Framework compiler installed with .NET Framework 4.x. It is built by `npm run build` and included by the Windows packager.
+
+## Verification
+
+```powershell
+npm test
+npm run test:desktop
+```
+
+The Windows-only desktop test runs the actual Electron app, isolated SQLite/settings and a disposable test window. TeachGPT responses are mocked; no personal screen or credential is sent. It checks image-to-provider content arrays, actual screenshot transport and Unicode input, formatted maths/code/Copy, layout, and Stop. Set `SCHOOLWORK_TEST_OUTPUT` to an existing output directory to keep its UI screenshots. Live provider vision must be tested separately in Settings. Manual checks should cover paste/drop, app selection, window movement/focus loss, rapid Stop, 100/125/150% display scaling, partially off-screen windows, protected content and elevated apps; don't dismiss UAC or unlock Windows automatically.
 
 ## Important limits
 

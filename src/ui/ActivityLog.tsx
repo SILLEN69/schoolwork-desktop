@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 type Entry = { id: string; taskId?: string; createdAt: number; type: string; text: string; payload?: { ok?: boolean; callId?: string; durationMs?: number } };
 const visible = new Set(['tool-start', 'tool-output', 'tool-result', 'plan', 'retry', 'error', 'paused', 'cancelled', 'verification']);
-export default function ActivityLog({ conversationId, swedish }: { conversationId: string; swedish: boolean }) {
+export default function ActivityLog({ conversationId, swedish, compact = false }: { conversationId: string; swedish: boolean; compact?: boolean }) {
   const [entries, setEntries] = useState<Entry[]>([]);
   const [error, setError] = useState('');
   useEffect(() => {
@@ -25,6 +25,7 @@ export default function ActivityLog({ conversationId, swedish }: { conversationI
     if (entry.type === 'tool-result') group.end = entry;
     if (entry.type === 'tool-output') group.output = entry;
   }
+  if (compact && !entries.length && !error) return null;
   return <div className="execution-log" aria-label={swedish ? 'Utförda arbetssteg' : 'Task activity'}>
     {error && <p role="alert">{error}</p>}
     {!entries.length && <p>{swedish ? 'Filer, kommandon och resultat visas här när arbetet börjar.' : 'Files, commands and results appear here as work starts.'}</p>}
