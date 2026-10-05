@@ -1,5 +1,8 @@
 import { contextBridge, ipcRenderer } from 'electron';
 contextBridge.exposeInMainWorld('schoolwork', {
+  setFileAccess: (value: 'workspace' | 'full-user') => ipcRenderer.invoke('settings:file-access', value),
+  inspectProject: (input: unknown) => ipcRenderer.invoke('project:inspect', input),
+  openUrl: (url: string) => ipcRenderer.invoke('app:open-url', url),
   settingsGet: () => ipcRenderer.invoke('settings:get'),
   setKey: (key: string) => ipcRenderer.invoke('settings:set-key', key),
   setModel: (model: string) => ipcRenderer.invoke('settings:set-model', model),

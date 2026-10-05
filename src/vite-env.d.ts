@@ -1,5 +1,8 @@
 /// <reference types="vite/client" />
 interface Window { schoolwork: {
+ setFileAccess:(value:'workspace'|'full-user')=>Promise<string>;
+ inspectProject:(input:{tool:'list_files'|'read_file'|'find_files';args:unknown;conversationId?:string})=>Promise<any>;
+ openUrl:(url:string)=>Promise<void>;
  getActivity:(id:string)=>Promise<any[]>;
  settingsGet:()=>Promise<any>;setKey:(key:string)=>Promise<boolean>;setModel:(m:string)=>Promise<string>;setLanguage:(language:'en'|'sv')=>Promise<boolean>;
  chooseWorkspace:()=>Promise<string|null>;listModels:()=>Promise<string[]>;listChats:()=>Promise<any[]>;getChat:(id:string)=>Promise<any>;deleteChat:(id:string)=>Promise<void>;openPath:(p:string)=>Promise<void>;

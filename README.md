@@ -1,6 +1,6 @@
 # SchoolWork
 
-SchoolWork is a Windows desktop AI work assistant powered by the models available through your TeachGPT account. It can work through multi-step tasks, edit files in a selected workspace, run PowerShell commands, search the web, and keep project notes in a local Markdown memory vault.
+SchoolWork is a Windows desktop AI work assistant powered by the models available through your TeachGPT account. It can map and search projects, edit files with stale-file protection, run direct processes or PowerShell commands, inspect localhost previews, search the web, and keep project notes in a local Markdown memory vault.
 
 ## Install on Windows
 
@@ -39,14 +39,19 @@ The installer and portable executable are written to `release/`.
 - Chat and multi-step tasks using TeachGPT models.
 - Task progress with a total timer and a timer for the current stage.
 - TeachGPT model list with matching Artificial Analysis Intelligence Index scores where available. Unmatched models are labeled as unranked.
-- Workspace-scoped file listing, bounded reads and search, writes with backups, targeted patches, and cancellable PowerShell commands.
+- Project mapping with manifests and scripts, paginated file discovery, bounded multi-file reads, literal search with line references, hash-checked multi-edit patches, versioned backups, and cancellable process trees.
+- Direct process execution with separate arguments for Node/test runners, app-owned background development servers, streamed output, and cleanup on cancellation or application exit.
+- PowerShell command mode without temporary script files or execution-policy changes.
+- Isolated localhost preview checks with optional CSS-selector interaction and expected-text assertions.
 - Web search and opening links in the system browser.
 - Local SQLite conversation/task storage and an Obsidian-compatible Markdown memory vault.
-- Pause, cancel, and retry/resume controls.
+- Pause, cancel, and retry/resume controls, persistent project plans, and completion checks tied to real test commands.
 - Swedish and English interface.
 
 ## Important limits
 
-SchoolWork is independent software and does not claim feature or intelligence parity with ChatGPT Work. The Artificial Analysis Intelligence Index is a general model benchmark, not a guarantee of coding or project success. TeachGPT may intermittently return HTTP 504; saved tasks can be resumed without repeating completed tools. Web search can be blocked or challenged. PowerShell runs with the current Windows user's permissions and is not a security sandbox.
+SchoolWork is independent software and does not claim feature or intelligence parity with ChatGPT Work. The Artificial Analysis Intelligence Index is a general model benchmark, not a guarantee of coding or project success. TeachGPT may intermittently return HTTP 504; saved tasks can be resumed without repeating completed tools. Web search can be blocked or challenged. Processes and PowerShell run with the current Windows user's permissions and are not a security sandbox. Background servers stop when SchoolWork exits.
+
+File tools default to the selected folder. Settings includes a **Full user access** profile for task-relevant files elsewhere under the same Windows account. Existing tasks keep their original access mode; new tasks use the current setting. Credential files, `.env` files, private keys, and similar secrets are excluded from model context in both modes.
 
 No `.env` file, API key, conversation database, browser profile, or local diagnostic log belongs in this repository. Every user must obtain and configure their own TeachGPT key under their school's terms.
