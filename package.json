@@ -1,0 +1,63 @@
+{
+  "name": "schoolwork-desktop",
+  "version": "0.2.5",
+  "private": true,
+  "description": "A local-first AI work assistant powered by TeachGPT",
+  "main": "dist-electron/main.js",
+  "author": "SchoolWork contributors",
+  "license": "MIT",
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc -b && vite build && esbuild electron/main.ts electron/preload.ts --bundle --platform=node --format=cjs --external:electron --outdir=dist-electron",
+    "start": "electron .",
+    "dev:app": "concurrently -k -n web,desktop -c green,blue \"vite --host 127.0.0.1\" \"wait-on tcp:5173 && electron .\"",
+    "package:win": "npm run build && electron-builder --win nsis --config.electronDist=node_modules/electron/dist --config.win.artifactName=SchoolWork-${version}-${arch}-setup.${ext} && electron-builder --win portable --config.electronDist=node_modules/electron/dist --config.win.artifactName=SchoolWork-${version}-${arch}-portable.${ext}",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "electron-store": "^10.0.1",
+    "lucide-react": "^0.468.0",
+    "react": "^19.1.0",
+    "react-dom": "^19.1.0",
+    "zod": "^4.0.0"
+  },
+  "devDependencies": {
+    "@types/node": "^24.0.0",
+    "@types/react": "^19.1.0",
+    "@types/react-dom": "^19.1.0",
+    "concurrently": "^10.0.5",
+    "electron": "^44.5.1",
+    "electron-builder": "^26.0.12",
+    "esbuild": "^0.25.9",
+    "typescript": "^5.9.0",
+    "vite": "^7.1.0",
+    "vitest": "^3.2.0",
+    "wait-on": "^9.5.1"
+  },
+  "build": {
+    "appId": "nu.ssis.schoolwork",
+    "productName": "SchoolWork",
+    "directories": {
+      "output": "release"
+    },
+    "files": [
+      "dist/**",
+      "dist-electron/**",
+      "package.json",
+      "!**/.env*",
+      "!**/*.db"
+    ],
+    "win": {
+      "target": [
+        "nsis",
+        "portable"
+      ],
+      "artifactName": "SchoolWork-${version}-${arch}.${ext}"
+    },
+    "nsis": {
+      "oneClick": false,
+      "perMachine": false,
+      "allowToChangeInstallationDirectory": true
+    }
+  }
+}

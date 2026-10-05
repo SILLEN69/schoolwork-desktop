@@ -1,0 +1,13 @@
+node_modules/
+dist/
+dist-electron/
+release*/
+work/
+BUILD_STATE.md
+.env*
+*.db
+*.db-*
+*.sqlite3
+*.sqlite3-*
+*.log
+*.tsbuildinfo
