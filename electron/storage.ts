@@ -205,7 +205,7 @@ export class SchoolWorkStore {
       .run(input.id, input.conversationId, input.clientRequestId, input.objective, input.model, input.workspace, input.state, now, now);
   }
 
-  startTask(input: { id: string; conversationId: string; clientRequestId: string; objective: string; model: string; workspace: string }) {
+  startTask(input: { id: string; conversationId: string; clientRequestId: string; objective: string; model: string; workspace: string; attachmentIds?: string[]; metadata?: Record<string, string> }) {
     const now = Date.now();
     this.transaction(() => {
       this.db.prepare('INSERT OR IGNORE INTO conversations(id,title,created_at,updated_at) VALUES(?,?,?,?)')
@@ -213,9 +213,16 @@ export class SchoolWorkStore {
       this.db.prepare('INSERT INTO tasks(id,conversation_id,client_request_id,objective,model,workspace,state,created_at,updated_at) VALUES(?,?,?,?,?,?,?,?,?)')
         .run(input.id, input.conversationId, input.clientRequestId, input.objective, input.model, input.workspace, 'queued', now, now);
       const sequence = Number((this.db.prepare('SELECT COALESCE(MAX(sequence),-1)+1 AS n FROM messages WHERE conversation_id=?').get(input.conversationId) as any).n);
+      const messageId = crypto.randomUUID();
       this.db.prepare('INSERT INTO messages(id,conversation_id,sequence,role,content,client_request_id,created_at) VALUES(?,?,?,?,?,?,?)')
-        .run(crypto.randomUUID(), input.conversationId, sequence, 'user', input.objective, input.clientRequestId, now);
+        .run(messageId, input.conversationId, sequence, 'user', input.objective, input.clientRequestId, now);
+      for (const attachmentId of input.attachmentIds || []) {
+        const linked = this.db.prepare('UPDATE image_attachments SET message_id=? WHERE id=? AND conversation_id=? AND message_id IS NULL').run(messageId, attachmentId, input.conversationId);
+        if (!linked.changes) throw new Error('Attachment ownership changed. The message was not sent.');
+      }
       this.db.prepare('UPDATE conversations SET updated_at=? WHERE id=?').run(now, input.conversationId);
+      // Permission snapshots and phone routing must commit with the user message/task.
+      for (const [key, value] of Object.entries(input.metadata || {})) this.setMetadata(key, value);
     });
   }
 

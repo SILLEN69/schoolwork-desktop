@@ -34,6 +34,8 @@ npm run package:win
 
 The installer and portable executable are written to `release/`.
 
+For an isolated test profile, launch with `--user-data-dir=<existing absolute directory>`; the default SchoolWork profile is not changed. After packaging, run the desktop test with `SCHOOLWORK_TEST_PACKAGED=1` to additionally verify the packaged executable and bundled native helper.
+
 ## Current features
 
 - Chat and multi-step tasks using TeachGPT models.
@@ -47,6 +49,49 @@ The installer and portable executable are written to `release/`.
 - Local SQLite conversation/task storage and an Obsidian-compatible Markdown memory vault.
 - Pause, cancel, and retry/resume controls, persistent project plans, and completion checks tied to real test commands.
 - Swedish and English interface.
+- Rendered LaTeX maths, syntax-highlighted fenced code with Copy, tables and clearer message spacing.
+- PNG/JPEG image attachments: file picker, paste/drop, thumbnail previews and saved conversation images.
+- All-app Windows access (or optional selected-app mode): launch, list/focus/inspect windows, per-monitor screenshots, moving windows between monitors, mouse clicks/double-clicks, Unicode typing, shortcuts and scrolling.
+- Persisted failure/pause replies, offline action-status summaries, interrupted tool-history repair and UI recovery from missed events.
+- Bounded evidence-based desktop recovery memory; clear it in Settings. No automatic model training or self-modifying code.
+- Optional two-way Telegram chat with photos, saved conversation context, encrypted bot token, private-account pairing and retry/status/stop.
+- A Desktop panel and immediate Stop control (`Ctrl+Alt+Escape`). No per-action confirmation dialogs.
+
+## Applications, screen and images
+
+All-app mode is the default: the desktop tools can use any accessible ordinary Windows application, without adding each executable. Settings retains an optional selected-app mode and independent launching/view/input switches. Add an executable with **Add application** to retain it as a launch shortcut. Modern packaged apps may require their normal shell launcher through PowerShell; not every application has a directly launchable `.exe`. Existing tasks retain their access snapshot; revocations apply immediately. Start a new task to expand a previously restricted task.
+
+Ask the agent to use an application normally. `list_displays` exposes all physical monitors, `capture_screen` accepts a monitor or window, and `move_window` fits a window to the chosen monitor's work area. Each input requires a one-use window screenshot (maximum age 180 seconds to accommodate model latency); identity, focus and bounds are rechecked before input. Moving the window, switching focus, revoking access or ending the task invalidates input. Windows may refuse foreground focus; manually activate the window if that happens. The helper stays unelevated: it cannot control secure/UAC/locked/screen-saver desktops or reliably inject input into elevated applications. Visible screen capture may include occluding windows and protected video may appear black. This is point-in-time capture, not continuous recording.
+
+## Telegram phone link
+
+Create your own bot with `@BotFather` in Telegram. In SchoolWork Settings → Telegram, paste the token into the password field, choose **Save & enable**, then **Link phone** and press Start in the bot's private chat. The one-time link expires after five minutes. Token storage uses Electron's Windows-protected credential storage; it is never returned to the renderer, the agent, diagnostics or notifications. Only the paired private chat **and** sender can use task buttons or `/status`, `/retry`, `/stop` (optionally followed by a full task UUID). A newer work request prevents an old task from being retried. Status-only questions do not supersede saved work.
+
+Send normal messages or individual PNG/JPEG photos (optionally with a caption) in the bot chat: the AI responds there using the same saved history and tools as SchoolWork. Photos are also saved as visible attachments in the desktop conversation. `/new` starts a fresh chat without stopping old work. Reply to a task notification, press its Status button, or send `/use <full task UUID>` to continue an existing desktop conversation. New chats use the model selected in Settings; existing chats keep their latest task model. That model must support vision for photos. Albums, voice, video and non-image documents are not supported. If a chat is already working, use `/stop` then resend, or `/new`; new messages are explicitly rejected rather than mixed into an active tool turn.
+
+SchoolWork must remain open and the PC online. It uses long polling, not a public server. Other desktop tasks send generic status only. Tasks started, retried or stopped through Telegram send their assistant replies/failure checkpoints to the paired phone; this can include requested results, code or error explanations. No screenshots are automatically sent to Telegram. Bot chats are cloud chats, not end-to-end encrypted Secret Chats; do not send secrets. Messages/photos go through Telegram and TeachGPT and remain in SchoolWork until conversation deletion. Delivery failures remain in a local retry outbox (latest 200 message parts); uncertain network acknowledgements can occasionally cause duplicate delivery. Incoming offsets are saved before commands/messages: a crash or rejected submission will not blindly replay input; check SchoolWork and resend if needed. Retry preserves the original model/progress and reobserves current screen state. A completed/cancelled task is not restarted by Retry. **Pause link** disables polling and aborts downloads, not already accepted local tasks. **Disconnect** deletes the encrypted token, pairing, routing and queued replies, not saved chats/photos.
+
+Verified coding-tool completion uses “heyyy i did it brochaho”; the reply still describes the actual check and its limits. Slang does not turn an unverified result into success.
+
+See [the 0.5 implementation and verification notes](docs/agent-upgrade.md) for the ten additional improvements, privacy boundaries and manual multi-monitor checks.
+See [the 0.6 Telegram chat and photo notes](docs/telegram-chat.md) for setup, implementation decisions and verification boundaries.
+
+Attach PNG/JPEG images with the composer, clipboard or drop. Limits: 10 MB original, 32 megapixels, six images and 8 MB normalized images per message. Images are resized to a maximum 1600-pixel side and re-encoded locally as PNG. Saved images stay in the app's user-data attachment directory until conversation deletion; unsent images expire after 24 hours at next startup. Tool screenshots are ephemeral and are not written into memory or diagnostic logs. Capture buttons create normal persistent attachments; **sending** them uploads them to TeachGPT. A screenshot requested by the agent is sent to TeachGPT at its next step. Do not use these features with secrets visible on screen.
+
+Image reasoning requires a vision-capable model on your school's TeachGPT endpoint. Model names alone are not proof. Settings includes a synthetic-image vision test, showing verified/unknown/unsupported separately from streaming support. Unknown models may be tried; rejected image input produces a recoverable error without silently changing models or dropping images. The latest two image-bearing messages are included in inference, with a notice for older omitted images.
+
+PowerShell and process tools already execute with your Windows account's permissions and can bypass the desktop allowlist. Capability switches are application-level controls, **not** a security sandbox. Pausing/cancelling stops the helper and invalidates observations; applications you opened remain running. An interrupted input can have partial effects: inspect it before repeating it.
+
+The bundled x64 helper uses Windows .NET Framework, Win32 `SendInput`, UI Automation and GDI; no Node native addon, background service, network listener or elevation is required. Building it requires the Windows Framework compiler installed with .NET Framework 4.x. It is built by `npm run build` and included by the Windows packager.
+
+## Verification
+
+```powershell
+npm test
+npm run test:desktop
+```
+
+The Windows-only desktop test runs the actual Electron app, isolated SQLite/settings and a disposable test window. TeachGPT responses are mocked; no personal screen or credential is sent. It checks image-to-provider content arrays, actual screenshot transport and Unicode input, formatted maths/code/Copy, layout, and Stop. Set `SCHOOLWORK_TEST_OUTPUT` to an existing output directory to keep its UI screenshots. Live provider vision must be tested separately in Settings. Manual checks should cover paste/drop, app selection, window movement/focus loss, rapid Stop, 100/125/150% display scaling, partially off-screen windows, protected content and elevated apps; don't dismiss UAC or unlock Windows automatically.
 
 ## Important limits
 

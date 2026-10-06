@@ -1,0 +1,325 @@
+.message.assistant .msg-body {
+  width: calc(100% - 43px);
+  max-width: calc(100% - 43px);
+}
+.markdown {
+  min-width: 0;
+  color: #dde3dc;
+}
+.markdown > :first-child {
+  margin-top: 0;
+}
+.markdown > :last-child {
+  margin-bottom: 0;
+}
+.markdown h4,
+.markdown h5,
+.markdown h6 {
+  font-size: 15px;
+  margin: 22px 0 10px;
+}
+.markdown strong {
+  color: #f0f4eb;
+  font-weight: 650;
+}
+.markdown hr {
+  border: 0;
+  border-top: 1px solid #343d36;
+  margin: 24px 0;
+}
+.markdown li > p {
+  margin: 8px 0;
+}
+.markdown li::marker {
+  color: #a9c58c;
+}
+.markdown blockquote {
+  margin: 18px 0;
+  padding: 12px 18px;
+  background: #1b221d;
+  border-radius: 0 8px 8px 0;
+}
+.markdown blockquote p:last-child {
+  margin-bottom: 0;
+}
+.markdown table {
+  width: max-content;
+  font-size: 13px;
+  border-radius: 8px;
+}
+.markdown th {
+  background: #202820;
+  color: #e8efdc;
+  font-weight: 600;
+}
+.markdown tbody tr:nth-child(even) {
+  background: #151c18;
+}
+.markdown .katex {
+  font-size: 1.12em;
+  color: #edf3e2;
+}
+.markdown p .katex {
+  display: inline-block;
+  max-width: 100%;
+  overflow-x: auto;
+  overflow-y: hidden;
+  vertical-align: middle;
+  padding: 3px 0;
+}
+.markdown .katex-display {
+  max-width: 100%;
+  overflow-x: auto;
+  overflow-y: hidden;
+  padding: 18px 14px;
+  margin: 18px 0;
+  border: 1px solid #34402f;
+  border-radius: 10px;
+  background: #192019;
+}
+.markdown .katex-display > .katex {
+  text-align: left;
+  padding: 2px;
+}
+.markdown .katex-error {
+  color: #f0be94 !important;
+  white-space: pre-wrap;
+  font-family: Consolas, monospace;
+}
+.code-block {
+  border: 1px solid #364038;
+  border-radius: 10px;
+  overflow: hidden;
+  background: #111817;
+  margin: 18px 0;
+}
+.code-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 9px 14px;
+  background: #202824;
+  border-bottom: 1px solid #364038;
+  color: #aebcaa;
+  font:
+    11px/1.5 Consolas,
+    monospace;
+}
+.code-header button {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 8px;
+  border: 1px solid #43503e;
+  border-radius: 5px;
+  background: transparent;
+  color: #d9eacb;
+  font: 11px/1.5 inherit;
+  cursor: pointer;
+}
+.code-header button:hover {
+  background: #303c2a;
+}
+.markdown .code-block pre {
+  white-space: pre;
+  overflow-wrap: normal;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  padding: 16px;
+  font:
+    13px/1.75 Consolas,
+    "Cascadia Code",
+    monospace;
+  tab-size: 2;
+  overflow-x: auto;
+}
+.markdown .code-block code {
+  font: inherit;
+  color: #dbe6df;
+  border-radius: 0;
+}
+.hljs-keyword,
+.hljs-selector-tag,
+.hljs-literal {
+  color: #c7abf5;
+}
+.hljs-string,
+.hljs-regexp,
+.hljs-attribute {
+  color: #b7d993;
+}
+.hljs-number,
+.hljs-symbol,
+.hljs-bullet {
+  color: #eeb78b;
+}
+.hljs-title,
+.hljs-built_in,
+.hljs-section {
+  color: #88cce0;
+}
+.hljs-comment,
+.hljs-quote {
+  color: #89988b;
+  font-style: italic;
+}
+.hljs-variable,
+.hljs-params,
+.hljs-property {
+  color: #dce5ba;
+}
+.hljs-meta,
+.hljs-type,
+.hljs-name {
+  color: #e7bd7b;
+}
+.composer textarea:focus-visible {
+  outline: none;
+}
+.composer:focus-within {
+  box-shadow: 0 0 0 2px #bddc7022;
+  border-color: #91ae61;
+}
+.attachment-tray {
+  display: flex;
+  gap: 10px;
+  padding: 0 3px 12px;
+  flex-wrap: wrap;
+}
+.attachment-chip {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  border: 1px solid #394636;
+  background: #252f24;
+  border-radius: 8px;
+  padding: 6px;
+  max-width: 210px;
+}
+.attachment-chip img {
+  width: 48px;
+  height: 48px;
+  object-fit: contain;
+  border-radius: 4px;
+  background: #141a14;
+}
+.attachment-chip span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 11px;
+}
+.attachment-chip button {
+  flex-shrink: 0;
+}
+.message-images {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 10px;
+}
+.message-images img {
+  max-width: min(340px, 100%);
+  max-height: 240px;
+  border: 1px solid #404c38;
+  border-radius: 8px;
+  object-fit: contain;
+}
+.desktop-status {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  margin-bottom: 14px;
+  font-size: 12px;
+  color: #b6c7a5;
+}
+.desktop-window {
+  width: 100%;
+  padding: 10px;
+  border: 1px solid #35432f;
+  background: #1b2419;
+  border-radius: 8px;
+  color: #dae9cb;
+  text-align: left;
+  margin-bottom: 8px;
+  cursor: pointer;
+}
+.desktop-window strong,
+.desktop-window small {
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.desktop-window small {
+  margin-top: 4px;
+  font-size: 10px;
+  color: #9ead92;
+}
+.desktop-screenshot {
+  width: 100%;
+  border-radius: 8px;
+  border: 1px solid #364b31;
+  margin-top: 14px;
+}
+.capability-toggle {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  margin: 12px 0;
+  font-size: 12px;
+}
+.capability-toggle input {
+  accent-color: #cdeb86;
+}
+.capability-app {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  margin: 7px 0;
+  font-size: 11px;
+  color: #bccab3;
+}
+.capability-app span {
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.composer-tools {
+  flex-wrap: wrap;
+}
+@media (max-width: 1000px) {
+  .right-panel {
+    width: 260px;
+  }
+  .sidebar {
+    width: 170px;
+  }
+  .conversation.has-messages {
+    padding: 22px 16px;
+  }
+  .msg-body {
+    font-size: 13px;
+  }
+  .markdown .code-block pre {
+    font-size: 12px;
+  }
+}
+.telegram-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: 12px 0;
+}
+.telegram-settings input {
+  width: 100%;
+  box-sizing: border-box;
+  border: 1px solid #383b3b;
+  background: #131516;
+  color: #eee;
+  padding: 10px;
+  border-radius: 6px;
+  font: inherit;
+}
