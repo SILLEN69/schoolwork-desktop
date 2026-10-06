@@ -1,102 +1,280 @@
 # SchoolWork
 
-SchoolWork is a Windows desktop AI work assistant powered by the models available through your TeachGPT account. It can map and search projects, edit files with stale-file protection, run direct processes or PowerShell commands, inspect localhost previews, search the web, and keep project notes in a local Markdown memory vault.
+### Learn, build and debug with your school's AI models.
+
+SchoolWork is an open-source Windows assistant for students and teachers with access to **TeachGPT** at **Stockholm Science and Innovation School (SSIS)**. Ask a question, work through a calculation, build a website or investigate a broken project. The assistant can read relevant files, make changes, run checks and show the results in one workspace.
+
+Conversations and project memory live on your computer. AI requests go to the school's TeachGPT endpoint. **No OpenAI API key or paid ChatGPT subscription is required to use SchoolWork.** You do need your own working TeachGPT account and API key.
+
+**[Download for Windows](https://github.com/SILLEN69/schoolwork-desktop/releases/latest)** · **[Installation script](Install-SchoolWork.ps1)** · **[First task](#your-first-task)** · **[Screen control](#screen-control-see-act-check)** · **[Phone link](#talk-to-schoolwork-from-your-phone)** · **[Report a problem](https://github.com/SILLEN69/schoolwork-desktop/issues)**
+
+> **Which version am I getting?** Checked 6 October 2026: the public installer is **v0.3.0**. The latest source on `main` is **0.6.0**, which adds screen control, image attachments, formatted maths and Telegram. Those additions are **not included in the v0.3.0 download**. Use [the source instructions](#run-the-latest-source) to try them. This is an early project, not an official TeachGPT or school-managed product.
+
+![SchoolWork showing a physics explanation, rendered maths and Python code in its chat workspace](docs/images/workspace.png)
+
+*The current 0.6.0 interface, captured from the real application using an isolated demo profile and a simulated model reply. Screenshots contain no student records or real credentials; they illustrate the interface, not a live model benchmark.*
+
+## For the classroom
+
+| If you are… | Try SchoolWork for… |
+|---|---|
+| Learning to code | Understanding an existing project, locating a bug, making a small change and running its tests. |
+| Studying maths or science | Asking for an explanation, checking units and comparing a calculation with a short program. The source version renders equations and accepts images with a vision-capable model. |
+| Building a school project | Turning a brief into milestones, editing several files, starting a local website and checking its behaviour. |
+| Preparing a lesson | Drafting exercises, explanations, example code or a small interactive demonstration to review before class. |
+| Supervising project work | Reviewing visible tool activity, test output and changed files alongside the student's explanation of their work. |
+
+Use it according to your teacher's rules for AI assistance. Ask for explanations and check the work: a confident answer or a passing syntax check is not proof that an entire project is correct. Start with a copy of a project and avoid identifiable student records or confidential assessments.
+
+## What it can do today
+
+| Capability | Public installer 0.3.0 | Latest source 0.6.0 |
+|---|:---:|:---:|
+| Swedish/English chat and interface; select a TeachGPT model | Yes | Yes |
+| Multi-step work, saved conversations, progress and task/stage timers | Yes | Yes |
+| Map projects, find files, search text and read selected line ranges | Yes | Yes |
+| Create files and apply targeted edits with stale-file checks and backups | Yes | Yes |
+| Run commands, tests and background development servers | Yes | Yes |
+| Search the web, open links and check a localhost website | Yes | Yes |
+| Local Markdown memory with linked notes and an editor | Yes | Yes |
+| Markdown tables and code blocks | Yes | Yes |
+| Rendered LaTeX equations and syntax-highlighted code | — | Yes |
+| PNG/JPEG attachments and screenshot questions | — | Requires model vision support |
+| Windows app control, screenshots and multiple monitors | — | Yes, within Windows permissions |
+| Telegram messages, photos, task notifications and controls | — | Optional setup |
+
+Model availability comes from your TeachGPT account. Displayed Artificial Analysis rankings are a dated reference where a matching model exists, not a live leaderboard or a guarantee of coding ability. School-hosted settings can differ from benchmark settings. SchoolWork keeps the model you choose; it does not silently switch providers or buy API credits.
 
 ## Install on Windows
 
-Download the latest installer from the [SchoolWork Releases page](https://github.com/SILLEN69/schoolwork-desktop/releases/latest), then run `SchoolWork-<version>-x64-setup.exe`. The current Windows package is unsigned. Each user configures their own TeachGPT API key in the app; no API key is included in the repository or installer.
+### Option 1 — Download the installer
 
-You can also download and verify the latest installer with the included PowerShell script:
+1. Open **[Releases](https://github.com/SILLEN69/schoolwork-desktop/releases/latest)**.
+2. Download the file ending in **`-x64-setup.exe`** and run the interactive installer. The supported distribution target is Windows x64; Windows 11 is the intended classroom platform.
+3. Start SchoolWork and follow [first-time setup](#first-time-setup).
+
+Current download links:
+
+| File | Purpose |
+|---|---|
+| [SchoolWork 0.3.0 installer](https://github.com/SILLEN69/schoolwork-desktop/releases/download/v0.3.0/SchoolWork-0.3.0-x64-setup.exe) | Normal per-user installation; no developer tools needed to open the app. |
+| [SchoolWork 0.3.0 portable](https://github.com/SILLEN69/schoolwork-desktop/releases/download/v0.3.0/SchoolWork-0.3.0-x64-portable.exe) | Launch without the installation wizard. "Portable" does not mean that all settings and chats stay beside the executable. |
+| [SHA-256 checksums](https://github.com/SILLEN69/schoolwork-desktop/releases/download/v0.3.0/SHA256SUMS-v0.3.0.txt) | Compare downloaded files with the published manifest. |
+
+Packages are **unsigned**. On a managed school computer, follow your school's software-installation process if Windows or an administrator blocks them. The app does not require automatic administrator elevation.
+
+### Option 2 — Use the installation script
+
+**[Read the script](Install-SchoolWork.ps1)** or **[download its raw contents](https://raw.githubusercontent.com/SILLEN69/schoolwork-desktop/main/Install-SchoolWork.ps1)**. From a folder you can write to, run:
 
 ```powershell
-.\Install-SchoolWork.ps1
+Invoke-WebRequest -Uri "https://raw.githubusercontent.com/SILLEN69/schoolwork-desktop/main/Install-SchoolWork.ps1" -OutFile ".\Install-SchoolWork.ps1"
+Get-Content .\Install-SchoolWork.ps1
+.\Install-SchoolWork.ps1 -Version v0.3.0
 ```
 
-The script checks the release's SHA-256 manifest before starting the regular interactive installer. It does not change PowerShell's execution policy or bypass Windows security prompts. If your school device blocks scripts, use the installer download or ask your administrator for the approved method.
+The script downloads that release, verifies the installer against its SHA-256 manifest, then opens the regular installation wizard. Its current default is **v0.3.0**; it does not automatically install the newest source code. It does not change PowerShell execution policy. If scripts are blocked, use Option 1 or your school's approved method.
 
-## Run from source
+For an update, finish or pause your current work and close SchoolWork normally before running the newer installer. Keep backups of important projects. Downloading source code alone does not update an installed app.
 
-Requirements: Windows 10/11 x64 and Node.js 22.12 or later.
+## First-time setup
+
+1. **Get your own TeachGPT key.** Sign in to [TeachGPT](https://teachgpt.ssis.nu/) with your eligible school account, then open [API tokens](https://teachgpt.ssis.nu/user/api-tokens). These pages require school access; downloading SchoolWork does not grant it.
+2. **Open Settings in SchoolWork.** Paste the key into **TeachGPT API key** and select **Save**. Put keys in Settings, never in a chat, screenshot or GitHub issue.
+3. **Select Refresh available models**, then choose a **Default model** returned by the school. [TeachGPT's model page](https://teachgpt.ssis.nu/about/models) describes its current offering.
+4. **Choose a Working folder.** Start with a dedicated lesson/project folder. File tools default to **Selected workspace only**. **Full user access** allows file tools to work elsewhere with your Windows account's permissions; it applies to new tasks.
+5. **If running 0.6.0, review Applications & screen.** New default settings allow all accessible apps, launching, screen viewing and input. Turn off capabilities you do not want, or select specific apps. For image questions, run the sample-image test under **Image understanding**.
+6. Choose English or Swedish using the language control, start a new task and give it a small, concrete objective.
+
+Internet is needed for TeachGPT inference. Existing local conversations and files remain available offline. Coding tasks may need additional tools such as Git, npm or Python; SchoolWork can run installed tools, but does not bundle every language, package manager or project dependency. Its `node` process tool uses Electron's bundled Node runtime.
+
+## Your first task
+
+Start with one outcome and describe how to check it. You can write in Swedish or English.
+
+**Learn with an explanation**
+
+> Förklara hur en for-loop fungerar med ett litet Python-exempel. Ge mig sedan en uppgift att lösa själv. Visa inte lösningen förrän jag har försökt.
+
+**Build something you can test**
+
+> In this empty project folder, build a small HTML/CSS/JavaScript flashcard app for Swedish vocabulary. Make a short plan. Add five sample cards, a reveal-answer button and a score counter. Start a local preview and check that revealing an answer and updating the score work. Tell me exactly what you tested.
+
+**Fix a project**
+
+> Map this project and find its test command. Reproduce the failing test, make the smallest relevant change and run the test again. Preserve my existing edits. Explain the cause and show the files you changed.
+
+**Prepare a lesson**
+
+> Create a Markdown worksheet introducing Ohm's law for upper-secondary students. Include a worked example, five practice questions and a separate answer section. Check the numerical answers with code and state the assumptions.
+
+For bigger projects, give the agent milestones and acceptance checks. Review each meaningful result before expanding the scope. SchoolWork improves access to tools and context; it does not make every model equally capable or guarantee completion.
+
+## Follow the work
+
+The left sidebar holds your conversations and **Memory vault**. The centre shows the conversation, current activity and task controls. The right panel offers **Files**, **Preview** and **Activity**; the source version also includes **Desktop**.
+
+- Expand a tool step to see the file operation, command or result. Commands can report output, exit status and errors.
+- Use **Files** to explore the project and read bounded excerpts. Use **Preview** for a local website.
+- The total stopwatch follows the task; the stage timer follows its current step. Receiving stream data means the provider is active, not that a file has been created or a test has passed.
+- **Pause**, **Cancel** and **Retry / resume** let you stop or recover work. Saved tool records help avoid repeating completed operations; check the screen or files after an interrupted action with uncertain effects.
+- Progress includes short explanations and observable actions. It is not a live transcript of the model's private reasoning.
+
+### How the agent works
+
+```mermaid
+flowchart LR
+    A[Your request] --> B[Relevant instructions, files and memory]
+    B --> C[Selected TeachGPT model]
+    C --> D[SchoolWork validates the requested tool]
+    D --> E[Read, edit, run or inspect]
+    E --> F[Record output and result]
+    F --> C
+    C --> G[Check the work and report the result]
+```
+
+The model chooses an action; the application executes it and sends the result back. For example, a failing test returns an actual error the model can use to revise its edit. Streaming keeps long replies moving through the school gateway. Incomplete streamed tool arguments are not executed. Provider errors can still occur, and a retry cannot repair an unavailable school server.
+
+## Screen control: see, act, check
+
+**Available in source 0.6.0; not in the public 0.3.0 installer.**
+
+SchoolWork can use ordinary Windows applications through its bundled desktop helper. It can list and launch apps, find and focus windows, read accessible controls, capture a window or monitor, move windows between monitors, click/double-click, type Unicode text, press shortcuts and scroll.
+
+![SchoolWork Applications and screen settings with separate controls for launching, viewing and mouse/keyboard input](docs/images/screen-control.png)
+
+*Real settings from the isolated demo profile. This example uses selected-app access; a fresh default profile uses all-app access.*
+
+### Try a small desktop task
+
+1. Open **Settings → Applications & screen**. Choose all-app access or turn it off and use **Add application…** to select an ordinary app you are comfortable testing.
+2. Enable **Launch applications**, **View screen** and **Control mouse & keyboard** as needed. For visual reasoning, test the selected model's image support first.
+3. Open a blank document and ask: **“Find the blank Notepad window, type a three-item revision checklist, then inspect the window and tell me whether the text is there.”**
+4. Follow the **Desktop** panel and activity. Avoid changing the target window or using the mouse/keyboard during the action.
+5. Use **Stop screen control** or **Ctrl+Alt+Escape** to stop desktop interaction immediately. Re-enable the relevant controls in Settings when you want to use it again.
+
+For each input action, the agent must first capture a fresh, window-specific observation. The app checks window identity, position and focus before applying input. That observation is single-use and expires after three minutes; the agent must observe again after acting. This helps prevent typing into a window that has changed since the last screenshot.
+
+Screen viewing is **point-in-time capture**, not continuous video. UI Automation provides text from accessible controls; interpreting pixels requires a vision-capable TeachGPT model. The image test checks a synthetic picture, not your personal screen. Text-only models can use available control text but cannot be assumed to understand screenshots.
+
+Desktop actions share your real mouse, keyboard and windows and run without per-action confirmation dialogs. They cannot bypass UAC, a locked desktop or Windows privilege restrictions. Minimized, covered, protected or elevated windows may not work as expected. If Windows refuses focus, activate the intended window yourself. Stopping control leaves the applications open; an interrupted input may already have had a partial effect.
+
+## Images, equations and code
+
+**Source 0.6.0** supports PNG/JPEG through the image picker, clipboard paste or drag-and-drop. You can ask about an error screenshot, a diagram or a photographed exercise. Attach only what you intend to send to TeachGPT.
+
+- Up to six images per desktop message; originals are limited to 10 MB and 32 megapixels each, with an 8 MB combined normalized limit.
+- Images are resized locally to a maximum 1,600-pixel side and re-encoded. Older image-bearing messages may be omitted from model context with a notice; reattach a needed image when appropriate.
+- Photos require image support on the selected school model. Unsupported input produces an error instead of silently changing the model.
+- Maths uses LaTeX rendering; fenced code has highlighting and a Copy button. Tables, lists and code remain part of the saved conversation.
+
+An uploaded screenshot and an agent screenshot have different lifetimes: user attachments stay with the saved chat until deletion; agent tool screenshots are transient. A screenshot attached using a capture button is a normal saved attachment. Screenshots sent to the model can contain other visible windows, so clear unrelated sensitive content first.
+
+## Memory you can read and edit
+
+Open **Memory vault** to search, read and edit local Markdown notes. Notes can link to one another with `[[wikilinks]]`; the graph shows those explicit links. You can archive or forget a note, and **Open vault folder** lets you use the same files in Obsidian. Obsidian is optional.
+
+Memory records project context and observations from previous work. Failed attempts can become provisional lessons; recorded successful checks can support a more specific remedy. In 0.6.0, desktop recovery patterns also keep bounded evidence of failures followed by successful actions and fresh observations. You can clear those patterns in Settings.
+
+This is stored knowledge, **not training the school model's weights**. Notes can be incomplete or outdated and should be checked against the current project. They do not grant tool permissions. Forgetting a memory is separate from deleting its original conversation. The vault contains ordinary local files, not encrypted secret storage.
+
+## Talk to SchoolWork from your phone
+
+**Optional in source 0.6.0.** Telegram lets you send messages or individual photos, receive replies and task notifications, and check or stop work from your phone. The PC must stay awake and online with SchoolWork running. There is no mobile SchoolWork app or public server to host, but you do need to create a Telegram bot once.
+
+![SchoolWork Telegram settings with bot-token entry, Link phone and Send test controls](docs/images/telegram.png)
+
+1. In Telegram, use the official **[@BotFather](https://t.me/BotFather)** account to create your own bot with `/newbot`.
+2. Paste its token into **SchoolWork Settings → Telegram → bot token**, then select **Save & enable**. Never send that token in an AI chat.
+3. Select **Link phone**, open the link in Telegram and press **Start**. The one-time link expires after five minutes.
+4. Use **Send test**, then send a normal message to your bot. Only the paired private chat and sender can submit or control work.
+
+| Telegram action | What it does |
+|---|---|
+| Normal message | Starts or continues the selected saved conversation. |
+| One PNG/JPEG photo, with an optional caption | Sends an image question to the conversation's model; vision support is required. |
+| `/status` | Reports the selected conversation's latest work task, or the latest desktop task before one is selected. |
+| `/retry` | Resumes eligible saved work with its existing model and progress. |
+| `/stop` | Stops the targeted task. |
+| `/new` | Starts a fresh conversation; it does not stop earlier work. |
+| Reply to a notification, or `/use <full task UUID>` | Continues the associated desktop conversation. |
+
+If a chat is busy, stop then resend, or start `/new`; messages are not silently inserted into a running tool step. Voice messages, albums, video and non-image documents are not supported. This is Telegram integration, not WhatsApp or a voice-call feature.
+
+Phone-controlled tasks send their replies and checkpoints through Telegram; unrelated desktop tasks send generic status. Screenshots are not automatically sent to Telegram. Bot conversations are Telegram cloud chats, not end-to-end encrypted Secret Chats. **Pause link** pauses the connection; **Disconnect** removes the token, pairing and queued replies, but neither deletes existing conversations nor stops already accepted local tasks. See [Telegram details and verification limits](docs/telegram-chat.md).
+
+## Data, permissions and school use
+
+| Data or action | Where it goes / what it can access |
+|---|---|
+| Prompts, relevant file excerpts and retrieved memory | Sent to the configured school TeachGPT service for inference. Local storage does not mean offline inference. |
+| Image attachments and model-requested screenshots | Sent to TeachGPT when used as image context. Model/tool support and school service policies apply. |
+| Conversations, task history, attachments and memory | Stored under the local SchoolWork app-data profile, normally `%APPDATA%\schoolwork-desktop`. These are not all encrypted. |
+| TeachGPT key and optional Telegram token | Stored through Electron's Windows-protected credential storage. Every user supplies their own credentials. |
+| Web searches and opened links | Contact search providers/websites, independently of TeachGPT. |
+| Telegram messages, photos and replies | Pass through Telegram as well as TeachGPT where inference is required. |
+| File tools | Start within the chosen workspace, or use Full user access when selected. Credential files are excluded by built-in filtering, not a guarantee that every possible secret will be detected. |
+| Commands and desktop input | Run with your Windows user's permissions. Folder limits and capability switches are **not an operating-system security sandbox**. |
+
+Ask your school which data may be sent to TeachGPT or Telegram and what its retention rules are. SchoolWork cannot promise a school's server policy or that data is never used for training. For classroom adoption, have a teacher or IT administrator review the app and start with non-sensitive demo projects. There is no classroom administration console, managed student roster or institutional deployment policy built in.
+
+## If something goes wrong
+
+| Symptom | What to try |
+|---|---|
+| No models or authentication error | Check your own key in Settings and refresh the list. Confirm your TeachGPT account can access the service. |
+| HTTP 504, a long wait or an interrupted stream | Let the current attempt settle; use the saved Retry / resume control. Check TeachGPT availability and try a smaller task/context if it repeats. Stream activity is not a completion check. |
+| “Path is outside the selected workspace” | Select the intended folder, or choose Full user access for a new task if appropriate. |
+| `node`, `npm`, `git` or `python` not found | Check which runtime/package manager the project requires. The tool's bundled Node support does not include every other executable. |
+| PowerShell blocks the install script | Download the `.exe` directly or use the school-approved install route; changing policy is not required by SchoolWork. |
+| Screen input is refused or the observation expired | Keep the intended window visible and active, inspect capability settings, and let the agent take a fresh screenshot. |
+| Images fail | Test vision in Settings with the selected model. A model identifier is not proof of image support. |
+| Telegram is silent | Check PC sleep/network, SchoolWork is open, pairing, and whether the link is paused. Use Send test. |
+| An advertised source feature is absent | Check your installed version. The public 0.3.0 installer does not include the 0.6.0 source additions. |
+
+For a bug report, use [GitHub Issues](https://github.com/SILLEN69/schoolwork-desktop/issues). Include your app version, Windows version, model ID, steps, expected result and actual error. Review diagnostic exports and screenshots before sharing; do not include keys, `.env`, student records or private project files.
+
+## Run the latest source
+
+For developers or school IT testing the 0.6.0 additions before a newer public binary is released:
+
+**Requirements:** Windows x64, Git, Node.js **22.12 or later** with npm, and Windows .NET Framework 4.x with its x64 C# compiler. The build compiles the small desktop helper locally. Opening the released installer does not require this developer setup.
 
 ```powershell
-npm install
+git clone https://github.com/SILLEN69/schoolwork-desktop.git
+cd schoolwork-desktop
+npm ci
 npm run dev:app
 ```
 
-On first launch, open Settings, enter your own TeachGPT API key, refresh the models, and choose a workspace folder. SchoolWork stores the key using Windows-protected application storage and sends it to TeachGPT for inference.
-
-## Build Windows packages
+`dev:app` builds the frontend, backend and Windows helper before starting Electron and Vite. Configure your TeachGPT key in Settings. `npm run dev` alone is only a browser preview and cannot run local file, process or desktop tools.
 
 ```powershell
-npm install
+# Unit tests
+npm test
+
+# Production application and native helper
+npm run build
+npm start
+
+# Windows integration checks with simulated provider traffic
+# Run on an awake, unlocked desktop; a disposable window receives input.
+npm run test:desktop
+
+# Build installer and portable executable in release/
 npm run package:win
 ```
 
-The installer and portable executable are written to `release/`.
+For testing without touching your normal profile, create an empty directory and pass its absolute path via `--user-data-dir=<directory>` when launching the Electron app. Keep real credentials out of test profiles. Local packaging does not publish a release or change the installation script's pinned version.
 
-For an isolated test profile, launch with `--user-data-dir=<existing absolute directory>`; the default SchoolWork profile is not changed. After packaging, run the desktop test with `SCHOOLWORK_TEST_PACKAGED=1` to additionally verify the packaged executable and bundled native helper.
+### Verification and contributing
 
-## Current features
+Tests cover provider recovery, tool execution, storage, image transport, desktop observation checks and Telegram routing. Integration tests with simulated transports do **not** establish live TeachGPT vision quality or real Telegram delivery. Mixed-monitor scaling and third-party apps need additional manual checks. The existing [desktop](docs/desktop-implementation.md), [agent](docs/agent-upgrade.md) and [Telegram](docs/telegram-chat.md) reports describe their dated verification scope; older design notes are not the current release catalogue.
 
-- Chat and multi-step tasks using TeachGPT models.
-- Task progress with a total timer and a timer for the current stage.
-- TeachGPT model list with matching Artificial Analysis Intelligence Index scores where available. Unmatched models are labeled as unranked.
-- Project mapping with manifests and scripts, paginated file discovery, bounded multi-file reads, literal search with line references, hash-checked multi-edit patches, versioned backups, and cancellable process trees.
-- Direct process execution with separate arguments for Node/test runners, app-owned background development servers, streamed output, and cleanup on cancellation or application exit.
-- PowerShell command mode without temporary script files or execution-policy changes.
-- Isolated localhost preview checks with optional CSS-selector interaction and expected-text assertions.
-- Web search and opening links in the system browser.
-- Local SQLite conversation/task storage and an Obsidian-compatible Markdown memory vault.
-- Pause, cancel, and retry/resume controls, persistent project plans, and completion checks tied to real test commands.
-- Swedish and English interface.
-- Rendered LaTeX maths, syntax-highlighted fenced code with Copy, tables and clearer message spacing.
-- PNG/JPEG image attachments: file picker, paste/drop, thumbnail previews and saved conversation images.
-- All-app Windows access (or optional selected-app mode): launch, list/focus/inspect windows, per-monitor screenshots, moving windows between monitors, mouse clicks/double-clicks, Unicode typing, shortcuts and scrolling.
-- Persisted failure/pause replies, offline action-status summaries, interrupted tool-history repair and UI recovery from missed events.
-- Bounded evidence-based desktop recovery memory; clear it in Settings. No automatic model training or self-modifying code.
-- Optional two-way Telegram chat with photos, saved conversation context, encrypted bot token, private-account pairing and retry/status/stop.
-- A Desktop panel and immediate Stop control (`Ctrl+Alt+Escape`). No per-action confirmation dialogs.
+Contributions should include a focused reproduction, a small change and the relevant checks. Keep keys, `.env` files, local conversations, browser profiles and private logs out of commits. See [image provenance](docs/images/README.md) for the screenshots used here.
 
-## Applications, screen and images
+**Not currently a built-in workflow:** voice conversation, image/video generation, WhatsApp, cloud sync, scheduled classroom work, or a complete Office/PDF creation-and-rendering pipeline. Installing other tools or controlling a desktop application is not the same as a verified native integration.
 
-All-app mode is the default: the desktop tools can use any accessible ordinary Windows application, without adding each executable. Settings retains an optional selected-app mode and independent launching/view/input switches. Add an executable with **Add application** to retain it as a launch shortcut. Modern packaged apps may require their normal shell launcher through PowerShell; not every application has a directly launchable `.exe`. Existing tasks retain their access snapshot; revocations apply immediately. Start a new task to expand a previously restricted task.
+## License
 
-Ask the agent to use an application normally. `list_displays` exposes all physical monitors, `capture_screen` accepts a monitor or window, and `move_window` fits a window to the chosen monitor's work area. Each input requires a one-use window screenshot (maximum age 180 seconds to accommodate model latency); identity, focus and bounds are rechecked before input. Moving the window, switching focus, revoking access or ending the task invalidates input. Windows may refuse foreground focus; manually activate the window if that happens. The helper stays unelevated: it cannot control secure/UAC/locked/screen-saver desktops or reliably inject input into elevated applications. Visible screen capture may include occluding windows and protected video may appear black. This is point-in-time capture, not continuous recording.
-
-## Telegram phone link
-
-Create your own bot with `@BotFather` in Telegram. In SchoolWork Settings → Telegram, paste the token into the password field, choose **Save & enable**, then **Link phone** and press Start in the bot's private chat. The one-time link expires after five minutes. Token storage uses Electron's Windows-protected credential storage; it is never returned to the renderer, the agent, diagnostics or notifications. Only the paired private chat **and** sender can use task buttons or `/status`, `/retry`, `/stop` (optionally followed by a full task UUID). A newer work request prevents an old task from being retried. Status-only questions do not supersede saved work.
-
-Send normal messages or individual PNG/JPEG photos (optionally with a caption) in the bot chat: the AI responds there using the same saved history and tools as SchoolWork. Photos are also saved as visible attachments in the desktop conversation. `/new` starts a fresh chat without stopping old work. Reply to a task notification, press its Status button, or send `/use <full task UUID>` to continue an existing desktop conversation. New chats use the model selected in Settings; existing chats keep their latest task model. That model must support vision for photos. Albums, voice, video and non-image documents are not supported. If a chat is already working, use `/stop` then resend, or `/new`; new messages are explicitly rejected rather than mixed into an active tool turn.
-
-SchoolWork must remain open and the PC online. It uses long polling, not a public server. Other desktop tasks send generic status only. Tasks started, retried or stopped through Telegram send their assistant replies/failure checkpoints to the paired phone; this can include requested results, code or error explanations. No screenshots are automatically sent to Telegram. Bot chats are cloud chats, not end-to-end encrypted Secret Chats; do not send secrets. Messages/photos go through Telegram and TeachGPT and remain in SchoolWork until conversation deletion. Delivery failures remain in a local retry outbox (latest 200 message parts); uncertain network acknowledgements can occasionally cause duplicate delivery. Incoming offsets are saved before commands/messages: a crash or rejected submission will not blindly replay input; check SchoolWork and resend if needed. Retry preserves the original model/progress and reobserves current screen state. A completed/cancelled task is not restarted by Retry. **Pause link** disables polling and aborts downloads, not already accepted local tasks. **Disconnect** deletes the encrypted token, pairing, routing and queued replies, not saved chats/photos.
-
-Verified coding-tool completion uses “heyyy i did it brochaho”; the reply still describes the actual check and its limits. Slang does not turn an unverified result into success.
-
-See [the 0.5 implementation and verification notes](docs/agent-upgrade.md) for the ten additional improvements, privacy boundaries and manual multi-monitor checks.
-See [the 0.6 Telegram chat and photo notes](docs/telegram-chat.md) for setup, implementation decisions and verification boundaries.
-
-Attach PNG/JPEG images with the composer, clipboard or drop. Limits: 10 MB original, 32 megapixels, six images and 8 MB normalized images per message. Images are resized to a maximum 1600-pixel side and re-encoded locally as PNG. Saved images stay in the app's user-data attachment directory until conversation deletion; unsent images expire after 24 hours at next startup. Tool screenshots are ephemeral and are not written into memory or diagnostic logs. Capture buttons create normal persistent attachments; **sending** them uploads them to TeachGPT. A screenshot requested by the agent is sent to TeachGPT at its next step. Do not use these features with secrets visible on screen.
-
-Image reasoning requires a vision-capable model on your school's TeachGPT endpoint. Model names alone are not proof. Settings includes a synthetic-image vision test, showing verified/unknown/unsupported separately from streaming support. Unknown models may be tried; rejected image input produces a recoverable error without silently changing models or dropping images. The latest two image-bearing messages are included in inference, with a notice for older omitted images.
-
-PowerShell and process tools already execute with your Windows account's permissions and can bypass the desktop allowlist. Capability switches are application-level controls, **not** a security sandbox. Pausing/cancelling stops the helper and invalidates observations; applications you opened remain running. An interrupted input can have partial effects: inspect it before repeating it.
-
-The bundled x64 helper uses Windows .NET Framework, Win32 `SendInput`, UI Automation and GDI; no Node native addon, background service, network listener or elevation is required. Building it requires the Windows Framework compiler installed with .NET Framework 4.x. It is built by `npm run build` and included by the Windows packager.
-
-## Verification
-
-```powershell
-npm test
-npm run test:desktop
-```
-
-The Windows-only desktop test runs the actual Electron app, isolated SQLite/settings and a disposable test window. TeachGPT responses are mocked; no personal screen or credential is sent. It checks image-to-provider content arrays, actual screenshot transport and Unicode input, formatted maths/code/Copy, layout, and Stop. Set `SCHOOLWORK_TEST_OUTPUT` to an existing output directory to keep its UI screenshots. Live provider vision must be tested separately in Settings. Manual checks should cover paste/drop, app selection, window movement/focus loss, rapid Stop, 100/125/150% display scaling, partially off-screen windows, protected content and elevated apps; don't dismiss UAC or unlock Windows automatically.
-
-## Important limits
-
-SchoolWork is independent software and does not claim feature or intelligence parity with ChatGPT Work. The Artificial Analysis Intelligence Index is a general model benchmark, not a guarantee of coding or project success. TeachGPT may intermittently return HTTP 504; saved tasks can be resumed without repeating completed tools. Web search can be blocked or challenged. Processes and PowerShell run with the current Windows user's permissions and are not a security sandbox. Background servers stop when SchoolWork exits.
-
-File tools default to the selected folder. Settings includes a **Full user access** profile for task-relevant files elsewhere under the same Windows account. Existing tasks keep their original access mode; new tasks use the current setting. Credential files, `.env` files, private keys, and similar secrets are excluded from model context in both modes.
-
-No `.env` file, API key, conversation database, browser profile, or local diagnostic log belongs in this repository. Every user must obtain and configure their own TeachGPT key under their school's terms.
+SchoolWork's original source is available under the [MIT License](LICENSE). TeachGPT access and model availability are provided separately by the school. This independent project does not redistribute model weights or claim endorsement by a school, TeachGPT, Telegram, OpenAI or Microsoft.
