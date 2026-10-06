@@ -121,8 +121,8 @@ export default function TelegramSettings({ swedish }: { swedish: boolean }) {
       </p>
       <p>
         {t(
-          "Phone messages/photos are saved in SchoolWork and sent to TeachGPT. Replies to tasks started/retried/stopped from your phone are sent through Telegram, including relevant results or error explanations. Other desktop tasks send status only. Screenshots aren’t automatically uploaded to Telegram. Bot chats aren’t Secret Chats: don’t send sensitive data. Disconnect clears the phone link and pending replies, not saved conversations/photos; delete those in SchoolWork.",
-          "Telefonmeddelanden/bilder sparas i SchoolWork och skickas till TeachGPT. Svar på uppgifter startade/återupptagna/stoppade från telefonen skickas via Telegram, inklusive relevanta resultat eller felbeskrivningar. Andra datoruppgifter skickar bara status. Skärmbilder laddas inte automatiskt upp till Telegram. Botchattar är inte hemliga chattar: skicka inte känslig data. Frånkoppling tar bort telefonkoppling och väntande svar, inte sparade chattar/bilder; radera dem i SchoolWork.",
+          "Phone messages/photos are saved in SchoolWork and sent to TeachGPT. When linked, actual final replies from desktop and phone tasks go through Telegram, including results or error explanations—not just generic status. Actions get short result replies; questions can get detailed answers. Screenshots aren’t automatically uploaded to Telegram. Bot chats aren’t Secret Chats: don’t send sensitive data. Disconnect clears the link and pending replies, not saved chats/photos.",
+          "Telefonmeddelanden/bilder sparas i SchoolWork och skickas till TeachGPT. När telefonen är kopplad skickas riktiga slutsvar från både dator- och telefonuppgifter via Telegram, inklusive resultat eller fel—inte bara generell status. Åtgärder får korta resultatsvar; frågor kan få utförliga svar. Skärmbilder laddas inte automatiskt upp till Telegram. Botchattar är inte hemliga chattar: skicka inte känslig data. Frånkoppling tar bort kopplingen och väntande svar, inte sparade chattar/bilder.",
         )}
       </p>
       {(error || status.error) && (

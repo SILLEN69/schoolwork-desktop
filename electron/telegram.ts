@@ -297,7 +297,7 @@ export class TelegramLink {
             "sendMessage",
             {
               chat_id: pair.chatId,
-              text: item.text + "\nTask: " + item.taskId.slice(0, 8),
+              text: item.text,
               link_preview_options: { is_disabled: true },
               reply_markup: {
                 inline_keyboard: [

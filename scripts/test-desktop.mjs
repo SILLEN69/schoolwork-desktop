@@ -65,6 +65,7 @@ try {
     timeout: 30000,
   });
   const page = await app.firstWindow();
+  assert.equal(await app.evaluate(({app})=>app.getPath('userData')),data,'Test must never use the installed app profile');
   const errors = [];
   page.on("pageerror", (e) => errors.push(e.message));
   await page.waitForFunction(() => Boolean(window.schoolwork));
@@ -110,7 +111,7 @@ try {
       .evaluate((img) => img.naturalWidth > 0),
   );
   await page.getByRole("button", { name: "Copy code", exact: true }).click();
-  await page.getByRole("button", { name: "Copy code", exact: true }).getByText("Copied").waitFor();
+  await page.getByRole('button',{name:'Copy code',exact:true}).getByText('Copied',{exact:true}).waitFor();
   assert.match(
     await app.evaluate(({ clipboard }) => clipboard.readText()),
     /math\.sqrt/,
@@ -174,7 +175,7 @@ try {
       /Actual screenshot pixels received/,
     );
     const observed = await state();
-    assert.match(observed.text, /Agent typed: åäö\r?\nSecond line ✓/);
+    assert.equal(observed.text.replace(/\r\n/g,'\n'),'Agent typed: åäö\nSecond line ✓','Typing/selection must replace old text exactly, not just contain an expected substring');
     assert(observed.clicks > 0);
     assert(observed.wheels > 0);
     for (const message of desktopChat.messages.filter(
@@ -278,8 +279,8 @@ try {
   assert.match(failedChat.messages.at(-1).content, /stopped here/);
   if (!uiOnly)
     assert.match(
-      failedChat.messages.at(-1).content,
-      /capture_screen: 1 succeeded/,
+      failedChat.messages.find(m=>m.name==='capture_screen').content,
+      /"ok":true/,
     );
   await page.reload();
   await page
@@ -317,6 +318,38 @@ try {
       : "PASS: all-app access, physical monitor capture/window switching, persisted post-screen failure reply, offline status and ordinary follow-up.",
   );
   const launchOwner = crypto.randomUUID();
+  // Regressions from the real email/memory task: no false code gate, ordered live/reloaded feed,
+  // unrelated successful reads must not reset repeated screen failures, and release keeps schemas.
+  for(const marker of ['#memory-quick','#failure-loop','#release-control']) {
+    const regressionOwner=crypto.randomUUID();
+    await page.evaluate(({owner,marker})=>window.schoolwork.send({chatId:owner,userText:marker,model:'Test-vision'}),{owner:regressionOwner,marker});
+    const regression=await completed(regressionOwner,marker==='#failure-loop'?'waiting_retry':'completed');
+    if(marker==='#failure-loop') {
+      assert.match(regression.messages.at(-1).content,/3 times/);
+      assert.equal(regression.messages.filter(m=>m.name==='capture_screen').length,3);
+      assert.equal(regression.messages.filter(m=>m.name==='memory_search').length,2);
+    }
+    if(marker==='#release-control')assert.match(regression.messages.at(-1).content,/screen control released/);
+    if(marker==='#memory-quick') {
+      assert.match(regression.messages.at(-1).content,/nothing sent/);
+      const saved=JSON.parse(regression.messages.find(m=>m.name==='memory_save').content);
+      assert.equal(saved.ok,true);assert.equal(saved.data.indexed,true);
+      assert.equal(regression.task.currentTurn,3);
+      if(!await page.getByRole('button',{name:marker,exact:true}).isVisible())await page.getByRole('button',{name:'Recent tasks',exact:true}).click();
+      await page.getByRole('button',{name:marker,exact:true}).click();
+      await page.locator('[data-timeline="message"]').filter({hasText:'nothing sent'}).waitFor();
+      const assertOrder=async()=>{
+        const rows=await page.locator('.thread > [data-timeline]').evaluateAll(elements=>elements.map(el=>({type:el.dataset.timeline,text:el.textContent})));
+        assert.deepEqual(rows.map(r=>r.type),['message','message','activity','message','activity','message']);
+        assert.match(rows[1].text,/on it/);assert.match(rows[3].text,/draft saved/);assert.match(rows[5].text,/nothing sent/);
+      };
+      await assertOrder();await page.reload();
+      await page.getByRole('button',{name:marker,exact:true}).click();
+      await page.locator('[data-timeline="message"]').filter({hasText:'nothing sent'}).waitFor();await assertOrder();
+      await page.screenshot({path:path.join(out,'SchoolWork-chronological-chat.png')});
+    }
+  }
+  console.log('PASS: three-request draft + verified memory save, interleaved/reloaded timeline, bounded failure loop and agent release with all schemas retained (mock provider).');
   await page.evaluate(() =>
     window.schoolwork.telegramConfigure({
       token: "123456789:fixture-token-only-not-a-real-token",
@@ -421,7 +454,7 @@ try {
     .map(JSON.parse);
   assert(notifications.some((n) => n.input.text?.includes("brochaho")));
   assert(notifications.some((n) => n.input.text?.includes("hit an error")));
-  assert(notifications.some((n) => n.input.text?.includes("gotchu")));
+  assert(notifications.some((n) => n.input.text?.includes("on it")));
   const settingsText = await fs.readFile(
     path.join(data, "schoolwork-settings.json"),
     "utf8",
@@ -487,6 +520,18 @@ try {
     }
     throw new Error("Phone reply not delivered: " + text);
   }
+  for(const marker of ['#desktop-draft-sms','#desktop-question-sms']) {
+    const owner=crypto.randomUUID();
+    await page.evaluate(({owner,marker})=>window.schoolwork.send({chatId:owner,userText:marker,model:'Test-vision'}),{owner,marker});
+    const result=await completed(owner);
+    const final=result.messages.at(-1).content;
+    const delivered=await phoneDelivery(final);
+    assert.equal(delivered.input.text,final,'Desktop notification must carry the actual fresh final, not generic boilerplate');
+    assert.equal(delivered.input.reply_markup.inline_keyboard[0][0].callback_data,'status:'+result.task.id);
+    assert(!delivered.input.text.includes('Task:'));assert(!delivered.input.text.includes('results are in SchoolWork'));
+    if(marker==='#desktop-draft-sms')assert(final.length<100);else assert(final.length>250);
+  }
+  console.log('PASS: desktop action sends its short actual outcome; desktop question sends the full explanation, without visible task IDs (mock provider/Telegram).');
   await sendPhone({ text: "/new" });
   await sendPhone({ text: "#phone-chat hey, can we talk here?" });
   const fullPhoneChat = await phoneResult("#phone-chat hey, can we talk here?");
@@ -543,7 +588,7 @@ try {
     priorCount,
   );
   const desktopNotification = (await phoneSent()).find((n) =>
-    n.input.text?.includes("Task: " + phoneFailure.task.id.slice(0, 8)),
+    n.input.reply_markup?.inline_keyboard?.[0]?.[0]?.callback_data==='status:'+phoneFailure.task.id,
   );
   assert(desktopNotification);
   await sendPhone({
@@ -581,7 +626,7 @@ try {
     0,
   );
   const phoneCodingReply = await phoneDelivery(
-    "Task: " + phoneCoding.task.id.slice(0, 8),
+    "heyyy i did it brochaho",
   );
   assert.match(phoneCodingReply.input.text, /brochaho/);
   const textOwner = crypto.randomUUID();
@@ -605,7 +650,7 @@ try {
     "waiting_retry",
   );
   assert.equal(visionFailure.task.conversationId, textOwner);
-  await phoneDelivery("haven’t verified completion");
+  await phoneDelivery("Not verified yet");
   await sendPhone({ text: "#phone-followup text after rejected image" });
   await phoneResult("#phone-followup text after rejected image");
   const phoneRequests = (
@@ -774,7 +819,8 @@ try {
     const profile = await packagedPage.evaluate(() =>
       window.schoolwork.settingsGet(),
     );
-    assert.equal(profile.version, "0.6.0");
+    assert.equal(profile.version, "0.7.0");
+    assert.equal(profile.capabilities.controlScreen,false,'Restart must not undo a user Stop');
     assert.equal(profile.workspace, data);
     await packagedPage
       .getByRole("button", { name: "Explain the physics", exact: true })
@@ -820,8 +866,8 @@ try {
     app = undefined;
     console.log(
       uiOnly
-        ? "PASS: packaged SchoolWork 0.6.0, restored SQLite/images and bundled KaTeX (native capture not verified)."
-        : "PASS: packaged SchoolWork 0.6.0, restored SQLite/images, bundled KaTeX assets and bundled Windows helper capture.",
+        ? "PASS: packaged SchoolWork 0.7.0, restored SQLite/images and bundled KaTeX (native capture not verified)."
+        : "PASS: packaged SchoolWork 0.7.0, restored SQLite/images, bundled KaTeX assets and bundled Windows helper capture.",
     );
   }
   console.log(

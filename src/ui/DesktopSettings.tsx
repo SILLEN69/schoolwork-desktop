@@ -43,8 +43,8 @@ export default function DesktopSettings({
       <label>{t("Applications & screen", "Appar och skärm")}</label>
       <p>
         {t(
-          "Actions run without confirmation dialogs. Choose the applications the desktop tools can use.",
-          "Åtgärder körs utan bekräftelsedialoger. Välj vilka appar skärmverktygen får använda.",
+          "All desktop tools are available by default, without confirmation dialogs. The AI can release screen input when finished; your Stop always wins. You can restrict access below.",
+          "Alla skärmverktyg är tillgängliga som standard, utan bekräftelser. AI:n kan släppa skärminmatning när den är klar; ditt Stopp gäller alltid. Du kan begränsa åtkomst nedan.",
         )}
       </p>
       {capabilities && (

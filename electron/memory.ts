@@ -123,6 +123,21 @@ export class MemoryVault {
     await this.persist(note, 'user-edit');
     return note;
   }
+  async saveFact(input: {title:string;body:string;scope:'user'|'project';tags:string[]}): Promise<MemoryNote> {
+    const body=redactMemoryText(input.body).trim(), title=redactMemoryText(input.title).trim();
+    const candidates=this.store.db.prepare("SELECT id FROM memory_notes WHERE title=? AND scope=? AND status NOT IN ('archived','superseded') AND (scope!='project' OR project_id=?) ORDER BY updated_at DESC LIMIT 20").all(title,input.scope,this.projectId) as {id:string}[];
+    const existing=candidates.map(n=>this.get(n.id)).find(n=>n?.body.trim()===body);
+    const note=existing || await this.create({...input,body,title,type:'fact',status:'provisional',source:'agent-memory-save'});
+    const saved=this.get(note.id);
+    let indexed=this.store.db.prepare('SELECT body FROM memory_fts WHERE note_id=?').get(note.id) as {body:string}|undefined;
+    if(saved && saved.body.trim()===body && indexed?.body.trim()!==body) {
+      // A matching file may have been edited externally before the watcher reconciled it.
+      await this.reconcile();
+      indexed=this.store.db.prepare('SELECT body FROM memory_fts WHERE note_id=?').get(note.id) as {body:string}|undefined;
+    }
+    if(!saved || saved.body.trim()!==body || indexed?.body.trim()!==body) throw new Error('Memory persistence/index check failed. Inspect the saved note before retrying.');
+    return saved;
+  }
 
   get(noteId: string): MemoryNote | undefined {
     const row = this.store.db.prepare('SELECT * FROM memory_notes WHERE id=?').get(noteId) as any;

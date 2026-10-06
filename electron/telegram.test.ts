@@ -412,7 +412,8 @@ describe("Telegram two-way chat and images", () => {
       .filter(([url]) => String(url).endsWith("/sendMessage"))
       .map(([, init]) => JSON.parse(init.body));
     expect(sent.some((s) => s.text.includes("private-old"))).toBe(false);
-    expect(sent.filter((s) => s.text.includes("Task: task"))).toHaveLength(2);
+    expect(sent.filter((s) => s.reply_markup?.inline_keyboard?.[0]?.[0]?.callback_data==='status:task')).toHaveLength(2);
+    expect(sent.every(s=>!s.text.includes('Task:'))).toBe(true);
     expect(sent.every((s) => !s.parse_mode && s.text.length <= 4096)).toBe(
       true,
     );

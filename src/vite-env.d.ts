@@ -59,7 +59,7 @@ interface Window {
     setLanguage: (language: "en" | "sv") => Promise<boolean>;
     chooseWorkspace: () => Promise<string | null>;
     listModels: () => Promise<string[]>;
-    listChats: () => Promise<any[]>;
+    listChats: (compact?: boolean) => Promise<any[]>;
     getChat: (id: string) => Promise<any>;
     taskStatus: (id: string) => Promise<{ text: string; state: string }>;
     deleteChat: (id: string) => Promise<void>;

@@ -16,6 +16,8 @@ SchoolWork is a Windows assistant for students and teachers with access to **Tea
 
 **Current release: v0.6.0 for Windows x64.** It includes the screen, image and Telegram features shown below. Every installation needs its own eligible TeachGPT account and API key. SchoolWork is an independent open-source project, not an official school application.
 
+The 0.7 source update adds bounded observation loops, one-call memory saves, chronological chat and actual task-specific Telegram replies. See [0.7 implementation and verification](docs/agent-efficiency-0.7.md). The published downloads below remain 0.6.0 until a separate release is published.
+
 **[Installer and portable downloads](https://github.com/SILLEN69/schoolwork-desktop/releases/tag/v0.6.0)** · **[Installation script](Install-SchoolWork.ps1)** · **[Source setup](#run-the-latest-source)** · **[Report a problem](https://github.com/SILLEN69/schoolwork-desktop/issues)**
 
 ![SchoolWork showing a physics explanation, rendered maths and Python code in its chat workspace](docs/images/workspace.png)
@@ -143,6 +145,8 @@ The model chooses an action; the application executes it and sends the result ba
 
 SchoolWork can use ordinary Windows applications through its bundled desktop helper. It can list and launch apps, find and focus windows, read accessible controls, capture a window or monitor, move windows between monitors, click/double-click, type Unicode text, press shortcuts and scroll.
 
+In 0.7, the requested full-desktop policy enables all applications/launching/view/input once on upgrade, including unfinished task snapshots. This migration never repeats on restart. **Stop screen control** disables input and pauses active work; only the user can enable it again. The AI can use `release_screen_control` to relinquish input for its task without disabling other tools or future tasks. All schemas remain registered even when execution is blocked by revocation. The central chat interleaves updates and tool steps, with the final answer after its tools.
+
 ![SchoolWork Applications and screen settings with separate controls for launching, viewing and mouse/keyboard input](docs/images/screen-control.png)
 
 *Real settings from the isolated demo profile. This example uses selected-app access; a fresh default profile uses all-app access.*
@@ -203,7 +207,7 @@ This is stored knowledge, **not training the school model's weights**. Notes can
 
 If a chat is busy, stop then resend, or start `/new`; messages are not silently inserted into a running tool step. Voice messages, albums, video and non-image documents are not supported. This is Telegram integration, not WhatsApp or a voice-call feature.
 
-Phone-controlled tasks send their replies and checkpoints through Telegram; unrelated desktop tasks send generic status. Screenshots are not automatically sent to Telegram. Bot conversations are Telegram cloud chats, not end-to-end encrypted Secret Chats. **Pause link** pauses the connection; **Disconnect** removes the token, pairing and queued replies, but neither deletes existing conversations nor stops already accepted local tasks. See [Telegram details and verification limits](docs/telegram-chat.md).
+In the published 0.6 release, phone-controlled tasks send their replies and checkpoints through Telegram; unrelated desktop tasks send generic status. In the 0.7 source update, paired phone delivery also includes the actual fresh final answer from desktop tasks: action results are short, while questions receive the explanation they need. Task IDs stay in button/reply routing instead of visible boilerplate. These replies can contain requested results and private content; do not use the link for sensitive work. Screenshots are not automatically sent to Telegram. Bot conversations are Telegram cloud chats, not end-to-end encrypted Secret Chats. **Pause link** pauses the connection; **Disconnect** removes the token, pairing and queued replies, but neither deletes existing conversations nor stops already accepted local tasks. See [Telegram details and verification limits](docs/telegram-chat.md).
 
 ## Data, permissions and school use
 

@@ -53,6 +53,15 @@ function setup() {
   return { tools, ctx, request, stop };
 }
 describe("desktop action boundaries", () => {
+  it('observes an unfocused window but issues no reusable input token',async () => {
+    const {tools,ctx,request}=setup();
+    request.mockImplementation(async action => action==='list_windows'?[window]:{window:{...window,focused:false},image:Buffer.from('pixels').toString('base64')} as any);
+    const capture=await tools.execute('capture_screen',{windowId:'123'},ctx);
+    expect(capture.ok).toBe(true);expect(capture.data.inputReady).toBe(false);
+    expect(capture.data.frameDigest).toMatch(/^[a-f0-9]{64}$/);
+    expect(capture.summary).toContain('may be covered');
+    await expect(tools.execute('click',{screenshotId:capture.data.screenshotId,x:1,y:1},ctx)).rejects.toThrow('expired');
+  });
   it("allows every accessible app in all-app mode and honors live revocation", async () => {
     const { tools, ctx } = setup();
     const all = {
