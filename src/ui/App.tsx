@@ -23,8 +23,7 @@ import {
   X,
 } from "lucide-react";
 import MemoryView from "./MemoryView";
-import ActivityLog from "./ActivityLog";
-import MessageMarkdown from "./MessageMarkdown";
+import ConversationTimeline from "./ConversationTimeline";
 import WorkPanel from "./WorkPanel";
 import DesktopSettings from "./DesktopSettings";
 import TelegramSettings from "./TelegramSettings";
@@ -101,7 +100,7 @@ export default function App() {
   const refresh = async () => {
     const [s, c] = await Promise.all([
       window.schoolwork.settingsGet(),
-      window.schoolwork.listChats(),
+      window.schoolwork.listChats(true),
     ]);
     setSettings(s);
     setChats(c);
@@ -124,7 +123,7 @@ export default function App() {
           "cancelled",
         ].includes(e.type)
       )
-        void window.schoolwork.listChats().then(setChats);
+        void window.schoolwork.listChats(true).then(setChats);
       if (e.conversationId !== selectedId.current) return;
       if (e.type === "screenshot") return;
       if (e.type === "queued") {
@@ -158,7 +157,7 @@ export default function App() {
         setLoading(false);
         setStatus(null);
         if (e.state === "waiting_retry") setError(e.text);
-        void window.schoolwork.listChats().then(setChats);
+        void window.schoolwork.listChats(true).then(setChats);
         return;
       }
       const nextStage =
@@ -192,7 +191,7 @@ export default function App() {
         ]);
         setLoading(false);
         setStatus(null);
-        window.schoolwork.listChats().then(setChats);
+        window.schoolwork.listChats(true).then(setChats);
       }
       if (e.type === "cancelled" || e.type === "paused") {
         setLoading(false);
@@ -602,6 +601,14 @@ export default function App() {
                 {t("Stop screen control", "Stoppa skärmkontroll")}
               </button>
             )}
+            {!settings.capabilities?.controlScreen && (
+              <button className="tool-pill" title={t("Only you can re-enable input after Stop.", "Bara du kan aktivera inmatning efter Stopp.")} onClick={async () => {
+                try {await window.schoolwork.setCapabilities({...settings.capabilities,viewScreen:true,controlScreen:true});await refresh();}
+                catch(e:any) {setError(e.message);}
+              }}>
+                <Monitor size={13} />{t("Enable screen control", "Aktivera skärmkontroll")}
+              </button>
+            )}
             <div className="privacy">
               <span className="green-dot" />
               TeachGPT <span className="privacy-sep">·</span>
@@ -730,42 +737,7 @@ export default function App() {
             </div>
           ) : (
             <div className="thread">
-              {messages
-                .filter(
-                  (m) =>
-                    m.role !== "tool" &&
-                    (m.content.trim() || m.attachments?.length),
-                )
-                .map((m, i) => (
-                  <div className={"message " + m.role} key={i}>
-                    {m.role === "assistant" && (
-                      <div className="msg-avatar">
-                        <Workflow size={15} />
-                      </div>
-                    )}
-                    <div className="msg-body">
-                      {m.role === "tool" ? (
-                        <details className="tool-message">
-                          <summary>Saved tool result</summary>
-                          <pre>{m.content}</pre>
-                        </details>
-                      ) : m.role === "user" ? (
-                        <div className="user-bubble">
-                          {m.content}
-                          <ImageAttachments attachments={m.attachments || []} />
-                        </div>
-                      ) : (
-                        <>
-                          <div className="msg-meta">
-                            SchoolWork {m.model && <span>· {m.model}</span>}
-                          </div>
-                          <MessageMarkdown text={m.content} />
-                        </>
-                      )}
-                    </div>
-                  </div>
-                ))}
-              <ActivityLog conversationId={id} swedish={isSv} compact />
+              <ConversationTimeline conversationId={id} fallback={messages} swedish={isSv} running={loading} onUpdated={() => {if(stickToBottom.current)end.current?.scrollIntoView({behavior:'auto'});}} />
               {status && (
                 <div className="activity">
                   <span className="activity-icon">

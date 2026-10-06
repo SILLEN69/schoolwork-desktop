@@ -38,7 +38,7 @@ contextBridge.exposeInMainWorld("schoolwork", {
     ipcRenderer.invoke("settings:set-language", language),
   chooseWorkspace: () => ipcRenderer.invoke("settings:workspace"),
   listModels: () => ipcRenderer.invoke("models:list"),
-  listChats: () => ipcRenderer.invoke("chat:list"),
+  listChats: (compact = false) => ipcRenderer.invoke("chat:list", compact),
   getChat: (id: string) => ipcRenderer.invoke("chat:get", id),
   taskStatus: (id: string) => ipcRenderer.invoke("chat:status", id),
   getActivity: (id: string) => ipcRenderer.invoke("chat:activity", id),

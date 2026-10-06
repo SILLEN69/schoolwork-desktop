@@ -172,6 +172,10 @@ export class SchoolWorkStore {
     return rows.map(row => ({ id: row.id, title: row.title, updatedAt: row.updated_at }));
   }
 
+  lastMessageSequence(conversationId: string): number {
+    return Number((this.db.prepare('SELECT COALESCE(MAX(sequence),-1) AS n FROM messages WHERE conversation_id=?').get(conversationId) as any).n);
+  }
+
   getMessages(conversationId: string, includeObservations = true): StoredMessage[] {
     const rows = this.db.prepare(`SELECT id,conversation_id,sequence,role,content,model,name,tool_call_id,tool_calls_json,legacy_data,created_at
       FROM messages WHERE conversation_id=? ${includeObservations ? '' : "AND role!='legacy_observation'"} ORDER BY sequence`).all(conversationId) as any[];

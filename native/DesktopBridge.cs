@@ -28,6 +28,7 @@ static class DesktopBridge {
     [DllImport("user32.dll", CharSet = CharSet.Unicode)] static extern int GetWindowText(IntPtr h, StringBuilder s, int size);
     [DllImport("user32.dll")] static extern uint GetWindowThreadProcessId(IntPtr h, out uint pid);
     [DllImport("user32.dll")] static extern bool GetWindowRect(IntPtr h, out Rect r);
+    [DllImport("dwmapi.dll")] static extern int DwmGetWindowAttribute(IntPtr h, int attribute, out Rect r, int size);
     [DllImport("user32.dll")] static extern IntPtr GetForegroundWindow();
     [DllImport("user32.dll")] static extern bool SetForegroundWindow(IntPtr h);
     [DllImport("user32.dll")] static extern bool ShowWindow(IntPtr h, int command);
@@ -59,6 +60,9 @@ static class DesktopBridge {
         string exe=Process.GetProcessById((int)pid).MainModule.FileName;
         var title=new StringBuilder(1024); GetWindowText(h,title,title.Capacity);
         Rect r; if (!GetWindowRect(h,out r)) throw new Exception("Window bounds unavailable.");
+        // GetWindowRect includes invisible resize borders (e.g. -8 on a maximized Chrome window).
+        // Use visible physical frame bounds consistently for capture AND input validation.
+        Rect frame; if(DwmGetWindowAttribute(h,9,out frame,Marshal.SizeOf(typeof(Rect)))==0 && frame.Right>frame.Left && frame.Bottom>frame.Top) r=frame;
         return Obj("windowId",h.ToInt64().ToString(),"pid",pid,"appId",exe,"title",title.ToString(),"left",r.Left,"top",r.Top,"width",r.Right-r.Left,"height",r.Bottom-r.Top,"focused",h==GetForegroundWindow(),"minimized",IsIconic(h));
     }
     static IntPtr Target(Dictionary<string, object> a, bool focus) {
@@ -115,8 +119,8 @@ static class DesktopBridge {
             if(!SetWindowPos(target,IntPtr.Zero,area.Left,area.Top,Math.Min(Num(info,"width"),area.Width),Math.Min(Num(info,"height"),area.Height),0x14)) throw new Exception("Windows refused window movement (possibly elevated).");
             Thread.Sleep(150); return Obj("window",WindowInfo(target),"displayId",display.DeviceName);
         }
+        if (action=="capture_screen") { if(IsIconic(target)) throw new Exception("Window is minimized; restore it before observing."); var w=WindowInfo(target); return Capture(new Rectangle(Num(w,"left"),Num(w,"top"),Num(w,"width"),Num(w,"height")),w); }
         target=Target(a,true);
-        if (action=="capture_screen") { var w=WindowInfo(target); return Capture(new Rectangle(Num(w,"left"),Num(w,"top"),Num(w,"width"),Num(w,"height")),w); }
         Unmodified();
         if (action=="click" || action=="scroll") {
             int x=Num(a,"x"),y=Num(a,"y"); var w=WindowInfo(target);

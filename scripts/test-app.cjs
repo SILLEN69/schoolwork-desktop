@@ -164,6 +164,32 @@ Here is the calculation in code:
 ` +
       "```python\nimport math\ntime = math.sqrt(2 * 0.95 / 9.82)\nprint(1.10 / time)\n```";
     let toolCalls;
+    if(requested.includes('#desktop-draft-sms')) {
+      const step=counts.get('desktop-draft-sms')||0;counts.set('desktop-draft-sms',step+1);
+      content=step===0?'on it':'mejlutkast sparat, brochacho. inget skickat.';
+      if(!step)toolCalls=[{index:0,id:'desktop-draft',type:'function',function:{name:'write_file',arguments:JSON.stringify({path:'telegram-draft.md',content:'A synthetic local draft, not sent mail.'})}}];
+    }
+    if(requested.includes('#desktop-question-sms'))content='Så funkar det: tiden i luften bestäms av fallhöjden, inte av hastigheten framåt. Först räknar du t = sqrt(2h/g). Sedan använder du avståndet längs golvet: v = s/t. Med h = 0,95 m och s = 1,10 m blir tiden ungefär 0,44 s och hastigheten cirka 2,5 m/s. Det bygger på att kulan lämnar bordet horisontellt och att luftmotståndet är försumbart.';
+    for (const marker of ['#memory-quick','#failure-loop','#release-control']) {
+      if(!requested.includes(marker)) continue;
+      const step=counts.get(marker)||0;counts.set(marker,step+1);
+      let action;
+      if(marker==='#memory-quick') {
+        action=[['write_file',{path:'draft-note.md',content:'A local test draft. This is NOT sent mail.'}],['memory_save',{title:'Test SMS style',body:'Use short chill replies.',scope:'user',tags:['fixture']} ]][step];
+        content=step===0?'on it':step===1?'draft saved, remembering your style':'done — draft and memory saved. nothing sent.';
+      }
+      if(marker==='#failure-loop') {
+        action=step%2===0?['capture_screen',{windowId:'999999999'}]:['memory_search',{query:'fixture'}];
+        content='checking the fixture';
+      }
+      if(marker==='#release-control') {
+        if(!body.tools.some(t=>t.function.name==='click'))throw new Error('Desktop tools disappeared from schema');
+        if(step>0&&!body.messages[0].content.includes('execution is OFF'))throw new Error('Released status missing from prompt');
+        action=step===0?['release_screen_control',{}]:undefined;
+        content=step===0?'letting go of the screen':'done — screen control released';
+      }
+      if(action)toolCalls=[{index:0,id:marker+'-'+step,type:'function',function:{name:action[0],arguments:JSON.stringify(action[1])}}];
+    }
     if (requested.includes("#coding-integration")) {
       const codingKey = requested.includes("phone") ? "phone-coding" : "coding";
       const step = counts.get(codingKey) || 0;
@@ -340,7 +366,7 @@ Here is the calculation in code:
         );
       const selected = previous.find(
         (r) => Array.isArray(r.data) && r.data[0]?.windowId,
-      )?.data[0];
+      )?.data.find(w=>w.appId.toLowerCase()===process.env.SCHOOLWORK_TEST_EXE.toLowerCase());
       const shot = [...previous].reverse().find((r) => r.data?.screenshotId);
       const controls =
         [...previous].reverse().find((r) => r.data?.controls)?.data?.controls ||
