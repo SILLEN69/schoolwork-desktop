@@ -110,6 +110,7 @@ try {
       .evaluate((img) => img.naturalWidth > 0),
   );
   await page.getByRole("button", { name: "Copy code", exact: true }).click();
+  await page.getByRole("button", { name: "Copy code", exact: true }).getByText("Copied").waitFor();
   assert.match(
     await app.evaluate(({ clipboard }) => clipboard.readText()),
     /math\.sqrt/,

@@ -1,14 +1,22 @@
 # SchoolWork
 
-### Learn, build and debug with your school's AI models.
+![SchoolWork logo and project workflow: explore, build, verify](docs/images/schoolwork-banner.svg)
 
-SchoolWork is an open-source Windows assistant for students and teachers with access to **TeachGPT** at **Stockholm Science and Innovation School (SSIS)**. Ask a question, work through a calculation, build a website or investigate a broken project. The assistant can read relevant files, make changes, run checks and show the results in one workspace.
+<p align="center"><strong>Your ideas, your computer, your school's AI models.</strong></p>
 
-Conversations and project memory live on your computer. AI requests go to the school's TeachGPT endpoint. **No OpenAI API key or paid ChatGPT subscription is required to use SchoolWork.** You do need your own working TeachGPT account and API key.
+<p align="center">
+  <a href="https://github.com/SILLEN69/schoolwork-desktop/releases/latest"><img alt="Latest release" src="https://img.shields.io/github/v/release/SILLEN69/schoolwork-desktop?style=flat-square&amp;color=C7F173"></a>
+  <img alt="Windows x64" src="https://img.shields.io/badge/Windows-x64-243329?style=flat-square">
+  <img alt="MIT license" src="https://img.shields.io/badge/license-MIT-243329?style=flat-square">
+</p>
 
-**[Download for Windows](https://github.com/SILLEN69/schoolwork-desktop/releases/latest)** · **[Installation script](Install-SchoolWork.ps1)** · **[First task](#your-first-task)** · **[Screen control](#screen-control-see-act-check)** · **[Phone link](#talk-to-schoolwork-from-your-phone)** · **[Report a problem](https://github.com/SILLEN69/schoolwork-desktop/issues)**
+<p align="center"><a href="https://github.com/SILLEN69/schoolwork-desktop/releases/latest"><strong>Download v0.6.0</strong></a> · <a href="#first-time-setup">Get started</a> · <a href="#what-schoolwork-can-do">Features</a> · <a href="#screen-control-see-act-check">Screen control</a> · <a href="#talk-to-schoolwork-from-your-phone">Telegram</a></p>
 
-> **Which version am I getting?** Checked 6 October 2026: the public installer is **v0.3.0**. The latest source on `main` is **0.6.0**, which adds screen control, image attachments, formatted maths and Telegram. Those additions are **not included in the v0.3.0 download**. Use [the source instructions](#run-the-latest-source) to try them. This is an early project, not an official TeachGPT or school-managed product.
+SchoolWork is a Windows assistant for students and teachers with access to **TeachGPT at Stockholm Science and Innovation School (SSIS)**. Explain a concept, investigate a bug or build a project: SchoolWork helps the selected school model find relevant files, edit code, run tests and report what happened. Your conversations and Markdown memory stay on your computer; model requests go to TeachGPT.
+
+**Current release: v0.6.0 for Windows x64.** It includes the screen, image and Telegram features shown below. Every installation needs its own eligible TeachGPT account and API key. SchoolWork is an independent open-source project, not an official school application.
+
+**[Installer and portable downloads](https://github.com/SILLEN69/schoolwork-desktop/releases/tag/v0.6.0)** · **[Installation script](Install-SchoolWork.ps1)** · **[Source setup](#run-the-latest-source)** · **[Report a problem](https://github.com/SILLEN69/schoolwork-desktop/issues)**
 
 ![SchoolWork showing a physics explanation, rendered maths and Python code in its chat workspace](docs/images/workspace.png)
 
@@ -19,29 +27,23 @@ Conversations and project memory live on your computer. AI requests go to the sc
 | If you are… | Try SchoolWork for… |
 |---|---|
 | Learning to code | Understanding an existing project, locating a bug, making a small change and running its tests. |
-| Studying maths or science | Asking for an explanation, checking units and comparing a calculation with a short program. The source version renders equations and accepts images with a vision-capable model. |
+| Studying maths or science | Asking for an explanation, checking units and comparing a calculation with a short program. SchoolWork renders equations and accepts images with a vision-capable model. |
 | Building a school project | Turning a brief into milestones, editing several files, starting a local website and checking its behaviour. |
 | Preparing a lesson | Drafting exercises, explanations, example code or a small interactive demonstration to review before class. |
 | Supervising project work | Reviewing visible tool activity, test output and changed files alongside the student's explanation of their work. |
 
 Use it according to your teacher's rules for AI assistance. Ask for explanations and check the work: a confident answer or a passing syntax check is not proof that an entire project is correct. Start with a copy of a project and avoid identifiable student records or confidential assessments.
 
-## What it can do today
+## What SchoolWork can do
 
-| Capability | Public installer 0.3.0 | Latest source 0.6.0 |
-|---|:---:|:---:|
-| Swedish/English chat and interface; select a TeachGPT model | Yes | Yes |
-| Multi-step work, saved conversations, progress and task/stage timers | Yes | Yes |
-| Map projects, find files, search text and read selected line ranges | Yes | Yes |
-| Create files and apply targeted edits with stale-file checks and backups | Yes | Yes |
-| Run commands, tests and background development servers | Yes | Yes |
-| Search the web, open links and check a localhost website | Yes | Yes |
-| Local Markdown memory with linked notes and an editor | Yes | Yes |
-| Markdown tables and code blocks | Yes | Yes |
-| Rendered LaTeX equations and syntax-highlighted code | — | Yes |
-| PNG/JPEG attachments and screenshot questions | — | Requires model vision support |
-| Windows app control, screenshots and multiple monitors | — | Yes, within Windows permissions |
-| Telegram messages, photos, task notifications and controls | — | Optional setup |
+| Work | Available in v0.6.0 |
+|---|---|
+| **Ask and explain** | Swedish or English conversations, selected TeachGPT models, rendered equations, tables and highlighted code. |
+| **Build and debug** | Project mapping, file search, bounded reads, targeted edits, backups, real test commands and local website checks. |
+| **Keep context** | Saved tasks, progress timers, checkpoints and a local linked Markdown memory vault. |
+| **Use your desktop** | Windows app/window inspection, point-in-time screenshots, monitor selection, mouse and keyboard actions. |
+| **Show a problem** | PNG/JPEG attachments, screenshot questions and a per-model vision test. Image understanding depends on the selected model. |
+| **Continue by phone** | Optional paired Telegram bot for messages, individual photos, task updates and stop/retry commands while the PC is on. |
 
 Model availability comes from your TeachGPT account. Displayed Artificial Analysis rankings are a dated reference where a matching model exists, not a live leaderboard or a guarantee of coding ability. School-hosted settings can differ from benchmark settings. SchoolWork keeps the model you choose; it does not silently switch providers or buy API credits.
 
@@ -57,9 +59,9 @@ Current download links:
 
 | File | Purpose |
 |---|---|
-| [SchoolWork 0.3.0 installer](https://github.com/SILLEN69/schoolwork-desktop/releases/download/v0.3.0/SchoolWork-0.3.0-x64-setup.exe) | Normal per-user installation; no developer tools needed to open the app. |
-| [SchoolWork 0.3.0 portable](https://github.com/SILLEN69/schoolwork-desktop/releases/download/v0.3.0/SchoolWork-0.3.0-x64-portable.exe) | Launch without the installation wizard. "Portable" does not mean that all settings and chats stay beside the executable. |
-| [SHA-256 checksums](https://github.com/SILLEN69/schoolwork-desktop/releases/download/v0.3.0/SHA256SUMS-v0.3.0.txt) | Compare downloaded files with the published manifest. |
+| [SchoolWork 0.6.0 installer](https://github.com/SILLEN69/schoolwork-desktop/releases/download/v0.6.0/SchoolWork-0.6.0-x64-setup.exe) | Normal per-user installation; no developer tools needed to open the app. |
+| [SchoolWork 0.6.0 portable](https://github.com/SILLEN69/schoolwork-desktop/releases/download/v0.6.0/SchoolWork-0.6.0-x64-portable.exe) | Launch without the installation wizard. "Portable" does not mean that all settings and chats stay beside the executable. |
+| [SHA-256 checksums](https://github.com/SILLEN69/schoolwork-desktop/releases/download/v0.6.0/SHA256SUMS-v0.6.0.txt) | Compare downloaded files with the published manifest. |
 
 Packages are **unsigned**. On a managed school computer, follow your school's software-installation process if Windows or an administrator blocks them. The app does not require automatic administrator elevation.
 
@@ -70,10 +72,10 @@ Packages are **unsigned**. On a managed school computer, follow your school's so
 ```powershell
 Invoke-WebRequest -Uri "https://raw.githubusercontent.com/SILLEN69/schoolwork-desktop/main/Install-SchoolWork.ps1" -OutFile ".\Install-SchoolWork.ps1"
 Get-Content .\Install-SchoolWork.ps1
-.\Install-SchoolWork.ps1 -Version v0.3.0
+.\Install-SchoolWork.ps1
 ```
 
-The script downloads that release, verifies the installer against its SHA-256 manifest, then opens the regular installation wizard. Its current default is **v0.3.0**; it does not automatically install the newest source code. It does not change PowerShell execution policy. If scripts are blocked, use Option 1 or your school's approved method.
+The script downloads **v0.6.0** by default, verifies the installer against its SHA-256 manifest, then opens the regular installation wizard. Pass `-Version v0.3.0` if you explicitly need the older release. It does not change PowerShell execution policy. If scripts are blocked, use Option 1 or your school's approved method.
 
 For an update, finish or pause your current work and close SchoolWork normally before running the newer installer. Keep backups of important projects. Downloading source code alone does not update an installed app.
 
@@ -83,7 +85,7 @@ For an update, finish or pause your current work and close SchoolWork normally b
 2. **Open Settings in SchoolWork.** Paste the key into **TeachGPT API key** and select **Save**. Put keys in Settings, never in a chat, screenshot or GitHub issue.
 3. **Select Refresh available models**, then choose a **Default model** returned by the school. [TeachGPT's model page](https://teachgpt.ssis.nu/about/models) describes its current offering.
 4. **Choose a Working folder.** Start with a dedicated lesson/project folder. File tools default to **Selected workspace only**. **Full user access** allows file tools to work elsewhere with your Windows account's permissions; it applies to new tasks.
-5. **If running 0.6.0, review Applications & screen.** New default settings allow all accessible apps, launching, screen viewing and input. Turn off capabilities you do not want, or select specific apps. For image questions, run the sample-image test under **Image understanding**.
+5. **Review Applications & screen.** New default settings allow all accessible apps, launching, screen viewing and input. Turn off capabilities you do not want, or select specific apps. For image questions, run the sample-image test under **Image understanding**.
 6. Choose English or Swedish using the language control, start a new task and give it a small, concrete objective.
 
 Internet is needed for TeachGPT inference. Existing local conversations and files remain available offline. Coding tasks may need additional tools such as Git, npm or Python; SchoolWork can run installed tools, but does not bundle every language, package manager or project dependency. Its `node` process tool uses Electron's bundled Node runtime.
@@ -112,7 +114,7 @@ For bigger projects, give the agent milestones and acceptance checks. Review eac
 
 ## Follow the work
 
-The left sidebar holds your conversations and **Memory vault**. The centre shows the conversation, current activity and task controls. The right panel offers **Files**, **Preview** and **Activity**; the source version also includes **Desktop**.
+The left sidebar holds your conversations and **Memory vault**. The centre shows the conversation, current activity and task controls. The right panel offers **Files**, **Preview**, **Desktop** and **Activity**.
 
 - Expand a tool step to see the file operation, command or result. Commands can report output, exit status and errors.
 - Use **Files** to explore the project and read bounded excerpts. Use **Preview** for a local website.
@@ -137,7 +139,7 @@ The model chooses an action; the application executes it and sends the result ba
 
 ## Screen control: see, act, check
 
-**Available in source 0.6.0; not in the public 0.3.0 installer.**
+**Included in v0.6.0.**
 
 SchoolWork can use ordinary Windows applications through its bundled desktop helper. It can list and launch apps, find and focus windows, read accessible controls, capture a window or monitor, move windows between monitors, click/double-click, type Unicode text, press shortcuts and scroll.
 
@@ -161,7 +163,7 @@ Desktop actions share your real mouse, keyboard and windows and run without per-
 
 ## Images, equations and code
 
-**Source 0.6.0** supports PNG/JPEG through the image picker, clipboard paste or drag-and-drop. You can ask about an error screenshot, a diagram or a photographed exercise. Attach only what you intend to send to TeachGPT.
+SchoolWork supports PNG/JPEG through the image picker, clipboard paste or drag-and-drop. You can ask about an error screenshot, a diagram or a photographed exercise. Attach only what you intend to send to TeachGPT.
 
 - Up to six images per desktop message; originals are limited to 10 MB and 32 megapixels each, with an 8 MB combined normalized limit.
 - Images are resized locally to a maximum 1,600-pixel side and re-encoded. Older image-bearing messages may be omitted from model context with a notice; reattach a needed image when appropriate.
@@ -180,7 +182,7 @@ This is stored knowledge, **not training the school model's weights**. Notes can
 
 ## Talk to SchoolWork from your phone
 
-**Optional in source 0.6.0.** Telegram lets you send messages or individual photos, receive replies and task notifications, and check or stop work from your phone. The PC must stay awake and online with SchoolWork running. There is no mobile SchoolWork app or public server to host, but you do need to create a Telegram bot once.
+**Optional in v0.6.0.** Telegram lets you send messages or individual photos, receive replies and task notifications, and check or stop work from your phone. The PC must stay awake and online with SchoolWork running. There is no mobile SchoolWork app or public server to host, but you do need to create a Telegram bot once.
 
 ![SchoolWork Telegram settings with bot-token entry, Link phone and Send test controls](docs/images/telegram.png)
 
@@ -230,13 +232,13 @@ Ask your school which data may be sent to TeachGPT or Telegram and what its rete
 | Screen input is refused or the observation expired | Keep the intended window visible and active, inspect capability settings, and let the agent take a fresh screenshot. |
 | Images fail | Test vision in Settings with the selected model. A model identifier is not proof of image support. |
 | Telegram is silent | Check PC sleep/network, SchoolWork is open, pairing, and whether the link is paused. Use Send test. |
-| An advertised source feature is absent | Check your installed version. The public 0.3.0 installer does not include the 0.6.0 source additions. |
+| A feature is absent | Check the version in your installation against the [latest release](https://github.com/SILLEN69/schoolwork-desktop/releases/latest). |
 
 For a bug report, use [GitHub Issues](https://github.com/SILLEN69/schoolwork-desktop/issues). Include your app version, Windows version, model ID, steps, expected result and actual error. Review diagnostic exports and screenshots before sharing; do not include keys, `.env`, student records or private project files.
 
 ## Run the latest source
 
-For developers or school IT testing the 0.6.0 additions before a newer public binary is released:
+For developers or school IT building and checking the application from source:
 
 **Requirements:** Windows x64, Git, Node.js **22.12 or later** with npm, and Windows .NET Framework 4.x with its x64 C# compiler. The build compiles the small desktop helper locally. Opening the released installer does not require this developer setup.
 

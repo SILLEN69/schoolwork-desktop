@@ -14,6 +14,6 @@ No real TeachGPT key, Telegram token, school record, personal conversation or de
 
 Playwright captured the whole app viewport for the workspace and the actual settings sections for the other two images. The renderer was checked for JavaScript errors, horizontal page overflow, rendered maths and code highlighting. Each image was visually reviewed. These are UI illustrations, not evidence of live provider vision, phone delivery or complete classroom acceptance testing.
 
-The public **v0.3.0** installer predates these UI additions. Keep the version distinction in the main README until a newer public binary is published.
+The public **v0.6.0** installer includes these UI additions. The screenshot conversation still uses the isolated simulated provider; the pictures are interface examples, not evidence of live TeachGPT output.
 
 To capture equivalent UI examples after a source change, build the app and use its isolated Electron fixture, as in [`scripts/test-desktop.mjs`](../../scripts/test-desktop.mjs). Use fictional content and a dedicated profile; never reuse a student's profile. `SCHOOLWORK_TEST_OUTPUT` can retain the integration script's own screenshots. Its desktop-input checks should run only on an awake, unlocked machine with the disposable test window.
