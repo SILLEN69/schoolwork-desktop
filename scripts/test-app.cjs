@@ -25,7 +25,20 @@ app.whenReady().then(() => {
   );
   const realFetch = global.fetch;
   const counts = new Map();
+  let telegramMessageId = 100;
   global.fetch = async (url, init) => {
+    if (String(url).startsWith("https://api.telegram.org/file/bot")) {
+      return new Response(
+        fs.readFileSync(
+          path.join(
+            dir,
+            String(url).endsWith("invalid.png")
+              ? "telegram-invalid.png"
+              : "telegram-photo.png",
+          ),
+        ),
+      );
+    }
     if (String(url).startsWith("https://api.telegram.org/bot")) {
       const method = String(url).split("/").at(-1),
         input = JSON.parse(init.body);
@@ -40,16 +53,24 @@ app.whenReady().then(() => {
           result: updates.filter((u) => u.update_id >= (input.offset || 0)),
         });
       }
+      const result =
+        method === "getMe"
+          ? { username: "SchoolWorkFixtureBot" }
+          : method === "getFile"
+            ? {
+                file_path:
+                  "photos/" +
+                  (input.file_id === "invalid" ? "invalid.png" : "fixture.png"),
+                file_size: 70,
+              }
+            : { message_id: ++telegramMessageId };
       fs.appendFileSync(
         path.join(dir, "telegram-sent.jsonl"),
-        JSON.stringify({ method, input }) + "\n",
+        JSON.stringify({ method, input, result }) + "\n",
       );
       return Response.json({
         ok: true,
-        result:
-          method === "getMe"
-            ? { username: "SchoolWorkFixtureBot" }
-            : { message_id: 1 },
+        result,
       });
     }
     if (!String(url).startsWith("https://teachgpt.ssis.nu/api/v1/"))
@@ -65,6 +86,15 @@ app.whenReady().then(() => {
     const users = body.messages.filter((m) => m.role === "user");
     const requested =
       users
+        .map((m) => ({
+          ...m,
+          content: Array.isArray(m.content)
+            ? m.content
+                .filter((p) => p.type === "text")
+                .map((p) => p.text)
+                .join("\n")
+            : m.content,
+        }))
         .filter(
           (m) =>
             typeof m.content === "string" &&
@@ -99,13 +129,22 @@ app.whenReady().then(() => {
       path.join(dir, "requests.jsonl"),
       JSON.stringify({
         hasImages,
+        model: body.model,
+        texts: users.map((m) =>
+          typeof m.content === "string"
+            ? m.content
+            : m.content
+                .filter((p) => p.type === "text")
+                .map((p) => p.text)
+                .join("\n"),
+        ),
         parts: users.map((m) =>
           Array.isArray(m.content) ? m.content.map((p) => p.type) : ["text"],
         ),
         internalFields: body.messages.some((m) => "screenObservation" in m),
       }) + "\n",
     );
-    if (body.model === "Test-text" && hasImages)
+    if (body.model.startsWith("Test-text") && hasImages)
       return Response.json(
         { error: { message: "This model does not support image inputs." } },
         { status: 400 },
@@ -126,8 +165,9 @@ Here is the calculation in code:
       "```python\nimport math\ntime = math.sqrt(2 * 0.95 / 9.82)\nprint(1.10 / time)\n```";
     let toolCalls;
     if (requested.includes("#coding-integration")) {
-      const step = counts.get("coding") || 0;
-      counts.set("coding", step + 1);
+      const codingKey = requested.includes("phone") ? "phone-coding" : "coding";
+      const step = counts.get(codingKey) || 0;
+      counts.set(codingKey, step + 1);
       const actions = [
         [
           "write_file",
@@ -157,6 +197,27 @@ Here is the calculation in code:
       } else
         content =
           "heyyy i did it brochaho 😎 saved the code and node --check passed. Syntax checked; this is not full behavior coverage.";
+    }
+    if (requested.includes("#phone-chat"))
+      content = "heyy phone chat works 🤝 (mock provider reply)";
+    if (requested.includes("#phone-followup"))
+      content =
+        "gotchu, I still have the previous phone chat context 🤝 (mock provider reply)";
+    if (requested.includes("#phone-image"))
+      content = "heyy, got ur photo 👀 (mock provider image reply)";
+    if (requested.includes("#phone-wait")) {
+      await new Promise((resolve, reject) => {
+        const timer = setTimeout(resolve, 8000);
+        init.signal.addEventListener(
+          "abort",
+          () => {
+            clearTimeout(timer);
+            reject(new Error("aborted"));
+          },
+          { once: true },
+        );
+      });
+      content = "wait fixture finished";
     }
     if (
       requested.includes("#screen-failure") ||

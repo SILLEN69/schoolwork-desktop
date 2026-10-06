@@ -49,7 +49,11 @@ import {
   isStatusQuestion,
 } from "../src/taskContinuity";
 import { DesktopLearning } from "./desktopLearning";
-import { TelegramLink } from "./telegram";
+import {
+  TelegramLink,
+  TelegramUserError,
+  type TelegramInput,
+} from "./telegram";
 import { DesktopBridge } from "./desktopBridge";
 import {
   DesktopTools,
@@ -383,9 +387,30 @@ function emit(task: any, type: string, payload: Record<string, unknown> = {}) {
     taskId: task.id,
     conversationId: task.conversationId,
   });
-  if (
+  const phoneSession = store.getMetadata("telegram-task:" + task.id);
+  if (telegram && phoneSession && ["answer", "checkpoint"].includes(type)) {
+    try {
+      telegram.notify(
+        `${task.id}:${event.id}`,
+        task.id,
+        type === "answer" ? "done" : "paused",
+        false,
+        redactMemoryText(
+          String(
+            payload.text ||
+              payload.summary ||
+              "Progress saved. Open SchoolWork for details.",
+          ),
+        ),
+        phoneSession,
+      );
+    } catch {
+      /* Phone delivery cannot undo a local result. */
+    }
+  } else if (
     ["answer", "error", "paused"].includes(type) &&
     telegram &&
+    !phoneSession &&
     !isStatusQuestion(task.objective)
   ) {
     try {
@@ -1763,6 +1788,167 @@ function schedule() {
   const next = store.getActiveTasks().find((t) => t.state === "queued");
   if (next) void runTask(next);
 }
+// All entry points share ownership, request deduplication, task journaling and current permissions.
+function submitTask(raw: unknown, phoneSession?: string) {
+  const payload = z
+    .object({
+      chatId: z.string().uuid(),
+      userText: z.string().trim().max(30000),
+      attachmentIds: z.array(z.string().uuid()).max(6).default([]),
+      model: z.string().min(1).max(160),
+      clientRequestId: z.string().uuid().optional(),
+    })
+    .refine(
+      (p) => p.userText.length > 0 || p.attachmentIds.length > 0,
+      "Enter a message or attach an image.",
+    )
+    .parse(raw);
+  const clientRequestId = payload.clientRequestId || crypto.randomUUID();
+  const previous = store.getTaskForRequest(clientRequestId);
+  if (previous) return previous.id;
+  if (!settings.get("encryptedKey"))
+    throw new TelegramUserError(
+      "Add your TeachGPT API key in SchoolWork Settings.",
+    );
+  attachments.assertOwned(payload.chatId, payload.attachmentIds);
+  if (
+    store
+      .getActiveTasks()
+      .some(
+        (t) =>
+          t.conversationId === payload.chatId &&
+          ["running", "queued"].includes(t.state),
+      )
+  )
+    throw new TelegramUserError(
+      "yo, this chat is still working. Send /stop first, then resend your message/photo, or use /new for a separate chat. Nothing new was started.",
+    );
+  const task = {
+    id: crypto.randomUUID(),
+    conversationId: payload.chatId,
+    clientRequestId,
+    objective: payload.userText || "Describe the attached image.",
+    model: payload.model,
+    workspace: path.resolve(
+      settings.get("workspace") || app.getPath("documents"),
+    ),
+    state: "queued",
+  };
+  store.startTask({
+    ...task,
+    attachmentIds: payload.attachmentIds,
+    metadata: {
+      ["access:" + task.id]: settings.get("fileAccess") || "workspace",
+      ["capabilities:" + task.id]: JSON.stringify(capabilities()),
+      ...(phoneSession
+        ? {
+            ["telegram-task:" + task.id]: phoneSession,
+            "telegram:conversation": JSON.stringify(payload.chatId),
+          }
+        : {}),
+    },
+  });
+  emit(task, "queued", {
+    text: "Task queued.",
+    source: phoneSession ? "telegram" : "desktop",
+  });
+  schedule();
+  return task.id;
+}
+function latestPhoneTask(id?: string) {
+  if (id) return store.getTask(id);
+  const conversation = telegram.selectedConversation();
+  const rows = store.db
+    .prepare(
+      "SELECT id,objective FROM tasks " +
+        (conversation ? "WHERE conversation_id=? " : "") +
+        "ORDER BY created_at DESC,rowid DESC LIMIT 200",
+    )
+    .all(...(conversation ? [conversation] : []));
+  const latest = rows.find(
+    (row: any) => !isStatusQuestion(row.objective),
+  ) as any;
+  return latest ? store.getTask(latest.id) : undefined;
+}
+async function receiveTelegram(input: TelegramInput) {
+  input.signal.throwIfAborted();
+  if (input.session !== telegram.session())
+    throw new TelegramUserError("Phone link changed; send your message again.");
+  const existing = store.getTaskForRequest(input.requestId);
+  if (existing)
+    return "already saved that message 🤝 Task: " + existing.id.slice(0, 8);
+  const replyTask = input.replyTaskId
+    ? store.getTask(input.replyTaskId)
+    : undefined;
+  if (input.replyTaskId && !replyTask)
+    throw new TelegramUserError(
+      "That task was deleted or is unavailable. Use /new for a fresh chat.",
+    );
+  let chatId =
+    replyTask?.conversationId || telegram.selectedConversation() || "";
+  if (!store.listConversations().some((c) => c.id === chatId))
+    chatId = crypto.randomUUID();
+  if (
+    store
+      .getActiveTasks()
+      .some(
+        (t) =>
+          t.conversationId === chatId &&
+          ["running", "queued"].includes(t.state),
+      )
+  )
+    throw new TelegramUserError(
+      "yo, still working in that chat. Send /stop then resend, or /new for a separate chat. Your message/photo wasn’t submitted.",
+    );
+  if (!settings.get("encryptedKey"))
+    throw new TelegramUserError(
+      "Add your TeachGPT API key in SchoolWork Settings first.",
+    );
+  const recent = store.db
+    .prepare(
+      "SELECT model FROM tasks WHERE conversation_id=? ORDER BY created_at DESC,rowid DESC LIMIT 1",
+    )
+    .get(chatId) as any;
+  const model = recent?.model || settings.get("model") || defaultModels[0];
+  const imported: string[] = [];
+  try {
+    if (input.image) {
+      const buffer = await telegram.downloadImage(input.image, input.signal);
+      input.signal.throwIfAborted();
+      // Shared decoder checks magic bytes, decoded dimensions, ownership, and strips metadata.
+      const attachment = await attachments.import(
+        chatId,
+        input.image.name,
+        buffer,
+      );
+      imported.push(attachment.id);
+    }
+    input.signal.throwIfAborted();
+    if (input.session !== telegram.session())
+      throw new TelegramUserError(
+        "Phone link changed; send your message again.",
+      );
+    const taskId = submitTask(
+      {
+        chatId,
+        userText: input.text,
+        attachmentIds: imported,
+        model,
+        clientRequestId: input.requestId,
+      },
+      input.session,
+    );
+    return `gotchu, ${input.image ? "photo saved + " : ""}task queued 🤝 I’ll reply here. Task: ${taskId.slice(0, 8)} · model: ${model}`;
+  } catch (error) {
+    for (const id of imported)
+      if (attachments.list(chatId).some((a) => a.id === id && !a.messageId))
+        await attachments.remove(id, chatId).catch(() => {});
+    if (error instanceof TelegramUserError) throw error;
+    throw new TelegramUserError(
+      "yo, couldn’t save/start that. Check SchoolWork. Send a valid PNG/JPEG under 10 MB (max 32 MP), or resend your text. Nothing was automatically retried.",
+    );
+  }
+}
 function jsonToolHistory(history: any[]) {
   return history.map(({ tool_calls, tool_call_id: _id, ...m }) =>
     m.role === "tool"
@@ -2257,62 +2443,7 @@ function registerIpc() {
   });
   ipcMain.handle("chat:send", (event, raw) => {
     trusted(event);
-    const payload = z
-      .object({
-        chatId: z.string().uuid(),
-        userText: z.string().trim().max(30000),
-        attachmentIds: z.array(z.string().uuid()).max(6).default([]),
-        model: z.string().min(1).max(160),
-        clientRequestId: z.string().uuid().optional(),
-      })
-      .refine(
-        (p) => p.userText.length > 0 || p.attachmentIds.length > 0,
-        "Enter a message or attach an image.",
-      )
-      .parse(raw);
-    const clientRequestId = payload.clientRequestId || crypto.randomUUID();
-    const previous = store.getTaskForRequest(clientRequestId);
-    if (previous) return previous.id;
-    if (!settings.get("encryptedKey"))
-      throw new Error("Add your TeachGPT API key in Settings.");
-    attachments.assertOwned(payload.chatId, payload.attachmentIds);
-    // One task per chat may write history at a time. Reject instead of mixing tool turns.
-    if (
-      store
-        .getActiveTasks()
-        .some(
-          (t) =>
-            t.conversationId === payload.chatId &&
-            ["running", "queued"].includes(t.state),
-        )
-    )
-      throw new Error(
-        "This chat already has a running task. Stop or pause it before sending a new task.",
-      );
-    const workspace = path.resolve(
-      settings.get("workspace") || app.getPath("documents"),
-    );
-    const task = {
-      id: crypto.randomUUID(),
-      conversationId: payload.chatId,
-      clientRequestId,
-      objective: payload.userText || "Describe the attached image.",
-      model: payload.model,
-      workspace,
-      state: "queued",
-    };
-    store.startTask({ ...task, attachmentIds: payload.attachmentIds });
-    store.setMetadata(
-      "access:" + task.id,
-      settings.get("fileAccess") || "workspace",
-    );
-    store.setMetadata(
-      "capabilities:" + task.id,
-      JSON.stringify(capabilities()),
-    );
-    emit(task, "queued", { text: "Task queued." });
-    schedule();
-    return task.id;
+    return submitTask(raw);
   });
   ipcMain.handle("chat:cancel", (event, raw) => {
     trusted(event);
@@ -2467,21 +2598,38 @@ else {
         }
       },
       async (verb, id) => {
-        const latest = store.db
-          .prepare(
-            "SELECT id,objective FROM tasks ORDER BY created_at DESC, rowid DESC LIMIT 200",
-          )
-          .all()
-          .find((row: any) => !isStatusQuestion(row.objective)) as any;
-        const task = store.getTask(id || latest?.id || "");
+        if (verb === "new") {
+          telegram.selectConversation(crypto.randomUUID());
+          return "fresh chat ready 🤝 send your message or photo + caption. Other tasks keep running.";
+        }
+        if (verb === "use" && !id)
+          return "send /use <full task id>, or reply to a task notification to continue that chat.";
+        const task = latestPhoneTask(id);
         if (!task) return "yo, no task found. Open SchoolWork to start one.";
-        if (verb === "status")
+        if (verb === "use") {
+          telegram.selectConversation(task.conversationId);
+          return `gotchu — continuing chat for task ${task.id.slice(0, 8)}. Send a message/photo; AI replies to phone-submitted tasks come here.`;
+        }
+        if (verb === "status") {
+          telegram.selectConversation(task.conversationId);
           return `hey, task ${task.id.slice(0, 8)} is ${task.state}.\n${taskEvidence(task.id)}\nDetails stay in SchoolWork.`;
-        controlTask(task.id, verb === "stop" ? "stop" : "retry");
+        }
+        // Opt this task into content delivery only when explicitly controlled from the phone.
+        const oldSession = store.getMetadata("telegram-task:" + task.id) || "";
+        store.setMetadata("telegram-task:" + task.id, telegram.session());
+        telegram.selectConversation(task.conversationId);
+        try {
+          controlTask(task.id, verb === "stop" ? "stop" : "retry");
+        } catch (error) {
+          store.setMetadata("telegram-task:" + task.id, oldSession);
+          throw error;
+        }
         return verb === "retry"
           ? "gotchu — resuming from saved progress, not replaying uncertain clicks 🤝"
           : "stopped it. progress is saved.";
       },
+      fetch,
+      receiveTelegram,
     );
     if (settings.get("telegramEnabled") && settings.get("telegramToken"))
       telegram.start();

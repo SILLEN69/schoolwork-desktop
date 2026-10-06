@@ -2,11 +2,26 @@ import { describe, expect, it } from 'vitest';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
+import crypto from 'node:crypto';
 import { SchoolWorkStore } from './storage';
 
 function temporary() { return fs.mkdtempSync(path.join(os.tmpdir(), 'schoolwork-store-')); }
 
 describe('durable conversation store', () => {
+  it('atomically persists routing and permission snapshots with tasks and rolls them back on failure', () => {
+    const dir = temporary(); const store = new SchoolWorkStore(dir);
+    const input = { id: crypto.randomUUID(), conversationId: crypto.randomUUID(), clientRequestId: crypto.randomUUID(), objective: 'phone task', model: 'vision', workspace: dir };
+    const metadata = { ['telegram-task:' + input.id]: 'paired-session', ['capabilities:' + input.id]: '{"allApps":true}', 'telegram:conversation': JSON.stringify(input.conversationId) };
+    store.startTask({ ...input, metadata });
+    expect(store.getMetadata('telegram-task:' + input.id)).toBe('paired-session');
+    expect(store.getMessages(input.conversationId)).toHaveLength(1);
+    const failed = { ...input, id: crypto.randomUUID(), clientRequestId: crypto.randomUUID(), conversationId: crypto.randomUUID() };
+    store.db.exec("CREATE TRIGGER test_route_failure BEFORE INSERT ON metadata WHEN NEW.key='fail-route' BEGIN SELECT RAISE(ABORT,'fixture storage failure'); END;");
+    expect(() => store.startTask({ ...failed, metadata: { 'fail-route': 'x' } })).toThrow();
+    expect(store.getTaskForRequest(failed.clientRequestId)).toBeUndefined();
+    expect(store.getMessages(failed.conversationId)).toHaveLength(0);
+    store.close(); fs.rmSync(dir, { recursive: true, force: true });
+  });
   it('imports legacy messages exactly once without inventing native tool-call records', () => {
     const dir = temporary();
     const legacy = [{ id: 'a12f4f9d-514e-42da-b2c4-01ebf9ca7335', title: 'Old task', updatedAt: 1234, messages: [

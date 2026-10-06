@@ -115,9 +115,14 @@ export default function App() {
         return;
       }
       if (
-        ["answer", "error", "checkpoint", "paused", "cancelled"].includes(
-          e.type,
-        )
+        [
+          "queued",
+          "answer",
+          "error",
+          "checkpoint",
+          "paused",
+          "cancelled",
+        ].includes(e.type)
       )
         void window.schoolwork.listChats().then(setChats);
       if (e.conversationId !== selectedId.current) return;
@@ -125,6 +130,19 @@ export default function App() {
       if (e.type === "queued") {
         taskRef.current = e.taskId;
         setCurrentTaskId(e.taskId);
+        setLoading(true);
+        if (e.source === "telegram")
+          void window.schoolwork
+            .getChat(e.conversationId)
+            .then((chat) => {
+              if (
+                selectedId.current === e.conversationId &&
+                taskRef.current === e.taskId &&
+                chat.task?.state !== "completed"
+              )
+                setMessages(chat.messages);
+            })
+            .catch(() => {});
       }
       if (
         taskRef.current &&

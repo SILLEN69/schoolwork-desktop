@@ -1,14 +1,45 @@
 import crypto from "node:crypto";
 import type { SchoolWorkStore } from "./storage";
 
-type Command = "retry" | "status" | "stop";
+type Command = "retry" | "status" | "stop" | "new" | "use";
 type Pair = { chatId: number; userId: number };
+export type TelegramInput = {
+  requestId: string;
+  text: string;
+  image?: { fileId: string; bytes?: number; name: string };
+  replyTaskId?: string;
+  session: string;
+  signal: AbortSignal;
+};
+const maxPhotoBytes = 10 * 1024 * 1024;
+const help =
+  "yo, send a message or PNG/JPEG photo + caption and I’ll reply here 🤝 /new starts fresh; reply to a task notification or /use <full task id> to continue it. /status, /retry and /stop still work. SchoolWork must stay open.";
+export function telegramChunks(text: string): string[] {
+  // No parse_mode: model Markdown, code and malformed HTML cannot break delivery.
+  const bounded =
+    text.length > 60000
+      ? text.slice(0, /[\uD800-\uDBFF]/.test(text[58999]) ? 58999 : 59000) +
+        "\n[Long reply shortened. Full result is saved in SchoolWork.]"
+      : text;
+  const chunks: string[] = [];
+  let part = "";
+  for (const character of bounded) {
+    if (part.length + character.length > 3500) {
+      chunks.push(part);
+      part = "";
+    }
+    part += character;
+  }
+  if (part) chunks.push(part);
+  return chunks;
+}
 type Outgoing = {
   id: string;
   taskId: string;
   text: string;
   tries: number;
   after: number;
+  session?: string;
 };
 export class TelegramLink {
   private controller?: AbortController;
@@ -23,6 +54,7 @@ export class TelegramLink {
     private token: () => string,
     private command: (verb: Command, taskId: string) => Promise<string>,
     private fetcher: typeof fetch = fetch,
+    private conversation?: (input: TelegramInput) => Promise<string>,
   ) {}
   private read<T>(key: string, fallback: T): T {
     try {
@@ -45,6 +77,76 @@ export class TelegramLink {
       error: this.lastError,
       pending: this.read<Outgoing[]>("outbox", []).length,
     };
+  }
+  session() {
+    return this.read<string>("session", "");
+  }
+  selectedConversation() {
+    return this.read<string>("conversation", "");
+  }
+  selectConversation(id: string) {
+    this.write("conversation", id);
+  }
+  /** Downloads only authenticated Telegram files; never accept a caller-supplied URL. */
+  async downloadImage(
+    image: NonNullable<TelegramInput["image"]>,
+    signal: AbortSignal,
+  ) {
+    const generation = this.generation;
+    if (
+      image.bytes !== undefined &&
+      (!Number.isSafeInteger(image.bytes) ||
+        image.bytes < 1 ||
+        image.bytes > maxPhotoBytes)
+    )
+      throw new Error("Send a PNG/JPEG image under 10 MB.");
+    const requestSignal = AbortSignal.any([signal, AbortSignal.timeout(30000)]);
+    const file = await this.api(
+      "getFile",
+      { file_id: image.fileId },
+      requestSignal,
+    );
+    if (generation !== this.generation || this.stopped)
+      throw new Error("Phone link changed.");
+    const filePath = String(file.file_path || "");
+    if (
+      !/^[A-Za-z0-9_/-]+\.[A-Za-z0-9]+$/.test(filePath) ||
+      filePath.split("/").some((p) => !p || p === "." || p === "..") ||
+      filePath.startsWith("/") ||
+      (file.file_size !== undefined &&
+        (!Number.isSafeInteger(file.file_size) ||
+          file.file_size > maxPhotoBytes))
+    )
+      throw new Error("Telegram image is unavailable or exceeds 10 MB.");
+    let response: Response;
+    try {
+      response = await this.fetcher(
+        `https://api.telegram.org/file/bot${this.token()}/${filePath}`,
+        { signal: requestSignal, redirect: "error" },
+      );
+    } catch {
+      throw new Error("Image download failed. Send the photo again.");
+    }
+    if (!response.ok || !response.body)
+      throw new Error("Image download failed. Send the photo again.");
+    const reader = response.body.getReader(),
+      parts: Uint8Array[] = [];
+    let size = 0;
+    try {
+      while (true) {
+        requestSignal.throwIfAborted();
+        const { done, value } = await reader.read();
+        if (done) break;
+        size += value.byteLength;
+        if (size > maxPhotoBytes) throw new Error("Send an image under 10 MB.");
+        parts.push(value);
+      }
+    } finally {
+      await reader.cancel().catch(() => {});
+    }
+    if (generation !== this.generation || this.stopped)
+      throw new Error("Phone link changed.");
+    return Buffer.concat(parts, size);
   }
   async api(
     method: string,
@@ -102,6 +204,9 @@ export class TelegramLink {
     this.pairing = undefined;
     this.write("pair", null);
     this.write("outbox", []);
+    this.write("session", "");
+    this.write("replies", []);
+    this.write("conversation", "");
   }
   resetBot() {
     this.disconnect();
@@ -110,6 +215,8 @@ export class TelegramLink {
   }
   start() {
     if (!this.stopped) return;
+    if (this.read<Pair | null>("pair", null) && !this.session())
+      this.write("session", crypto.randomUUID());
     this.stopped = false;
     const generation = ++this.generation;
     this.controller = new AbortController();
@@ -126,8 +233,12 @@ export class TelegramLink {
     taskId: string,
     state: "done" | "error" | "paused",
     coding = false,
+    answer?: string,
+    session?: string,
   ) {
-    if (this.stopped || !this.read<Pair | null>("pair", null)) return;
+    // Pause suspends delivery, not durable local completion notifications.
+    if (!this.read<Pair | null>("pair", null)) return;
+    if (session && session !== this.session()) return;
     const seen = this.read<string[]>("seen", []);
     if (seen.includes(id)) return;
     const text =
@@ -138,13 +249,26 @@ export class TelegramLink {
         : state === "paused"
           ? "yo, task paused. progress saved — check SchoolWork or tap status."
           : "yo, hit an error 😭 progress saved. check SchoolWork for details, then tap retry if u want.";
+    const chunks = telegramChunks(
+      (answer || text).replace(
+        /\b\d{5,16}:[A-Za-z0-9_-]{20,100}\b/g,
+        "[redacted bot token]",
+      ),
+    );
     this.write("seen", [...seen, id].slice(-500));
     this.write(
       "outbox",
       [
         ...this.read<Outgoing[]>("outbox", []),
-        { id, taskId, text, tries: 0, after: 0 },
-      ].slice(-100),
+        ...chunks.map((chunk, i) => ({
+          id: id + ":" + i,
+          taskId,
+          text: chunk,
+          tries: 0,
+          after: 0,
+          session: this.session(),
+        })),
+      ].slice(-200),
     );
     void this.flush().catch(() => {
       this.lastError =
@@ -158,16 +282,23 @@ export class TelegramLink {
     this.flushing = true;
     const generation = this.generation;
     try {
-      for (const item of this.read<Outgoing[]>("outbox", []).filter(
-        (i) => i.after <= Date.now(),
-      )) {
+      for (const item of this.read<Outgoing[]>("outbox", [])) {
         if (generation !== this.generation) return;
+        if (item.after > Date.now()) break; // Preserve chunk order across delivery retries.
+        if (item.session && item.session !== this.session()) {
+          this.write(
+            "outbox",
+            this.read<Outgoing[]>("outbox", []).filter((i) => i.id !== item.id),
+          );
+          continue;
+        }
         try {
-          await this.api(
+          const sent = await this.api(
             "sendMessage",
             {
               chat_id: pair.chatId,
               text: item.text + "\nTask: " + item.taskId.slice(0, 8),
+              link_preview_options: { is_disabled: true },
               reply_markup: {
                 inline_keyboard: [
                   [
@@ -189,6 +320,14 @@ export class TelegramLink {
               : AbortSignal.timeout(15000),
           );
           if (generation !== this.generation) return;
+          if (Number.isSafeInteger(sent?.message_id))
+            this.write(
+              "replies",
+              [
+                ...this.read<any[]>("replies", []),
+                { messageId: sent.message_id, taskId: item.taskId },
+              ].slice(-1000),
+            );
           this.write(
             "outbox",
             this.read<Outgoing[]>("outbox", []).filter((i) => i.id !== item.id),
@@ -243,11 +382,20 @@ export class TelegramLink {
       message.text === "/start " + this.pairing.code
     ) {
       this.write("pair", { chatId: message.chat.id, userId: user.id });
+      this.write("session", crypto.randomUUID());
+      this.write("conversation", "");
+      this.write("replies", []);
+      this.write("outbox", []);
       this.pairing = undefined;
       this.write("offset", update.update_id + 1);
+      // Re-pairing cancels downloads/work adapters belonging to the previous phone session.
+      this.stop();
+      this.start();
       await this.api("sendMessage", {
         chat_id: message.chat.id,
-        text: "heyy ur phone is linked 🙌 /status, /retry or /stop + task id. SchoolWork must stay open. No screenshots or chat contents are sent.",
+        text:
+          "heyy ur phone is linked 🙌 Messages + photos you send go to the AI, and its replies come back here. Other desktop tasks send status only. " +
+          help,
       });
       return;
     }
@@ -262,7 +410,9 @@ export class TelegramLink {
         .trim()
         .replace(/^\//, "")
         .replace(/\s+/, ":");
-    const match = /^(retry|status|stop)(?::([a-f0-9-]{36}))?$/.exec(value);
+    const match = /^(retry|status|stop|new|use)(?::([a-f0-9-]{36}))?$/.exec(
+      value,
+    );
     // Persist consumption BEFORE executing: a crash must not replay a desktop command.
     this.write("offset", update.update_id + 1);
     if (cb)
@@ -270,15 +420,93 @@ export class TelegramLink {
         () => {},
       );
     if (this.stopped || generation !== this.generation) return;
-    const reply = match
-      ? await this.command(match[1] as Command, match[2] || "").catch(
-          () =>
-            "yo, couldn’t do that. Check SchoolWork; no input was automatically repeated.",
+    let reply: string;
+    try {
+      const text = String(message.text || message.caption || "").trim();
+      if (match && !message.photo && !message.document) {
+        reply = await this.command(match[1] as Command, match[2] || "");
+      } else if (cb || text.startsWith("/")) {
+        reply = help;
+      } else if (this.conversation) {
+        const photo = Array.isArray(message.photo)
+          ? message.photo
+              .filter(
+                (p: any) =>
+                  typeof p.file_id === "string" &&
+                  (!p.file_size || p.file_size <= maxPhotoBytes),
+              )
+              .sort(
+                (a: any, b: any) => b.width * b.height - a.width * a.height,
+              )[0]
+          : undefined;
+        const document = message.document;
+        if (
+          document &&
+          !["image/png", "image/jpeg"].includes(document.mime_type)
         )
-      : "yo, use /status, /retry or /stop (optional full task id).";
+          throw new TelegramUserError(
+            "Send a PNG/JPEG photo or image file; other attachments aren’t supported yet.",
+          );
+        if (message.media_group_id)
+          throw new TelegramUserError(
+            "Send photos individually, with a caption if you want. Albums aren’t supported yet.",
+          );
+        if (message.photo && !photo)
+          throw new TelegramUserError("Send a photo under 10 MB.");
+        const file = photo || document;
+        if (!text && !file)
+          throw new TelegramUserError(
+            "Send text or a PNG/JPEG photo. Voice/video isn’t supported yet.",
+          );
+        if (
+          text.length > 30000 ||
+          (file &&
+            (typeof file.file_id !== "string" || file.file_id.length > 512))
+        )
+          throw new TelegramUserError(
+            "Message or image identifier is too long.",
+          );
+        const session = this.session();
+        const hash = crypto
+          .createHash("sha256")
+          .update(session + ":" + update.update_id)
+          .digest();
+        hash[6] = (hash[6] & 15) | 0x50;
+        hash[8] = (hash[8] & 63) | 0x80;
+        const requestId = hash
+          .toString("hex")
+          .slice(0, 32)
+          .replace(/^(.{8})(.{4})(.{4})(.{4})(.{12})$/, "$1-$2-$3-$4-$5");
+        const replyTaskId = this.read<any[]>("replies", []).find(
+          (r) => r.messageId === message.reply_to_message?.message_id,
+        )?.taskId;
+        reply = await this.conversation({
+          requestId,
+          text,
+          session,
+          replyTaskId,
+          signal: this.controller!.signal,
+          image: file
+            ? {
+                fileId: file.file_id,
+                bytes: file.file_size,
+                name: photo ? "Telegram photo.jpg" : "Telegram image",
+              }
+            : undefined,
+        });
+      } else reply = help;
+    } catch (error) {
+      // Only our own validation errors can be disclosed by the conversation adapter.
+      reply =
+        error instanceof TelegramUserError
+          ? error.message
+          : "yo, couldn’t accept that. Check SchoolWork; no input was automatically repeated. Send PNG/JPEG photos individually under 10 MB, or text.";
+    }
+    if (this.stopped || generation !== this.generation) return;
     await this.api("sendMessage", {
       chat_id: pair.chatId,
       text: reply.slice(0, 3000),
+      link_preview_options: { is_disabled: true },
     });
   }
   private async poll(generation: number) {
@@ -312,3 +540,5 @@ export class TelegramLink {
       );
   }
 }
+/** Explicitly safe messages, never raw provider/filesystem/token-bearing errors. */
+export class TelegramUserError extends Error {}

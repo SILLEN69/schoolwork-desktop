@@ -426,13 +426,228 @@ try {
     "utf8",
   );
   assert(!settingsText.includes("fixture-token-only"));
+  // Complete Telegram -> real app/SQLite/attachments -> provider -> phone path.
+  await fs.writeFile(
+    path.join(data, "telegram-photo.png"),
+    Buffer.from(png, "base64"),
+  );
+  await fs.writeFile(
+    path.join(data, "telegram-invalid.png"),
+    Buffer.from("not a PNG image"),
+  );
+  let phoneUpdateId = 3;
+  async function sendPhone(body) {
+    const update = {
+      update_id: ++phoneUpdateId,
+      message: { chat: { id: 10, type: "private" }, from: { id: 20 }, ...body },
+    };
+    updates.push(update);
+    await fs.writeFile(
+      path.join(data, "telegram-updates.json"),
+      JSON.stringify(updates),
+    );
+    return update;
+  }
+  async function phoneResult(marker, expectedState = "completed") {
+    for (let i = 0; i < 150; i++) {
+      const chats = await page.evaluate(() => window.schoolwork.listChats());
+      const target = chats.find((c) =>
+        c.messages.some((m) => m.role === "user" && m.content === marker),
+      );
+      if (target) {
+        const saved = await page.evaluate(
+          (id) => window.schoolwork.getChat(id),
+          target.id,
+        );
+        if (
+          saved.task.state === expectedState &&
+          saved.task.objective === marker
+        )
+          return saved;
+      }
+      await new Promise((r) => setTimeout(r, 100));
+    }
+    throw new Error(
+      "Phone task did not reach " + expectedState + ": " + marker,
+    );
+  }
+  const phoneSent = async () =>
+    (await fs.readFile(path.join(data, "telegram-sent.jsonl"), "utf8"))
+      .trim()
+      .split("\n")
+      .map(JSON.parse);
+  async function phoneDelivery(text) {
+    for (let i = 0; i < 100; i++) {
+      const sent = (await phoneSent()).findLast(
+        (n) => n.method === "sendMessage" && n.input.text.includes(text),
+      );
+      if (sent) return sent;
+      await new Promise((r) => setTimeout(r, 100));
+    }
+    throw new Error("Phone reply not delivered: " + text);
+  }
+  await sendPhone({ text: "/new" });
+  await sendPhone({ text: "#phone-chat hey, can we talk here?" });
+  const fullPhoneChat = await phoneResult("#phone-chat hey, can we talk here?");
+  await phoneDelivery("heyy phone chat works");
+  const repeated = updates.at(-1);
+  updates.push(repeated);
+  await fs.writeFile(
+    path.join(data, "telegram-updates.json"),
+    JSON.stringify(updates),
+  );
+  await sendPhone({ text: "#phone-followup try another approach" });
+  const followup = await phoneResult("#phone-followup try another approach");
+  assert.equal(followup.task.conversationId, fullPhoneChat.task.conversationId);
+  assert.equal(
+    followup.messages.filter(
+      (m) => m.content === "#phone-chat hey, can we talk here?",
+    ).length,
+    1,
+  );
+  await phoneDelivery("I still have the previous phone chat context");
+  await sendPhone({
+    caption: "#phone-image explain this photo",
+    photo: [{ file_id: "fixture", width: 1, height: 1, file_size: 70 }],
+  });
+  const phoneImage = await phoneResult("#phone-image explain this photo");
+  const imageMessage = phoneImage.messages.find(
+    (m) => m.content === "#phone-image explain this photo",
+  );
+  assert.equal(imageMessage.attachments.length, 1);
+  assert.match(
+    await page.evaluate(
+      ({ id, conversationId }) =>
+        window.schoolwork.readImage({ id, conversationId }),
+      {
+        id: imageMessage.attachments[0].id,
+        conversationId: phoneImage.task.conversationId,
+      },
+    ),
+    /^data:image\/png/,
+  );
+  await phoneDelivery("got ur photo");
+  const priorCount = phoneImage.messages.length;
+  await sendPhone({
+    photo: [{ file_id: "invalid", width: 1, height: 1, file_size: 70 }],
+  });
+  await phoneDelivery("couldn’t save/start that");
+  assert.equal(
+    (
+      await page.evaluate(
+        (id) => window.schoolwork.getChat(id),
+        phoneImage.task.conversationId,
+      )
+    ).messages.length,
+    priorCount,
+  );
+  const desktopNotification = (await phoneSent()).find((n) =>
+    n.input.text?.includes("Task: " + phoneFailure.task.id.slice(0, 8)),
+  );
+  assert(desktopNotification);
+  await sendPhone({
+    text: "#phone-followup continue this desktop task",
+    reply_to_message: { message_id: desktopNotification.result.message_id },
+  });
+  const desktopFollowup = await phoneResult(
+    "#phone-followup continue this desktop task",
+  );
+  assert.equal(desktopFollowup.task.conversationId, phoneOwner);
+  await phoneDelivery("I still have the previous phone chat context");
+  await sendPhone({ text: "/new" });
+  await sendPhone({ text: "#phone-wait" });
+  let busyChat;
+  for (let i = 0; i < 80; i++) {
+    busyChat = (await page.evaluate(() => window.schoolwork.listChats())).find(
+      (c) => c.title === "#phone-wait",
+    );
+    if (busyChat) break;
+    await new Promise((r) => setTimeout(r, 50));
+  }
+  assert(busyChat);
+  await sendPhone({ text: "do not mix this with a running task" });
+  await phoneDelivery("still working in that chat");
+  await sendPhone({ text: "/stop" });
+  await phoneResult("#phone-wait", "cancelled");
+  await phoneDelivery("Stopped by you");
+  await sendPhone({ text: "/new" });
+  await sendPhone({ text: "#coding-integration phone" });
+  const phoneCoding = await phoneResult("#coding-integration phone");
+  assert.equal(
+    JSON.parse(
+      phoneCoding.messages.find((m) => m.name === "run_powershell").content,
+    ).data.exitCode,
+    0,
+  );
+  const phoneCodingReply = await phoneDelivery(
+    "Task: " + phoneCoding.task.id.slice(0, 8),
+  );
+  assert.match(phoneCodingReply.input.text, /brochaho/);
+  const textOwner = crypto.randomUUID();
+  const textTask = await page.evaluate(
+    (chatId) =>
+      window.schoolwork.send({
+        chatId,
+        userText: "text-model fixture",
+        model: "Test-text-phone",
+      }),
+    textOwner,
+  );
+  await completed(textOwner);
+  await sendPhone({ text: "/use " + textTask });
+  await sendPhone({
+    caption: "#phone-image unsupported vision fixture",
+    document: { file_id: "fixture", mime_type: "image/png", file_size: 70 },
+  });
+  const visionFailure = await phoneResult(
+    "#phone-image unsupported vision fixture",
+    "waiting_retry",
+  );
+  assert.equal(visionFailure.task.conversationId, textOwner);
+  await phoneDelivery("haven’t verified completion");
+  await sendPhone({ text: "#phone-followup text after rejected image" });
+  await phoneResult("#phone-followup text after rejected image");
+  const phoneRequests = (
+    await fs.readFile(path.join(data, "requests.jsonl"), "utf8")
+  )
+    .trim()
+    .split("\n")
+    .map(JSON.parse);
+  assert(
+    phoneRequests.some(
+      (r) => r.hasImages && r.texts.includes("#phone-image explain this photo"),
+    ),
+  );
+  assert(
+    phoneRequests.some(
+      (r) =>
+        r.texts.includes("#phone-followup try another approach") &&
+        r.texts.includes("#phone-chat hey, can we talk here?"),
+    ),
+  );
+  await page.reload();
+  await page
+    .getByRole("button", {
+      name: "#phone-chat hey, can we talk here?",
+      exact: true,
+    })
+    .click();
+  await page.locator(".message-images img").waitFor();
+  assert(
+    await page
+      .locator(".message-images img")
+      .evaluate((img) => img.naturalWidth > 0),
+  );
+  await page.screenshot({
+    path: path.join(out, "SchoolWork-Telegram-chat.png"),
+  });
   await page.evaluate(() => window.schoolwork.telegramDisconnect());
   assert.equal(
     (await page.evaluate(() => window.schoolwork.telegramStatus())).configured,
     false,
   );
   console.log(
-    "PASS: real coding file/check/final loop and app-integrated encrypted Telegram pairing, success/error notifications, authorized retry, unauthorized sender rejection (mock Telegram/TeachGPT transport).",
+    "PASS: real app two-way Telegram chat, follow-up context, notification replies, photos/PNG documents and persistence, rejected image recovery, busy rejection, Stop and duplicate prevention (mock Telegram/TeachGPT transport).",
   );
   await page.evaluate(
     (owner) =>
@@ -558,7 +773,7 @@ try {
     const profile = await packagedPage.evaluate(() =>
       window.schoolwork.settingsGet(),
     );
-    assert.equal(profile.version, "0.5.0");
+    assert.equal(profile.version, "0.6.0");
     assert.equal(profile.workspace, data);
     await packagedPage
       .getByRole("button", { name: "Explain the physics", exact: true })
@@ -604,8 +819,8 @@ try {
     app = undefined;
     console.log(
       uiOnly
-        ? "PASS: packaged SchoolWork 0.5.0, restored SQLite/images and bundled KaTeX (native capture not verified)."
-        : "PASS: packaged SchoolWork 0.5.0, restored SQLite/images, bundled KaTeX assets and bundled Windows helper capture.",
+        ? "PASS: packaged SchoolWork 0.6.0, restored SQLite/images and bundled KaTeX (native capture not verified)."
+        : "PASS: packaged SchoolWork 0.6.0, restored SQLite/images, bundled KaTeX assets and bundled Windows helper capture.",
     );
   }
   console.log(

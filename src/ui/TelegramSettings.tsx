@@ -34,8 +34,8 @@ export default function TelegramSettings({ swedish }: { swedish: boolean }) {
       <label>Telegram · {t("phone link", "telefonkoppling")}</label>
       <p>
         {t(
-          "Create a bot with @BotFather in Telegram. Paste its token here (never in chat), then link your private Telegram account. SchoolWork must stay open for notifications and retry commands.",
-          "Skapa en bot med @BotFather i Telegram. Klistra in token här (aldrig i chatten), och koppla ditt privata Telegram-konto. SchoolWork måste vara öppet för notiser och försök igen.",
+          "Create a bot with @BotFather in Telegram. Paste its token here (never in chat), then link your private account. Send messages and PNG/JPEG photos to the AI from your phone. SchoolWork and your PC must stay on and online.",
+          "Skapa en bot med @BotFather i Telegram. Klistra in token här (aldrig i chatten), och koppla ditt privata konto. Skicka meddelanden och PNG/JPEG-bilder till AI:n från telefonen. SchoolWork och datorn måste vara på och online.",
         )}
       </p>
       <input
@@ -111,12 +111,18 @@ export default function TelegramSettings({ swedish }: { swedish: boolean }) {
           ? t("Phone paired", "Telefon kopplad")
           : t("Not paired", "Inte kopplad")}{" "}
         · {status.enabled ? t("Listening", "Lyssnar") : t("Off", "Av")} ·{" "}
-        {status.pending || 0} {t("pending notifications", "väntande notiser")}
+        {status.pending || 0} {t("pending messages", "väntande meddelanden")}
       </p>
       <p>
         {t(
-          "Only the paired private account can use /status, /retry and /stop or task buttons. Notifications include status only, not screenshots, prompts, file content or error logs. Retry observes current state rather than replaying uncertain clicks.",
-          "Bara det kopplade privata kontot kan använda /status, /retry och /stop eller uppgiftsknapparna. Notiser innehåller status, inte skärmbilder, instruktioner, filinnehåll eller felloggar. Försök igen utgår från aktuell status, inte osäkra klick.",
+          "Only your paired account can chat or control tasks. /new starts fresh; reply to a notification or /use <full task id> to continue a desktop chat. /status, /retry and /stop still work. Send photos individually with an optional caption (under 10 MB, max 32 MP); albums/voice/video aren’t supported. The chat’s selected model must support vision. Busy chat? Stop first and resend, or /new.",
+          "Bara ditt kopplade konto kan chatta eller styra uppgifter. /new startar nytt; svara på en notis eller /use <fullständigt uppgifts-id> för att fortsätta en datorchatt. /status, /retry och /stop fungerar fortfarande. Skicka en bild åt gången, gärna med bildtext (under 10 MB, max 32 MP); album/röst/video stöds inte. Chattens valda modell måste stödja bilder. Upptagen chatt? Stoppa och skicka igen, eller /new.",
+        )}
+      </p>
+      <p>
+        {t(
+          "Phone messages/photos are saved in SchoolWork and sent to TeachGPT. Replies to tasks started/retried/stopped from your phone are sent through Telegram, including relevant results or error explanations. Other desktop tasks send status only. Screenshots aren’t automatically uploaded to Telegram. Bot chats aren’t Secret Chats: don’t send sensitive data. Disconnect clears the phone link and pending replies, not saved conversations/photos; delete those in SchoolWork.",
+          "Telefonmeddelanden/bilder sparas i SchoolWork och skickas till TeachGPT. Svar på uppgifter startade/återupptagna/stoppade från telefonen skickas via Telegram, inklusive relevanta resultat eller felbeskrivningar. Andra datoruppgifter skickar bara status. Skärmbilder laddas inte automatiskt upp till Telegram. Botchattar är inte hemliga chattar: skicka inte känslig data. Frånkoppling tar bort telefonkoppling och väntande svar, inte sparade chattar/bilder; radera dem i SchoolWork.",
         )}
       </p>
       {(error || status.error) && (
