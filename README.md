@@ -10,19 +10,19 @@
   <img alt="MIT license" src="https://img.shields.io/badge/license-MIT-243329?style=flat-square">
 </p>
 
-<p align="center"><a href="https://github.com/SILLEN69/schoolwork-desktop/releases/latest"><strong>Download v0.6.0</strong></a> · <a href="#first-time-setup">Get started</a> · <a href="#what-schoolwork-can-do">Features</a> · <a href="#screen-control-see-act-check">Screen control</a> · <a href="#talk-to-schoolwork-from-your-phone">Telegram</a></p>
+<p align="center"><a href="https://github.com/SILLEN69/schoolwork-desktop/releases/latest"><strong>Download v0.7.0</strong></a> · <a href="#first-time-setup">Get started</a> · <a href="#what-schoolwork-can-do">Features</a> · <a href="#screen-control-see-act-check">Screen control</a> · <a href="#talk-to-schoolwork-from-your-phone">Telegram</a></p>
 
 SchoolWork is a Windows assistant for students and teachers with access to **TeachGPT at Stockholm Science and Innovation School (SSIS)**. Explain a concept, investigate a bug or build a project: SchoolWork helps the selected school model find relevant files, edit code, run tests and report what happened. Your conversations and Markdown memory stay on your computer; model requests go to TeachGPT.
 
-**Current release: v0.6.0 for Windows x64.** It includes the screen, image and Telegram features shown below. Every installation needs its own eligible TeachGPT account and API key. SchoolWork is an independent open-source project, not an official school application.
+**Current release: v0.7.0 for Windows x64.** It includes the screen, image and Telegram features shown below. Every installation needs its own eligible TeachGPT account and API key. SchoolWork is an independent open-source project, not an official school application.
 
-The 0.7 source update adds bounded observation loops, one-call memory saves, chronological chat and actual task-specific Telegram replies. See [0.7 implementation and verification](docs/agent-efficiency-0.7.md). The published downloads below remain 0.6.0 until a separate release is published.
+The 0.7 release adds bounded observation loops, one-call memory saves, chronological chat and actual task-specific Telegram replies. Its one-time upgrade migration enables application launching, screen viewing and input; later user revocations stay saved. See [0.7 implementation and verification](docs/agent-efficiency-0.7.md).
 
-**[Installer and portable downloads](https://github.com/SILLEN69/schoolwork-desktop/releases/tag/v0.6.0)** · **[Installation script](Install-SchoolWork.ps1)** · **[Source setup](#run-the-latest-source)** · **[Report a problem](https://github.com/SILLEN69/schoolwork-desktop/issues)**
+**[Installer and portable downloads](https://github.com/SILLEN69/schoolwork-desktop/releases/tag/v0.7.0)** · **[Installation script](Install-SchoolWork.ps1)** · **[Source setup](#run-the-latest-source)** · **[Report a problem](https://github.com/SILLEN69/schoolwork-desktop/issues)**
 
 ![SchoolWork showing a physics explanation, rendered maths and Python code in its chat workspace](docs/images/workspace.png)
 
-*The current 0.6.0 interface, captured from the real application using an isolated demo profile and a simulated model reply. Screenshots contain no student records or real credentials; they illustrate the interface, not a live model benchmark.*
+*The 0.6.0 interface, captured from the real application using an isolated demo profile and a simulated model reply. Screenshots contain no student records or real credentials; they illustrate the interface, not a live model benchmark. Version 0.7 interleaves progress updates and tool activity in the central chat.*
 
 ## For the classroom
 
@@ -38,7 +38,7 @@ Use it according to your teacher's rules for AI assistance. Ask for explanations
 
 ## What SchoolWork can do
 
-| Work | Available in v0.6.0 |
+| Work | Available in v0.7.0 |
 |---|---|
 | **Ask and explain** | Swedish or English conversations, selected TeachGPT models, rendered equations, tables and highlighted code. |
 | **Build and debug** | Project mapping, file search, bounded reads, targeted edits, backups, real test commands and local website checks. |
@@ -61,9 +61,9 @@ Current download links:
 
 | File | Purpose |
 |---|---|
-| [SchoolWork 0.6.0 installer](https://github.com/SILLEN69/schoolwork-desktop/releases/download/v0.6.0/SchoolWork-0.6.0-x64-setup.exe) | Normal per-user installation; no developer tools needed to open the app. |
-| [SchoolWork 0.6.0 portable](https://github.com/SILLEN69/schoolwork-desktop/releases/download/v0.6.0/SchoolWork-0.6.0-x64-portable.exe) | Launch without the installation wizard. "Portable" does not mean that all settings and chats stay beside the executable. |
-| [SHA-256 checksums](https://github.com/SILLEN69/schoolwork-desktop/releases/download/v0.6.0/SHA256SUMS-v0.6.0.txt) | Compare downloaded files with the published manifest. |
+| [SchoolWork 0.7.0 installer](https://github.com/SILLEN69/schoolwork-desktop/releases/download/v0.7.0/SchoolWork-0.7.0-x64-setup.exe) | Normal per-user installation; no developer tools needed to open the app. |
+| [SchoolWork 0.7.0 portable](https://github.com/SILLEN69/schoolwork-desktop/releases/download/v0.7.0/SchoolWork-0.7.0-x64-portable.exe) | Launch without the installation wizard. "Portable" does not mean that all settings and chats stay beside the executable. |
+| [SHA-256 checksums](https://github.com/SILLEN69/schoolwork-desktop/releases/download/v0.7.0/SHA256SUMS-v0.7.0.txt) | Compare downloaded files with the published manifest. |
 
 Packages are **unsigned**. On a managed school computer, follow your school's software-installation process if Windows or an administrator blocks them. The app does not require automatic administrator elevation.
 
@@ -77,7 +77,7 @@ Get-Content .\Install-SchoolWork.ps1
 .\Install-SchoolWork.ps1
 ```
 
-The script downloads **v0.6.0** by default, verifies the installer against its SHA-256 manifest, then opens the regular installation wizard. Pass `-Version v0.3.0` if you explicitly need the older release. It does not change PowerShell execution policy. If scripts are blocked, use Option 1 or your school's approved method.
+The script downloads **v0.7.0** by default, verifies the installer against its SHA-256 manifest, then opens the regular installation wizard. Pass `-Version v0.6.0` if you explicitly need the previous release. It does not change PowerShell execution policy. If scripts are blocked, use Option 1 or your school's approved method.
 
 For an update, finish or pause your current work and close SchoolWork normally before running the newer installer. Keep backups of important projects. Downloading source code alone does not update an installed app.
 
@@ -207,7 +207,7 @@ This is stored knowledge, **not training the school model's weights**. Notes can
 
 If a chat is busy, stop then resend, or start `/new`; messages are not silently inserted into a running tool step. Voice messages, albums, video and non-image documents are not supported. This is Telegram integration, not WhatsApp or a voice-call feature.
 
-In the published 0.6 release, phone-controlled tasks send their replies and checkpoints through Telegram; unrelated desktop tasks send generic status. In the 0.7 source update, paired phone delivery also includes the actual fresh final answer from desktop tasks: action results are short, while questions receive the explanation they need. Task IDs stay in button/reply routing instead of visible boilerplate. These replies can contain requested results and private content; do not use the link for sensitive work. Screenshots are not automatically sent to Telegram. Bot conversations are Telegram cloud chats, not end-to-end encrypted Secret Chats. **Pause link** pauses the connection; **Disconnect** removes the token, pairing and queued replies, but neither deletes existing conversations nor stops already accepted local tasks. See [Telegram details and verification limits](docs/telegram-chat.md).
+Paired phone delivery includes the actual fresh final answer from desktop and phone tasks: action results are short, while questions receive the explanation they need. Task IDs stay in button/reply routing instead of visible boilerplate. These replies can contain requested results and private content; do not use the link for sensitive work. Screenshots are not automatically sent to Telegram. Bot conversations are Telegram cloud chats, not end-to-end encrypted Secret Chats. **Pause link** pauses the connection; **Disconnect** removes the token, pairing and queued replies, but neither deletes existing conversations nor stops already accepted local tasks. See [Telegram details and verification limits](docs/telegram-chat.md).
 
 ## Data, permissions and school use
 
