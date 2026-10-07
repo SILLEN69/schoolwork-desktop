@@ -30,6 +30,8 @@ static class DesktopBridge {
     [DllImport("user32.dll")] static extern bool GetWindowRect(IntPtr h, out Rect r);
     [DllImport("dwmapi.dll")] static extern int DwmGetWindowAttribute(IntPtr h, int attribute, out Rect r, int size);
     [DllImport("user32.dll")] static extern IntPtr GetForegroundWindow();
+    [DllImport("user32.dll")] static extern IntPtr GetWindow(IntPtr h, uint command);
+    [DllImport("user32.dll")] static extern IntPtr GetLastActivePopup(IntPtr h);
     [DllImport("user32.dll")] static extern bool SetForegroundWindow(IntPtr h);
     [DllImport("user32.dll")] static extern bool ShowWindow(IntPtr h, int command);
     [DllImport("user32.dll")] static extern bool SetWindowPos(IntPtr h, IntPtr after, int x, int y, int width, int height, uint flags);
@@ -63,7 +65,33 @@ static class DesktopBridge {
         // GetWindowRect includes invisible resize borders (e.g. -8 on a maximized Chrome window).
         // Use visible physical frame bounds consistently for capture AND input validation.
         Rect frame; if(DwmGetWindowAttribute(h,9,out frame,Marshal.SizeOf(typeof(Rect)))==0 && frame.Right>frame.Left && frame.Bottom>frame.Top) r=frame;
-        return Obj("windowId",h.ToInt64().ToString(),"pid",pid,"appId",exe,"title",title.ToString(),"left",r.Left,"top",r.Top,"width",r.Right-r.Left,"height",r.Bottom-r.Top,"focused",h==GetForegroundWindow(),"minimized",IsIconic(h));
+        return Obj("windowId",h.ToInt64().ToString(),"ownerWindowId",GetWindow(h,4).ToInt64().ToString(),"pid",pid,"appId",exe,"title",title.ToString(),"left",r.Left,"top",r.Top,"width",r.Right-r.Left,"height",r.Bottom-r.Top,"focused",h==GetForegroundWindow(),"minimized",IsIconic(h));
+    }
+    // Follow only visible owned windows in the same process. Never adopt an unrelated app.
+    static bool OwnedBy(IntPtr child, IntPtr parent) {
+        uint cp, pp; GetWindowThreadProcessId(child,out cp); GetWindowThreadProcessId(parent,out pp);
+        if(cp!=pp) return false;
+        for(int i=0; child!=IntPtr.Zero && i<16; i++,child=GetWindow(child,4)) if(child==parent) return true;
+        return false;
+    }
+    static object FocusedControl(IntPtr target) {
+        try {
+            var e=AutomationElement.FocusedElement; if(e==null) return null;
+            uint pid; GetWindowThreadProcessId(target,out pid);
+            if(e.Current.ProcessId!=(int)pid || GetForegroundWindow()!=target) return null;
+            if(e.Current.IsPassword) return Obj("protected",true);
+            return Obj("runtimeId",String.Join(".",e.GetRuntimeId()),"name",e.Current.Name,"type",e.Current.ControlType.ProgrammaticName);
+        } catch { return null; }
+    }
+    static IntPtr ActiveTarget(IntPtr target) {
+        var foreground=GetForegroundWindow();
+        if(IsWindowVisible(foreground) && OwnedBy(foreground,target)) return foreground;
+        for(int i=0;i<16;i++) {
+            var popup=GetLastActivePopup(target);
+            if(popup==target || !IsWindowVisible(popup) || !OwnedBy(popup,target)) break;
+            target=popup;
+        }
+        return target;
     }
     static IntPtr Target(Dictionary<string, object> a, bool focus) {
         var h=new IntPtr(long.Parse(Str(a,"windowId"))); var w=WindowInfo(h);
@@ -109,7 +137,29 @@ static class DesktopBridge {
             if(a.ContainsKey("displayId")) { display=null; foreach(var candidate in Screen.AllScreens) if(candidate.DeviceName==Str(a,"displayId")) display=candidate; if(display==null) throw new Exception("Monitor disconnected. List displays again."); }
             var result=(Dictionary<string,object>)Capture(display.Bounds, null); result["displayId"]=display.DeviceName; return result;
         }
+        if(action=="observe_active") {
+            // Allow native dialogs to finish opening before choosing the next target.
+            Thread.Sleep(350);
+            var previous=new IntPtr(long.Parse(Str(a,"windowId")));
+            if(!IsWindow(previous) && Str(a,"ownerWindowId","0")!="0") {
+                var owner=WindowInfo(new IntPtr(long.Parse(Str(a,"ownerWindowId"))));
+                if(Str(owner,"appId")!=Str(a,"appId") || Num(owner,"pid")!=Num(a,"pid")) throw new Exception("Window identity changed. Observe again.");
+                a=owner;
+            }
+        }
         IntPtr target=Target(a,false);
+        if(action=="prepare_desktop" || action=="observe_active") {
+            target=ActiveTarget(target);
+            if(action=="prepare_desktop") {
+                if(IsIconic(target)) ShowWindow(target,9);
+                if(GetForegroundWindow()!=target) { SetForegroundWindow(target); Thread.Sleep(150); }
+                target=ActiveTarget(target);
+                if(GetForegroundWindow()!=target) throw new Exception("FOCUS_REQUIRED: Windows refused focus. Bring the requested app or its dialog to the front, then prepare_desktop once. Repeated screenshots cannot fix focus.");
+            }
+            if(IsIconic(target)) throw new Exception("Window is minimized; prepare_desktop before input.");
+            var w=WindowInfo(target);
+            return Capture(new Rectangle(Num(w,"left"),Num(w,"top"),Num(w,"width"),Num(w,"height")),w);
+        }
         if (action=="focus_window") { if (IsIconic(target)) ShowWindow(target,9); SetForegroundWindow(target); Thread.Sleep(150); if (GetForegroundWindow()!=target) throw new Exception("Windows refused foreground focus. Select the app manually and retry."); return WindowInfo(target); }
         if (action=="inspect_window") return Obj("window",WindowInfo(target),"controls",Controls(target));
         if (action=="move_window") {
@@ -126,10 +176,15 @@ static class DesktopBridge {
             int x=Num(a,"x"),y=Num(a,"y"); var w=WindowInfo(target);
             if (x<Num(w,"left") || y<Num(w,"top") || x>=Num(w,"left")+Num(w,"width") || y>=Num(w,"top")+Num(w,"height")) throw new Exception("Point is outside the target window.");
             if (!SetCursorPos(x,y)) throw new Exception("Pointer movement failed.");
-            CursorPoint p; GetCursorPos(out p); if (GetAncestor(WindowFromPoint(p),2)!=target) throw new Exception("Point is covered by another window. Capture again.");
+            CursorPoint p; GetCursorPos(out p); var covering=GetAncestor(WindowFromPoint(p),2);
+            if (covering!=target) throw new Exception("WINDOW_COVERED: Click was not sent. The point belongs to window "+covering.ToInt64()+". Use list_windows then prepare_desktop for the intended dialog/window; do not repeat the old coordinates.");
             if(action=="scroll") { int amount=Num(a,"amount"); if (Math.Abs(amount)>2400) throw new Exception("Scroll amount is too large."); Send(MouseEvent(0x0800,unchecked((uint)amount))); }
             else { string button=Str(a,"button","left"); uint down=button=="right"?8u:2u; int count=Num(a,"count",1); if(count<1 || count>2) throw new Exception("Invalid click count."); for(int i=0;i<count;i++) { Target(a,true); Send(MouseEvent(down),MouseEvent(down*2)); if(i+1<count) Thread.Sleep(60); } }
         } else if(action=="type_text") {
+            if(a.ContainsKey("expectedFocus")) {
+                var current=FocusedControl(target) as Dictionary<string,object>;
+                if(current==null || current.ContainsKey("protected") || Str(current,"runtimeId")!=Str(a,"expectedFocus")) throw new Exception("FOCUS_CHANGED: Editable focus changed or is protected. Prepare the window and inspect focus before typing; no text was sent.");
+            }
             string text=Str(a,"text"); if(text.Length>4000) throw new Exception("Text is too long.");
             text=text.Replace("\r\n","\n").Replace("\r","\n");
             for(int i=0;i<text.Length;i+=64) { Target(a,true); var inputs=new List<Input>(); foreach(char ch in text.Substring(i,Math.Min(64,text.Length-i))) { if(ch=='\n') { inputs.Add(Key(13,0,0)); inputs.Add(Key(13,0,2)); } else if(ch=='\t') { inputs.Add(Key(9,0,0)); inputs.Add(Key(9,0,2)); } else { inputs.Add(Key(0,ch,4)); inputs.Add(Key(0,ch,6)); } } Send(inputs.ToArray()); }
@@ -149,7 +204,8 @@ static class DesktopBridge {
         if(visible!=rect) throw new Exception("Window is partly off screen. Move it fully on screen and capture again.");
         using(var bitmap=new Bitmap(rect.Width,rect.Height)) using(var g=Graphics.FromImage(bitmap)) using(var stream=new MemoryStream()) {
             g.CopyFromScreen(rect.Location,Point.Empty,rect.Size); bitmap.Save(stream,ImageFormat.Png);
-            return Obj("image",Convert.ToBase64String(stream.ToArray()),"left",rect.Left,"top",rect.Top,"width",rect.Width,"height",rect.Height,"window",window);
+            var w=window as Dictionary<string,object>;
+            return Obj("image",Convert.ToBase64String(stream.ToArray()),"left",rect.Left,"top",rect.Top,"width",rect.Width,"height",rect.Height,"window",window,"focusedControl",w==null?null:FocusedControl(new IntPtr(long.Parse(Str(w,"windowId")))));
         }
     }
     [STAThread] static void Main() {

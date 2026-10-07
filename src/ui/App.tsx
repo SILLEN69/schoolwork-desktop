@@ -27,6 +27,7 @@ import ConversationTimeline from "./ConversationTimeline";
 import WorkPanel from "./WorkPanel";
 import DesktopSettings from "./DesktopSettings";
 import TelegramSettings from "./TelegramSettings";
+import UpdateNotice from './UpdateNotice';
 import ImageAttachments, { imageFileData } from "./ImageAttachments";
 import type { Attachment } from "../capabilities";
 import { rankTeachGPTModels } from "../modelRanking";
@@ -581,6 +582,7 @@ export default function App() {
         </button>
       </aside>
       <main className="main">
+        <UpdateNotice swedish={isSv}/>
         <header className="topbar">
           <div className="breadcrumbs">
             <span>{t("Workspace", "Arbetsyta")}</span>
@@ -1081,6 +1083,9 @@ export default function App() {
                 {error}
               </p>
             )}
+            <div className="setting-block">
+              <UpdateNotice settings swedish={isSv}/>
+            </div>
             <div className="setting-block">
               <label>{t("TeachGPT API key", "TeachGPT API-nyckel")}</label>
               <p>

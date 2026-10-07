@@ -53,6 +53,30 @@ function setup() {
   return { tools, ctx, request, stop };
 }
 describe("desktop action boundaries", () => {
+  it('rejects a replaced view even within its time limit',async()=>{
+    const {tools,ctx}=setup();const old=await tools.execute('capture_screen',{windowId:'123'},ctx);
+    await tools.execute('capture_screen',{windowId:'123'},ctx);
+    await expect(tools.execute('click',{screenshotId:old.data.screenshotId,x:1,y:1},ctx)).rejects.toMatchObject({code:'OBSERVATION_SUPERSEDED'});
+  });
+  it('returns the owned dialog after one input, then uses the new observation for typing',async()=>{
+    const {tools,ctx,request}=setup();
+    const modal={...window,windowId:'789',ownerWindowId:'123'};
+    request.mockImplementation(async action=>action==='list_windows'?[window]:action==='prepare_desktop'?{window,image:'cGl4ZWxz',focusedControl:{runtimeId:'a'}}:action==='observe_active'?{window:modal,image:'cGl4ZWxz',focusedControl:{runtimeId:'b'}}:{sent:true} as any);
+    const prepared=await tools.execute('prepare_desktop',{windowId:'123'},ctx);
+    const clicked=await tools.execute('click',{screenshotId:prepared.data.screenshotId,x:1,y:1},ctx);
+    expect(clicked.data.window.windowId).toBe('789');expect(clicked.data.actionSent).toBe(true);
+    await tools.execute('type_text',{screenshotId:clicked.data.screenshotId,text:'file.png'},ctx);
+    expect(request).toHaveBeenCalledWith('type_text',expect.objectContaining({windowId:'789',expectedFocus:'b'}),ctx.signal);
+    await expect(tools.execute('click',{screenshotId:prepared.data.screenshotId,x:1,y:1},ctx)).rejects.toMatchObject({code:'OBSERVATION_USED'});
+  });
+  it('does not replay input when its follow-up capture fails',async()=>{
+    const {tools,ctx,request}=setup();
+    request.mockImplementation(async action=>{if(action==='observe_active')throw new Error('window closed');return action==='list_windows'?[window]:action==='prepare_desktop'?{window,image:'cGl4ZWxz'}:{sent:true} as any;});
+    const prepared=await tools.execute('prepare_desktop',{windowId:'123'},ctx);
+    const result=await tools.execute('click',{screenshotId:prepared.data.screenshotId,x:1,y:1},ctx);
+    expect(result.ok).toBe(true);expect(result.data.actionSent).toBe(true);expect(result.summary).toContain('Do not repeat');
+    expect(request.mock.calls.filter(([name])=>name==='click')).toHaveLength(1);
+  });
   it('observes an unfocused window but issues no reusable input token',async () => {
     const {tools,ctx,request}=setup();
     request.mockImplementation(async action => action==='list_windows'?[window]:{window:{...window,focused:false},image:Buffer.from('pixels').toString('base64')} as any);
@@ -60,7 +84,7 @@ describe("desktop action boundaries", () => {
     expect(capture.ok).toBe(true);expect(capture.data.inputReady).toBe(false);
     expect(capture.data.frameDigest).toMatch(/^[a-f0-9]{64}$/);
     expect(capture.summary).toContain('may be covered');
-    await expect(tools.execute('click',{screenshotId:capture.data.screenshotId,x:1,y:1},ctx)).rejects.toThrow('expired');
+    await expect(tools.execute('click',{screenshotId:capture.data.screenshotId,x:1,y:1},ctx)).rejects.toThrow('not focused');
   });
   it("allows every accessible app in all-app mode and honors live revocation", async () => {
     const { tools, ctx } = setup();
@@ -133,7 +157,7 @@ describe("desktop action boundaries", () => {
       expect.objectContaining({ x: 800, y: 580, windowId: "123", pid: 42 }),
       ctx.signal,
     );
-    await expect(tools.execute("click", args, ctx)).rejects.toThrow("expired");
+    await expect(tools.execute("click", args, ctx)).rejects.toThrow("already used");
   });
   it("rejects stale, wrong-owner and out-of-bounds observations", async () => {
     const { tools, ctx } = setup();
@@ -198,7 +222,7 @@ describe("desktop action boundaries", () => {
         { screenshotId: image.data.screenshotId, text: "test" },
         ctx,
       ),
-    ).rejects.toThrow("expired");
+    ).rejects.toThrow("unknown or was cleared");
     await expect(
       tools.execute(
         "list_windows",

@@ -1,5 +1,8 @@
 import { contextBridge, ipcRenderer } from "electron";
 contextBridge.exposeInMainWorld("schoolwork", {
+  updateStatus: () => ipcRenderer.invoke('updates:status'),
+  updateAction: (action: string) => ipcRenderer.invoke('updates:action',action),
+  onUpdate: (callback: (state: any)=>void) => {const listener=(_event:any,state:any)=>callback(state);ipcRenderer.on('updates:state',listener);return ()=>ipcRenderer.removeListener('updates:state',listener);},
   chooseImages: (conversationId: string) =>
     ipcRenderer.invoke("attachments:choose", conversationId),
   importImage: (input: unknown) =>

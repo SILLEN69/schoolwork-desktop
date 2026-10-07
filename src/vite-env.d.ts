@@ -1,6 +1,9 @@
 /// <reference types="vite/client" />
 interface Window {
   schoolwork: {
+    updateStatus: () => Promise<import('./updateState').UpdateState>;
+    updateAction: (action:'check'|'download'|'install') => Promise<import('./updateState').UpdateState>;
+    onUpdate: (callback:(state:import('./updateState').UpdateState)=>void) => ()=>void;
     chooseImages: (
       conversationId: string,
     ) => Promise<import("./capabilities").Attachment[]>;

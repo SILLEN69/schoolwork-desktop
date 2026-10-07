@@ -19,6 +19,7 @@ export type DesktopWindow = {
   height: number;
   focused: boolean;
   minimized: boolean;
+  ownerWindowId?: string;
 };
 export type Attachment = {
   id: string;

@@ -7,6 +7,9 @@ import "./ui/messages.css";
 if (!window.schoolwork) {
   const key = "schoolwork-preview-chats";
   window.schoolwork = {
+    updateStatus: async () => ({phase:'unsupported',currentVersion:'preview',message:'Updates are available in the installed app.'}),
+    updateAction: async () => ({phase:'unsupported',currentVersion:'preview'}),
+    onUpdate: () => () => {},
     chooseImages: async () => {
       throw new Error("Image attachments require the desktop app.");
     },

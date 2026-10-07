@@ -52,6 +52,7 @@ async function state() {
 let app;
 const launchedPids = [];
 const uiOnly = process.env.SCHOOLWORK_UI_ONLY === "1";
+const expectedVersion=JSON.parse(await fs.readFile(path.resolve('package.json'),'utf8')).version;
 try {
   assert.equal(await line(), "ready");
   app = await electron.launch({
@@ -819,7 +820,7 @@ try {
     const profile = await packagedPage.evaluate(() =>
       window.schoolwork.settingsGet(),
     );
-    assert.equal(profile.version, "0.7.0");
+    assert.equal(profile.version, expectedVersion);
     assert.equal(profile.capabilities.controlScreen,false,'Restart must not undo a user Stop');
     assert.equal(profile.workspace, data);
     await packagedPage

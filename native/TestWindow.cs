@@ -16,6 +16,9 @@ static class TestWindow {
         var editor=new TextBox { Name="Editor", AccessibleName="Editor", Multiline=true, ScrollBars=ScrollBars.Vertical, Bounds=new Rectangle(20,20,610,300), Font=new Font("Consolas",14) };
         var password=new TextBox { AccessibleName="Password", UseSystemPasswordChar=true, Text="not-for-observation", Bounds=new Rectangle(20,335,250,30) };
         var button=new Button { Text="Click test", AccessibleName="Click test", Bounds=new Rectangle(300,335,200,35) }; int clicks=0, wheels=0;
+        var attach=new Button { Text="Attach file", AccessibleName="Attach file", Bounds=new Rectangle(300,385,200,35) };
+        attach.Click+=(s,e)=>{using(var picker=new OpenFileDialog()) {picker.Title="SchoolWork fixture attachment"; if(picker.ShowDialog(form)==DialogResult.OK)editor.Text=picker.FileName;}};
+        form.Controls.Add(attach);
         // The classic .NET Framework multiline EDIT fixture does not implement Ctrl+A itself.
         // Handle it explicitly, as an actual app shortcut, so input tests can verify replacement.
         editor.KeyDown+=(s,e)=>{ if(e.Control && e.KeyCode==Keys.A) {editor.SelectAll();e.SuppressKeyPress=true;} };

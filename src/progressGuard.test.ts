@@ -1,5 +1,11 @@
 import { expect, it } from 'vitest';
 import { ProgressGuard, capabilityInstructions, isDesktopAutomationCommand } from './progressGuard';
+it('distinguishes expired observations from covering windows on the same target',()=>{
+  const g=new ProgressGuard();
+  g.observe('click',{}, {ok:false,data:{code:'FOCUS_REQUIRED',windowId:'1'}});
+  g.observe('click',{}, {ok:false,data:{code:'FOCUS_REQUIRED',windowId:'1'}});
+  expect(g.observe('click',{}, {ok:false,data:{code:'WINDOW_COVERED',windowId:'1'}})).toBeUndefined();
+});
 it('keeps repeated focus failures across unrelated successful reads', () => {
   const g=new ProgressGuard();
   const failure={ok:false,summary:'Window focus changed'};

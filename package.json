@@ -1,6 +1,6 @@
 {
   "name": "schoolwork-desktop",
-  "version": "0.7.0",
+  "version": "0.8.1",
   "private": true,
   "description": "A local-first AI work assistant powered by TeachGPT",
   "main": "dist-electron/main.js",
@@ -8,7 +8,7 @@
   "license": "MIT",
   "scripts": {
     "dev": "vite",
-    "build": "tsc -b && vite build && esbuild electron/main.ts electron/preload.ts --bundle --platform=node --format=cjs --external:electron --outdir=dist-electron && node scripts/build-native.mjs",
+    "build": "tsc -b && vite build && esbuild electron/main.ts electron/preload.ts --bundle --platform=node --format=cjs --external:electron --external:electron-updater --outdir=dist-electron && node scripts/build-native.mjs",
     "start": "electron .",
     "dev:app": "npm run build && concurrently -k -n web,desktop -c green,blue \"vite --host 127.0.0.1\" \"wait-on tcp:5173 && node scripts/start-dev.mjs\"",
     "package:win": "npm run build && electron-builder --win nsis portable --config.electronDist=node_modules/electron/dist",
@@ -17,6 +17,7 @@
   },
   "dependencies": {
     "electron-store": "^10.0.1",
+    "electron-updater": "6.8.9",
     "katex": "^0.19.0",
     "lucide-react": "^0.468.0",
     "mdast-util-from-markdown": "^2.1.0",
@@ -44,6 +45,14 @@
     "wait-on": "^9.5.1"
   },
   "build": {
+    "publish": [
+      {
+        "provider": "github",
+        "owner": "SILLEN69",
+        "repo": "schoolwork-desktop",
+        "releaseType": "release"
+      }
+    ],
     "appId": "nu.ssis.schoolwork",
     "productName": "SchoolWork",
     "directories": {
