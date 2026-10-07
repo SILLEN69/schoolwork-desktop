@@ -867,8 +867,8 @@ try {
     app = undefined;
     console.log(
       uiOnly
-        ? "PASS: packaged SchoolWork 0.7.0, restored SQLite/images and bundled KaTeX (native capture not verified)."
-        : "PASS: packaged SchoolWork 0.7.0, restored SQLite/images, bundled KaTeX assets and bundled Windows helper capture.",
+        ? `PASS: packaged SchoolWork ${expectedVersion}, restored SQLite/images and bundled KaTeX (native capture not verified).`
+        : `PASS: packaged SchoolWork ${expectedVersion}, restored SQLite/images, bundled KaTeX assets and bundled Windows helper capture.`,
     );
   }
   console.log(
