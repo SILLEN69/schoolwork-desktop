@@ -32,14 +32,14 @@ export async function executeProcess(name: keyof typeof processInputs, raw: unkn
   const bundledNode = args.executable === 'node' && !!process.versions.electron;
   const executable = name === 'run_powershell' ? 'powershell.exe' : bundledNode ? process.execPath : args.executable;
   const argv = name === 'run_powershell' ? ['-NoLogo', '-NoProfile', '-NonInteractive', '-Command', `$ErrorActionPreference='Stop'; try { & { ${args.command}\n }; if ($LASTEXITCODE -ne $null) { exit $LASTEXITCODE } } catch { [Console]::Error.WriteLine($_); exit 1 }`] : args.args;
-  const env = Object.fromEntries(['SystemRoot','WINDIR','TEMP','TMP','USERPROFILE','PATH','PATHEXT','APPDATA','LOCALAPPDATA','HOME','LANG'].filter(k => process.env[k]).map(k => [k, process.env[k]! ]));
+  // Windows PowerShell requires its module search path to initialize; retain it without inheriting credentials.
+  const env = Object.fromEntries(['SystemRoot','WINDIR','TEMP','TMP','USERPROFILE','PATH','PATHEXT','APPDATA','LOCALAPPDATA','HOME','LANG','PSModulePath'].filter(k => process.env[k]).map(k => [k, process.env[k]! ]));
   if (bundledNode) env.ELECTRON_RUN_AS_NODE = '1';
   if (name === 'start_process') {
     if (!ctx.owner) throw new Error('Background processes require a conversation owner.');
     if ([...sessions.values()].filter(s => s.owner === ctx.owner && s.running).length >= 4) throw new Error('Stop an existing background process before starting another.');
     const sessionId = crypto.randomUUID();
     const child = spawn(executable, argv, { cwd, env, shell: false, windowsHide: true, detached: process.platform !== 'win32' });
-    child.stdin.end(); // These tools supply no interactive input; signal EOF to commands such as PowerShell.
     const session: Session = { owner: ctx.owner, child, cwd, output: '', exitCode: null, running: true }; sessions.set(sessionId, session);
     const capture = (data: Buffer) => { session.output = (session.output + data.toString()).slice(-30000); };
     child.stdout.on('data', capture); child.stderr.on('data', capture);

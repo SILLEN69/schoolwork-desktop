@@ -2,7 +2,7 @@
 
 ## What changed
 
-- Process commands now close unused standard input, allowing commands that wait for end-of-input (including Windows PowerShell) to finish.
+- Foreground process commands now close unused standard input, allowing commands that wait for end-of-input to finish. Windows PowerShell also retains its required module search path so it can initialize with the restricted child-process environment.
 
 - Model selection updates immediately. Rapid selections save in order, stale settings responses cannot replace the latest choice, and a failed save restores the last confirmed model with an error message. Existing running tasks continue with their original model.
 - **Följ lektion** opens a separate Swedish-first workspace with a timestamped transcript, structured summary, in-class tasks and future assignments. Notes persist across restarts. You can pause/continue capture, complete tasks, update the summary manually or automatically, export Markdown, and delete sessions.
