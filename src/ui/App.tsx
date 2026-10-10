@@ -10,6 +10,8 @@ import {
   History,
   ImagePlus,
   Monitor,
+  Mic,
+  GraduationCap,
   LoaderCircle,
   MoreHorizontal,
   PanelRightClose,
@@ -27,6 +29,8 @@ import ConversationTimeline from "./ConversationTimeline";
 import WorkPanel from "./WorkPanel";
 import DesktopSettings from "./DesktopSettings";
 import TelegramSettings from "./TelegramSettings";
+import LessonWorkspace from "./LessonWorkspace";
+import { isSpeechModel } from "../speechModels";
 import UpdateNotice from './UpdateNotice';
 import ImageAttachments, { imageFileData } from "./ImageAttachments";
 import type { Attachment } from "../capabilities";
@@ -81,6 +85,12 @@ export default function App() {
     [showHistory, setShowHistory] = useState(true),
     [rightPanel, setRightPanel] = useState(true),
     [language, setLanguage] = useState<"en" | "sv">("en");
+  const [lessonMode, setLessonMode] = useState<"lesson" | "transcription" | null>(null);
+  const modelRevision = useRef(0);
+  const pendingModel = useRef<string | null>(null);
+  const confirmedModel = useRef(defaults[0]);
+  const modelSaveQueue = useRef<Promise<void>>(Promise.resolve());
+  const [modelSaving, setModelSaving] = useState(false);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [pendingImages, setPendingImages] = useState<Attachment[]>([]);
   const [importing, setImporting] = useState(false);
@@ -97,15 +107,37 @@ export default function App() {
     stageKey = useRef("");
   const [clockNow, setClockNow] = useState(Date.now());
   const t = (en: string, sv: string) => (isSv ? sv : en);
-  const rankedModels = rankTeachGPTModels([...models, settings.model]);
+  const rankedModels = rankTeachGPTModels([...models, settings.model].filter(m => !isSpeechModel(m)));
   const refresh = async () => {
+    const revision = modelRevision.current;
     const [s, c] = await Promise.all([
       window.schoolwork.settingsGet(),
       window.schoolwork.listChats(true),
     ]);
-    setSettings(s);
+    if (revision === modelRevision.current && !pendingModel.current) confirmedModel.current = s.model;
+    setSettings((previous: any) => ({ ...s, model: revision !== modelRevision.current || pendingModel.current ? pendingModel.current || previous.model : s.model }));
     setChats(c);
     setLanguage(s.language === "sv" ? "sv" : "en");
+  };
+  const changeModel = (value: string) => {
+    const revision = ++modelRevision.current;
+    pendingModel.current = value;
+    setSettings((previous: any) => ({ ...previous, model: value }));
+    setModelSaving(true);
+    modelSaveQueue.current = modelSaveQueue.current.then(async () => {
+      try {
+        await window.schoolwork.setModel(value);
+        confirmedModel.current = value;
+        if (revision === modelRevision.current) { pendingModel.current = null; setModelSaving(false); }
+      } catch (error: any) {
+        if (revision === modelRevision.current) {
+          pendingModel.current = null;
+          setSettings((previous: any) => ({ ...previous, model: confirmedModel.current }));
+          setModelSaving(false);
+          setError(t("Could not save model: ", "Kunde inte spara modell: ") + error.message);
+        }
+      }
+    });
   };
   useEffect(() => {
     refresh().catch((e) => setError(e.message));
@@ -485,6 +517,7 @@ export default function App() {
       setError(e.message);
     }
   };
+  if (lessonMode) return <LessonWorkspace initialMode={lessonMode} summaryModel={settings.model} configured={settings.configured} onBack={() => setLessonMode(null)} />;
   return (
     <div className="shell">
       <aside className={"sidebar " + (sidebarCollapsed ? "collapsed" : "")}>
@@ -524,6 +557,8 @@ export default function App() {
             <ChevronRight size={14} className="nav-end" />
           </button>
         </div>
+        <button className="nav-item" onClick={() => setLessonMode("lesson")}><GraduationCap size={16}/><span>{t("Follow a lesson", "Följ en lektion")}</span></button>
+        <button className="nav-item" onClick={() => setLessonMode("transcription")}><Mic size={16}/><span>{t("Transcription", "Transkribering")}</span></button>
         <button
           className="nav-item memory-nav"
           onClick={() => setShowMemory(true)}
@@ -1030,7 +1065,7 @@ export default function App() {
               <span className="model-logo">✳</span>
               <span>
                 <b>{settings.model}</b>
-                <small>TeachGPT</small>
+                <small>{modelSaving ? t("Saving selection…", "Sparar val…") : "TeachGPT"}</small>
               </span>
               <ChevronDown size={15} />
             </button>
@@ -1138,10 +1173,8 @@ export default function App() {
               </p>
               <select
                 value={settings.model}
-                onChange={async (e) => {
-                  await window.schoolwork.setModel(e.target.value);
-                  setSettings({ ...settings, model: e.target.value });
-                }}
+                aria-label={t("Default model", "Standardmodell")}
+                onChange={(e) => changeModel(e.currentTarget.value)}
               >
                 {rankedModels.map((entry) => (
                   <option value={entry.model} key={entry.model}>

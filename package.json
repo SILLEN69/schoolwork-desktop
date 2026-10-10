@@ -1,6 +1,6 @@
 {
   "name": "schoolwork-desktop",
-  "version": "0.8.1",
+  "version": "0.9.0",
   "private": true,
   "description": "A local-first AI work assistant powered by TeachGPT",
   "main": "dist-electron/main.js",
@@ -11,9 +11,10 @@
     "build": "tsc -b && vite build && esbuild electron/main.ts electron/preload.ts --bundle --platform=node --format=cjs --external:electron --external:electron-updater --outdir=dist-electron && node scripts/build-native.mjs",
     "start": "electron .",
     "dev:app": "npm run build && concurrently -k -n web,desktop -c green,blue \"vite --host 127.0.0.1\" \"wait-on tcp:5173 && node scripts/start-dev.mjs\"",
-    "package:win": "npm run build && electron-builder --win nsis portable --config.electronDist=node_modules/electron/dist",
+    "package:win": "npm run build && node scripts/package-win.mjs",
     "test": "vitest run",
-    "test:desktop": "npm run build && node scripts/test-desktop.mjs"
+    "test:desktop": "npm run build && node scripts/test-desktop.mjs",
+    "test:lessons": "npm run build && node scripts/test-lessons.mjs"
   },
   "dependencies": {
     "electron-store": "^10.0.1",

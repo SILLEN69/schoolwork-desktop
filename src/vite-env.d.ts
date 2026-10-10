@@ -1,6 +1,20 @@
 /// <reference types="vite/client" />
 interface Window {
   schoolwork: {
+    lessonList: () => Promise<import('./lesson').LessonSession[]>;
+    lessonCreate: (input: {mode:'lesson'|'transcription';language:'sv'|'en';title:string}) => Promise<import('./lesson').LessonSession>;
+    lessonUpdate: (input: {id:string;title?:string;language?:'sv'|'en';taskId?:string;completed?:boolean}) => Promise<import('./lesson').LessonSession>;
+    lessonDelete: (id:string) => Promise<void>;
+    lessonAudio: (input: import('./lesson').AudioInput) => Promise<{session:import('./lesson').LessonSession;error?:string}>;
+    lessonRetry: (input: {id:string;audioId:string}) => Promise<{session:import('./lesson').LessonSession;error?:string}>;
+    lessonDiscard: (input: {id:string;audioId:string}) => Promise<import('./lesson').LessonSession>;
+    lessonCancel: (id:string) => Promise<boolean>;
+    lessonAnalyse: (input: {id:string;model:string}) => Promise<import('./lesson').LessonSession>;
+    calendarStatus: () => Promise<import('./lesson').CalendarStatus & {error?:string}>;
+    calendarConfigure: (input:{clientId:string;clientSecret:string;calendarId?:string}) => Promise<import('./lesson').CalendarStatus>;
+    calendarConnect: () => Promise<import('./lesson').CalendarStatus>;
+    calendarDisconnect: () => Promise<import('./lesson').CalendarStatus>;
+    calendarAdd: (input:{id:string;taskId:string;title:string;date:string}) => Promise<import('./lesson').LessonSession>;
     updateStatus: () => Promise<import('./updateState').UpdateState>;
     updateAction: (action:'check'|'download'|'install') => Promise<import('./updateState').UpdateState>;
     onUpdate: (callback:(state:import('./updateState').UpdateState)=>void) => ()=>void;

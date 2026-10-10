@@ -6,12 +6,16 @@ import {
   shell,
   nativeImage,
   globalShortcut,
+  session,
 } from "electron";
 import path from "node:path";
 import fs from "node:fs/promises";
 import crypto from "node:crypto";
 import Store from "electron-store";
 import { autoUpdater } from 'electron-updater';
+import { Lessons, audioInputSchema } from "./lessons";
+import { GoogleCalendar } from "./calendar";
+import { isSpeechModel } from "../src/speechModels";
 import { Updates } from './updates';
 import { z } from "zod";
 import { SchoolWorkStore } from "./storage";
@@ -116,6 +120,9 @@ let desktop: DesktopTools;
 let desktopLearning: DesktopLearning;
 let telegram: TelegramLink;
 let updates: Updates;
+let lessons: Lessons;
+let calendar: GoogleCalendar;
+const calendarWrites = new Set<string>();
 let updateTimer: ReturnType<typeof setInterval>|undefined;
 const capabilities = () =>
   capabilitiesSchema.parse(settings.get("capabilities") || {});
@@ -563,7 +570,8 @@ function emergencyStop() {
   win?.webContents.send("chat:event", { type: "settings-changed" });
 }
 function modelId(): string {
-  return settings.get("model") || defaultModels[0];
+  const value = settings.get("model") || defaultModels[0];
+  return isSpeechModel(value) ? defaultModels[0] : value;
 }
 function makeWindow() {
   win = new BrowserWindow({
@@ -2020,6 +2028,30 @@ const trusted = (event: Electron.IpcMainInvokeEvent) => {
     throw new Error("Untrusted IPC frame.");
 };
 function registerIpc() {
+  ipcMain.handle('lessons:list', event => { trusted(event); return lessons.list(); });
+  ipcMain.handle('lessons:create', (event, raw) => { trusted(event); const data = z.object({mode:z.enum(['lesson','transcription']),language:z.enum(['sv','en']),title:z.string().trim().min(1).max(160)}).parse(raw); return lessons.create(data.mode,data.language,data.title); });
+  ipcMain.handle('lessons:update', (event, raw) => { trusted(event); const data=z.object({id:z.string().uuid(),title:z.string().trim().min(1).max(160).optional(),language:z.enum(['sv','en']).optional(),taskId:z.string().min(1).max(80).optional(),completed:z.boolean().optional()}).parse(raw); return lessons.update(data.id,data); });
+  ipcMain.handle('lessons:delete', (event, raw) => { trusted(event); return lessons.remove(z.string().uuid().parse(raw)); });
+  ipcMain.handle('lessons:audio', (event, raw) => { trusted(event); return lessons.upload(audioInputSchema.parse(raw)); });
+  ipcMain.handle('lessons:retry', (event, raw) => { trusted(event); const data=z.object({id:z.string().uuid(),audioId:z.string().uuid()}).parse(raw); return lessons.transcribe(data.id,data.audioId); });
+  ipcMain.handle('lessons:discard', (event, raw) => { trusted(event); const data=z.object({id:z.string().uuid(),audioId:z.string().uuid()}).parse(raw); return lessons.discard(data.id,data.audioId); });
+  ipcMain.handle('lessons:cancel', (event, raw) => { trusted(event); lessons.cancel(z.string().uuid().parse(raw)); return true; });
+  ipcMain.handle('lessons:analyse', (event, raw) => { trusted(event); const data=z.object({id:z.string().uuid(),model:z.string().min(1).max(160)}).parse(raw); return lessons.analyse(data.id,data.model); });
+  ipcMain.handle('calendar:status', event => { trusted(event); return calendar.status(); });
+  ipcMain.handle('calendar:configure', (event, raw) => { trusted(event); return calendar.configure(raw); });
+  ipcMain.handle('calendar:connect', event => { trusted(event); return calendar.connect(); });
+  ipcMain.handle('calendar:disconnect', event => { trusted(event); return calendar.disconnect(); });
+  ipcMain.handle('calendar:add', async (event, raw) => {
+    trusted(event); const data=z.object({id:z.string().uuid(),taskId:z.string().min(1).max(80),title:z.string().trim().min(1).max(240),date:z.string().regex(/^\d{4}-\d{2}-\d{2}$/)}).parse(raw);
+    const task=lessons.get(data.id).analysis.tasks.find(t=>t.id===data.taskId);
+    if(!task || task.kind!=='assignment') throw new Error('Only a reviewed assignment can be added to Calendar.');
+    if(task.calendarEventId) return lessons.get(data.id);
+    const operation=data.id+':'+data.taskId;
+    if(calendarWrites.has(operation)) throw new Error('This assignment is already being saved.');
+    calendarWrites.add(operation);
+    try { const saved=await calendar.add({sessionId:data.id,taskId:data.taskId,title:data.title,date:data.date,details:task.details+'\n\n'+task.evidence+'\n\nSchoolWork: '+lessons.get(data.id).title}); return lessons.attachCalendar(data.id,data.taskId,saved.id,saved.htmlLink); }
+    finally { calendarWrites.delete(operation); }
+  });
   ipcMain.handle('updates:status',event=>{trusted(event);return updates.state;});
   ipcMain.handle('updates:action',(event,raw)=>{trusted(event);const action=z.enum(['check','download','install']).parse(raw);return updates[action]();});
   ipcMain.handle("chat:status", (event, raw) => {
@@ -2407,6 +2439,7 @@ function registerIpc() {
   ipcMain.handle("settings:set-model", (event, raw) => {
     trusted(event);
     const value = z.string().min(1).max(160).parse(raw);
+    if (isSpeechModel(value)) throw new Error("Whisper is a transcription model. Use the transcription workspace.");
     settings.set("model", value);
     return value;
   });
@@ -2427,7 +2460,7 @@ function registerIpc() {
   ipcMain.handle("models:list", async (event) => {
     trusted(event);
     try {
-      return await discoverModels();
+      return (await discoverModels()).filter(m => !isSpeechModel(m));
     } catch {
       return discoveredModels.length ? discoveredModels : defaultModels;
     }
@@ -2736,6 +2769,10 @@ else {
       setTimeout(()=>void updates.check(false),15000).unref();
       updateTimer=setInterval(()=>void updates.check(false),6*60*60*1000);updateTimer.unref();
     }
+    lessons = new Lessons(store, path.join(app.getPath('userData'), 'lesson-audio'), key);
+    calendar = new GoogleCalendar(store, encryptTeachGPTCredential, readTeachGPTCredential, shell.openExternal);
+    session.defaultSession.setPermissionCheckHandler((contents, permission, _origin, details) => contents === win?.webContents && details.isMainFrame && (permission === 'clipboard-sanitized-write' || permission === 'media' && details.mediaType === 'audio'));
+    session.defaultSession.setPermissionRequestHandler((contents, permission, callback, details) => callback(contents === win?.webContents && details.isMainFrame && (permission === 'clipboard-sanitized-write' || permission === 'media' && 'mediaTypes' in details && details.mediaTypes?.length === 1 && details.mediaTypes[0] === 'audio')));
     registerIpc();
     makeWindow();
     globalShortcut.register("CommandOrControl+Alt+Escape", emergencyStop);
@@ -2746,6 +2783,8 @@ else {
   app.on("before-quit", () => {
     if(updateTimer) clearInterval(updateTimer);
     telegram?.stop();
+    calendar?.stop();
+    for (const lesson of lessons?.list() || []) lessons.cancel(lesson.id);
     for (const controller of active.values()) controller.abort();
     stopDesktop();
     globalShortcut.unregisterAll();

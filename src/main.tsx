@@ -6,7 +6,12 @@ import "./ui/workspace.css";
 import "./ui/messages.css";
 if (!window.schoolwork) {
   const key = "schoolwork-preview-chats";
+  const desktopOnly = async (): Promise<never> => { throw new Error('Öppna SchoolWork-appen för ljud och Google Calendar. / Open the desktop app for audio and Google Calendar.'); };
   window.schoolwork = {
+    lessonList: async () => [], lessonCreate: desktopOnly, lessonUpdate: desktopOnly, lessonDelete: desktopOnly,
+    lessonAudio: desktopOnly, lessonRetry: desktopOnly, lessonDiscard: desktopOnly, lessonCancel: desktopOnly, lessonAnalyse: desktopOnly,
+    calendarStatus: async () => ({configured:false,connected:false,connecting:false,calendarId:'primary'}),
+    calendarConfigure: desktopOnly, calendarConnect: desktopOnly, calendarDisconnect: desktopOnly, calendarAdd: desktopOnly,
     updateStatus: async () => ({phase:'unsupported',currentVersion:'preview',message:'Updates are available in the installed app.'}),
     updateAction: async () => ({phase:'unsupported',currentVersion:'preview'}),
     onUpdate: () => () => {},
@@ -70,7 +75,7 @@ if (!window.schoolwork) {
       text: "Task status is available in the desktop app.",
     }),
     settingsGet: async () => ({
-      model: "Qwen3.8-27B",
+      model: localStorage.getItem("schoolwork-preview-model") || "Qwen3.8-27B",
       workspace: "Browser preview · desktop bridge unavailable",
       configured: false,
       language: "en",
@@ -80,7 +85,7 @@ if (!window.schoolwork) {
         "Configure the API key in the desktop application, where it can be encrypted by Windows.",
       );
     },
-    setModel: async (m: string) => m,
+    setModel: async (m: string) => { localStorage.setItem("schoolwork-preview-model",m); return m; },
     setLanguage: async () => true,
     chooseWorkspace: async () => "Choose a folder in the desktop application.",
     listModels: async () => {
