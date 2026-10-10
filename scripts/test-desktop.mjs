@@ -651,7 +651,7 @@ try {
     "waiting_retry",
   );
   assert.equal(visionFailure.task.conversationId, textOwner);
-  await phoneDelivery("Not verified yet");
+  await phoneDelivery("Completion is not verified");
   await sendPhone({ text: "#phone-followup text after rejected image" });
   await phoneResult("#phone-followup text after rejected image");
   const phoneRequests = (
