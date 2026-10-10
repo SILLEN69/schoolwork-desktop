@@ -6,6 +6,10 @@ it('passes arguments without shell interpretation and streams real output', asyn
   const r = await executeProcess('run_process', { executable: process.execPath, args: ['-e', 'console.log(process.argv[1])', 'spaces & symbols $value'] }, context(), text => output.push(text));
   expect(r.ok).toBe(true); expect(r.data.stdout).toContain('spaces & symbols $value'); expect(output.length).toBeGreaterThan(0);
 });
+it('closes standard input when commands have no interactive input', async () => {
+  const r = await executeProcess('run_process', { executable: process.execPath, args: ['-e', "process.stdin.resume(); process.stdin.on('end', () => console.log('stdin closed'));"], timeoutMs: 3000 }, context(), () => {});
+  expect(r.ok).toBe(true); expect(r.data.stdout).toContain('stdin closed'); expect(r.data.timedOut).toBe(false);
+});
 it('returns nonzero exits and kills cancelled processes', async () => {
   const r = await executeProcess('run_process', { executable: process.execPath, args: ['-e', 'process.exit(7)'] }, context(), () => {});
   expect(r.ok).toBe(false); expect(r.data.exitCode).toBe(7);

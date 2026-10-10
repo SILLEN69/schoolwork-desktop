@@ -39,6 +39,7 @@ export async function executeProcess(name: keyof typeof processInputs, raw: unkn
     if ([...sessions.values()].filter(s => s.owner === ctx.owner && s.running).length >= 4) throw new Error('Stop an existing background process before starting another.');
     const sessionId = crypto.randomUUID();
     const child = spawn(executable, argv, { cwd, env, shell: false, windowsHide: true, detached: process.platform !== 'win32' });
+    child.stdin.end(); // These tools supply no interactive input; signal EOF to commands such as PowerShell.
     const session: Session = { owner: ctx.owner, child, cwd, output: '', exitCode: null, running: true }; sessions.set(sessionId, session);
     const capture = (data: Buffer) => { session.output = (session.output + data.toString()).slice(-30000); };
     child.stdout.on('data', capture); child.stderr.on('data', capture);
@@ -52,6 +53,7 @@ export async function executeProcess(name: keyof typeof processInputs, raw: unkn
   }
   return new Promise<any>((resolve, reject) => {
     const child = spawn(executable, argv, { cwd, env, shell: false, windowsHide: true, detached: process.platform !== 'win32' });
+    child.stdin.end(); // These tools supply no interactive input; signal EOF to commands such as PowerShell.
     let stdout = '', stderr = '', timedOut = false, cancelled = false, last = 0;
     const kill = () => {
       killTree(child);

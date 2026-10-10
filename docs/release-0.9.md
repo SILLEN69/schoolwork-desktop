@@ -2,6 +2,8 @@
 
 ## What changed
 
+- Process commands now close unused standard input, allowing commands that wait for end-of-input (including Windows PowerShell) to finish.
+
 - Model selection updates immediately. Rapid selections save in order, stale settings responses cannot replace the latest choice, and a failed save restores the last confirmed model with an error message. Existing running tasks continue with their original model.
 - **Följ lektion** opens a separate Swedish-first workspace with a timestamped transcript, structured summary, in-class tasks and future assignments. Notes persist across restarts. You can pause/continue capture, complete tasks, update the summary manually or automatically, export Markdown, and delete sessions.
 - **Transkribera** gives a focused transcription view for the microphone or WAV/MP3/M4A/MP4/OGG/WebM/FLAC files under 25 MB. Swedish uses `kb-whisper-large`; the English button uses `faster-whisper-large-v3`. Whisper models are kept out of the chat model selector.
