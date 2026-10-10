@@ -1,9 +1,19 @@
 /// <reference types="vite/client" />
 interface Window {
   schoolwork: {
+    connectionList:()=>Promise<any[]>;
+    connectionSave:(input:{id?:string;name:string;url:string;token?:string;enabled:boolean})=>Promise<any[]>;
+    connectionRemove:(id:string)=>Promise<any[]>;
+    connectionTest:(id:string)=>Promise<any[]>;
+    calendarDrive:(enabled:boolean)=>Promise<import('./lesson').CalendarStatus>;
+    steer: (input:{taskId:string;chatId:string;userText:string;clientRequestId:string;attachmentIds?:string[]})=>Promise<string>;
+    lessonRefine: (input:{id:string;model:string})=>Promise<import('./lesson').LessonSession>;
+    lessonChat: (input:{id:string;model:string;question:string})=>Promise<{chatId:string;taskId:string}>;
+    calendarCheck: ()=>Promise<import('./lesson').CalendarStatus>;
+    calendarImport: ()=>Promise<import('./lesson').CalendarStatus|null>;
     lessonList: () => Promise<import('./lesson').LessonSession[]>;
     lessonCreate: (input: {mode:'lesson'|'transcription';language:'sv'|'en';title:string}) => Promise<import('./lesson').LessonSession>;
-    lessonUpdate: (input: {id:string;title?:string;language?:'sv'|'en';taskId?:string;completed?:boolean}) => Promise<import('./lesson').LessonSession>;
+    lessonUpdate: (input: {id:string;title?:string;language?:'sv'|'en';subject?:string;taskId?:string;completed?:boolean}) => Promise<import('./lesson').LessonSession>;
     lessonDelete: (id:string) => Promise<void>;
     lessonAudio: (input: import('./lesson').AudioInput) => Promise<{session:import('./lesson').LessonSession;error?:string}>;
     lessonRetry: (input: {id:string;audioId:string}) => Promise<{session:import('./lesson').LessonSession;error?:string}>;

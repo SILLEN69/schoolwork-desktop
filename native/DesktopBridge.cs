@@ -23,6 +23,7 @@ static class DesktopBridge {
     [StructLayout(LayoutKind.Sequential)] struct Input { public uint type; public Union u; }
     [DllImport("user32.dll")] static extern bool EnumWindows(EnumProc callback, IntPtr p);
     [DllImport("user32.dll")] static extern bool IsWindowVisible(IntPtr h);
+    [DllImport("user32.dll")] static extern bool IsWindowEnabled(IntPtr h);
     [DllImport("user32.dll")] static extern bool IsWindow(IntPtr h);
     [DllImport("user32.dll")] static extern bool IsIconic(IntPtr h);
     [DllImport("user32.dll", CharSet = CharSet.Unicode)] static extern int GetWindowText(IntPtr h, StringBuilder s, int size);
@@ -33,6 +34,8 @@ static class DesktopBridge {
     [DllImport("user32.dll")] static extern IntPtr GetWindow(IntPtr h, uint command);
     [DllImport("user32.dll")] static extern IntPtr GetLastActivePopup(IntPtr h);
     [DllImport("user32.dll")] static extern bool SetForegroundWindow(IntPtr h);
+    [DllImport("kernel32.dll")] static extern uint GetCurrentThreadId();
+    [DllImport("user32.dll")] static extern bool AttachThreadInput(uint from,uint to,bool attach);
     [DllImport("user32.dll")] static extern bool ShowWindow(IntPtr h, int command);
     [DllImport("user32.dll")] static extern bool SetWindowPos(IntPtr h, IntPtr after, int x, int y, int width, int height, uint flags);
     [DllImport("user32.dll")] static extern uint SendInput(uint n, Input[] input, int size);
@@ -47,6 +50,17 @@ static class DesktopBridge {
     [DllImport("user32.dll")] static extern bool SetProcessDpiAwarenessContext(IntPtr value);
     [DllImport("user32.dll")] static extern bool SetProcessDPIAware();
 
+    static void FocusTarget(IntPtr target) {
+        // The short-lived helper isn't the process that received the last input.
+        // Briefly join its input queue to the foreground queue; never synthesize
+        // Alt/key presses or weaken secure-desktop/UAC checks. Always detach.
+        uint ignored, current=GetCurrentThreadId();
+        uint foreground=GetWindowThreadProcessId(GetForegroundWindow(),out ignored);
+        bool attached=foreground!=0 && foreground!=current && AttachThreadInput(current,foreground,true);
+        try { SetForegroundWindow(target); }
+        finally { if(attached) AttachThreadInput(current,foreground,false); }
+        Thread.Sleep(150);
+    }
     static string Str(Dictionary<string, object> a, string k, string fallback = "") { return a.ContainsKey(k) ? Convert.ToString(a[k]) : fallback; }
     static int Num(Dictionary<string, object> a, string k, int fallback = 0) { return a.ContainsKey(k) ? Convert.ToInt32(a[k]) : fallback; }
     static Dictionary<string, object> Obj(params object[] pairs) { var d = new Dictionary<string, object>(); for (int i=0; i<pairs.Length; i+=2) d[(string)pairs[i]]=pairs[i+1]; return d; }
@@ -150,17 +164,27 @@ static class DesktopBridge {
         IntPtr target=Target(a,false);
         if(action=="prepare_desktop" || action=="observe_active") {
             target=ActiveTarget(target);
+            if(action=="observe_active") {
+                // Shell file pickers may become visible after the initial settle.
+                // A disabled parent is not an actionable view of its opening modal.
+                var until=DateTime.UtcNow.AddMilliseconds(1500);
+                while(!IsWindowEnabled(target) && DateTime.UtcNow<until) {Thread.Sleep(60);target=ActiveTarget(target);}
+                if(!IsWindowEnabled(target))throw new Exception("MODAL_PENDING: Input was sent but the dialog is still opening. Wait, then prepare_desktop once; do not repeat the input.");
+            }
             if(action=="prepare_desktop") {
                 if(IsIconic(target)) ShowWindow(target,9);
-                if(GetForegroundWindow()!=target) { SetForegroundWindow(target); Thread.Sleep(150); }
+                if(GetForegroundWindow()!=target) FocusTarget(target);
                 target=ActiveTarget(target);
                 if(GetForegroundWindow()!=target) throw new Exception("FOCUS_REQUIRED: Windows refused focus. Bring the requested app or its dialog to the front, then prepare_desktop once. Repeated screenshots cannot fix focus.");
             }
             if(IsIconic(target)) throw new Exception("Window is minimized; prepare_desktop before input.");
             var w=WindowInfo(target);
-            return Capture(new Rectangle(Num(w,"left"),Num(w,"top"),Num(w,"width"),Num(w,"height")),w);
+            var captured=Capture(new Rectangle(Num(w,"left"),Num(w,"top"),Num(w,"width"),Num(w,"height")),w);
+            var next=ActiveTarget(target);
+            if(next!=target) {w=WindowInfo(next);return Capture(new Rectangle(Num(w,"left"),Num(w,"top"),Num(w,"width"),Num(w,"height")),w);}
+            return captured;
         }
-        if (action=="focus_window") { if (IsIconic(target)) ShowWindow(target,9); SetForegroundWindow(target); Thread.Sleep(150); if (GetForegroundWindow()!=target) throw new Exception("Windows refused foreground focus. Select the app manually and retry."); return WindowInfo(target); }
+        if (action=="focus_window") { if (IsIconic(target)) ShowWindow(target,9); FocusTarget(target); if (GetForegroundWindow()!=target) throw new Exception("FOCUS_REQUIRED: Windows refused foreground focus. Bring this app to the front and retry once."); return WindowInfo(target); }
         if (action=="inspect_window") return Obj("window",WindowInfo(target),"controls",Controls(target));
         if (action=="move_window") {
             Screen display=null; foreach(var candidate in Screen.AllScreens) if(candidate.DeviceName==Str(a,"displayId")) display=candidate;

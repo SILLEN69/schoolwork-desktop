@@ -1,5 +1,15 @@
 import { contextBridge, ipcRenderer } from "electron";
 contextBridge.exposeInMainWorld("schoolwork", {
+  connectionList:()=>ipcRenderer.invoke('connections:list'),
+  connectionSave:(input:unknown)=>ipcRenderer.invoke('connections:save',input),
+  connectionRemove:(id:string)=>ipcRenderer.invoke('connections:remove',id),
+  connectionTest:(id:string)=>ipcRenderer.invoke('connections:test',id),
+  calendarDrive:(enabled:boolean)=>ipcRenderer.invoke('calendar:drive',enabled),
+  steer: (input:unknown)=>ipcRenderer.invoke('chat:steer',input),
+  lessonRefine: (input:unknown)=>ipcRenderer.invoke('lessons:refine',input),
+  lessonChat: (input:unknown)=>ipcRenderer.invoke('lessons:chat',input),
+  calendarCheck: ()=>ipcRenderer.invoke('calendar:check'),
+  calendarImport: ()=>ipcRenderer.invoke('calendar:import'),
   lessonList: () => ipcRenderer.invoke('lessons:list'),
   lessonCreate: (input: unknown) => ipcRenderer.invoke('lessons:create', input),
   lessonUpdate: (input: unknown) => ipcRenderer.invoke('lessons:update', input),

@@ -32,6 +32,7 @@ it('keeps transcripts and completed/calendar tasks during summary refresh',async
   let current=notes;const fetcher=vi.fn(async(url:unknown)=>String(url).endsWith('/audio/transcriptions')?Response.json({text:'Gör uppgift 3 nu. Lämna in rapporten den 16 oktober.'}):summary(JSON.stringify(current)));
   const lessons=new Lessons(db,root,()=> 'test',fetcher),s=lessons.create('lesson','sv','Test');await lessons.upload(audio(s.id));
   const result=await lessons.analyse(s.id,'Qwen3.8-27B');expect(result.analysis.tasks).toHaveLength(2);expect(result.analysedRevision).toBe(1);
+  expect(result.subject).toBe('Matematik');const more=audio(s.id);more.start=1;await lessons.upload(more);expect(lessons.get(s.id).subject).toBe('Matematik');
   lessons.update(s.id,{taskId:result.analysis.tasks[0].id,completed:true});lessons.attachCalendar(s.id,result.analysis.tasks[1].id,'event');
   const next=await lessons.analyse(s.id,'Qwen3.8-27B');expect(next.analysis.tasks[0].completed).toBe(true);expect(next.analysis.tasks[1].calendarEventId).toBe('event');
   current={...notes,tasks:[]};const fewer=await lessons.analyse(s.id,'Qwen3.8-27B');expect(fewer.analysis.tasks).toHaveLength(2);

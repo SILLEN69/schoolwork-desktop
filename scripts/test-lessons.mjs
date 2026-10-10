@@ -8,6 +8,8 @@ const shots=path.resolve('work/lesson-verification');await fs.mkdir(shots,{recur
 let app;
 const results=[];
 function pass(text){results.push(text);console.log('PASS:',text);}
+// waitForFunction polls synchronous predicates; a Promise is truthy before IPC completes.
+async function waitIPC(page,predicate,arg){const until=Date.now()+20000;while(Date.now()<until){if(await page.evaluate(predicate,arg))return;await page.waitForTimeout(100);}throw new Error('IPC state did not reach its acceptance condition.');}
 async function launch(){return electron.launch({executablePath:process.platform==='win32'?path.resolve('node_modules/electron/dist/electron.exe'):path.resolve('node_modules/electron/dist/electron'),args:[path.resolve('scripts/test-lesson-app.cjs'),'--user-data-dir='+data,...(process.platform==='linux'?['--no-sandbox']:[])],env:{...process.env,XDG_CACHE_HOME:path.resolve('../.cache'),SCHOOLWORK_LESSON_TEST_DATA:data},timeout:30_000});}
 try{
   app=await launch();app.process().stderr.on('data',chunk=>{ void fs.appendFile(path.join(shots,'electron-stderr.log'),chunk); });const page=await app.firstWindow();await page.waitForFunction(()=>Boolean(window.schoolwork));
@@ -32,10 +34,12 @@ try{
   await page.screenshot({path:path.join(shots,'lesson-empty.png')});
   await page.getByRole('button',{name:'Starta inspelning',exact:true}).click();await page.getByRole('button',{name:'Pausa',exact:true}).waitFor();
   await page.waitForTimeout(2000);await page.getByRole('button',{name:'Pausa',exact:true}).click();
-  await page.getByText('Gör uppgift 3 nu. Lämna in rapporten den 16 oktober.',{exact:true}).waitFor({timeout:15_000});
+  await waitIPC(page,async()=> (await window.schoolwork.lessonList())[0]?.segments.length===1);
   await page.getByRole('heading',{name:'Algebra · ekvationer'}).waitFor({timeout:15_000});
   assert.deepEqual(await app.evaluate(()=>global.__lessonTest.audioModels),['kb-whisper-large']);
   await page.locator('.lesson-title').fill('Matematik · fredag');await page.locator('.lesson-title').blur();
+  assert.equal(await page.getByRole('combobox',{name:'Ämne',exact:true}).inputValue(),'Matematik');
+  await page.getByRole('button',{name:/^Uppgifter/}).click();
   await page.getByRole('button',{name:'Markera uppgift: Uppgift 3'}).click();await page.waitForFunction(()=>document.querySelector('.lesson-check')?.getAttribute('aria-pressed')==='true');
   pass('real microphone capture produces a complete WAV; Swedish Whisper, persisted transcript, structured summary and task completion work with simulated service responses');
   await page.getByRole('button',{name:'Lägg till i Calendar'}).click();
@@ -56,7 +60,7 @@ try{
   await page.evaluate(async s=>window.schoolwork.calendarAdd({id:s.id,taskId:s.analysis.tasks.find(t=>t.kind==='assignment').id,title:'Lämna in rapporten',date:'2026-10-16'}),calendarSession);
   assert.equal(await app.evaluate(()=>global.__lessonTest.calendarWrites),1);
   pass('connected Google OAuth callback, confirmed Calendar write and duplicate-event prevention work through real IPC with simulated Google responses');
-  await page.getByRole('button',{name:'Kopiera text',exact:true}).click();
+  await page.getByRole('button',{name:'Transkript',exact:true}).click();await page.getByRole('button',{name:'Kopiera text',exact:true}).click();
   await page.waitForTimeout(150);
   assert.equal(await app.evaluate(({clipboard})=>clipboard.readText()),'Gör uppgift 3 nu. Lämna in rapporten den 16 oktober.');
   pass('transcript copy writes the expected text to the clipboard');
@@ -67,22 +71,42 @@ try{
   await page.getByRole('button',{name:'Fortsätt',exact:true}).click();await page.waitForTimeout(1200);await page.getByRole('button',{name:'Pausa',exact:true}).click();
   await page.getByRole('button',{name:'Försök igen',exact:true}).waitFor({timeout:15_000});
   await app.evaluate(()=>{global.__lessonTest.failAudio=false;});await page.getByRole('button',{name:'Försök igen',exact:true}).click();
-  await page.waitForFunction(async()=>{const s=await window.schoolwork.lessonList();return s[0].segments.length===2 && s[0].pending.length===0;});
+  await waitIPC(page,async()=>{const s=await window.schoolwork.lessonList();return s[0].segments.length===2 && s[0].pending.length===0;});
   pass('failed audio is retained and can be retried without duplicating previous segments');
   await page.getByRole('button',{name:'English',exact:true}).click();await page.getByRole('button',{name:'Continue',exact:true}).click();await page.waitForTimeout(1200);await page.getByRole('button',{name:'Pause',exact:true}).click();
-  await page.getByText('Do exercise three now. Submit the report on 16 October.',{exact:true}).waitFor({timeout:15_000});
+  await page.waitForFunction(()=>document.querySelector('.lesson-continuous>p')?.textContent.includes('Do exercise three now. Submit the report on 16 October.'));
   const models=await app.evaluate(()=>global.__lessonTest.audioModels);assert.equal(models.at(-1),'faster-whisper-large-v3');pass('English switch uses the multilingual Whisper model while retaining Swedish transcript segments');
-  await page.getByRole('button',{name:'Transcribe',exact:true}).click();assert.equal(await page.locator('.lesson-summary').count(),0);assert.equal(await page.locator('.lesson-actions').count(),0);
-  pass('ordinary transcription has its own focused layout');
+  await page.locator('.lesson-assistant input').fill('Explain the lesson');await page.locator('.lesson-assistant form button[type=submit]').click();
+  await page.locator('.lesson-assistant').getByText('Fixture answer: Explain the lesson',{exact:true}).waitFor();
+  const lessonRequest=await app.evaluate(()=>global.__lessonTest.agentRequests.at(-1));assert(lessonRequest[0].content.includes('Gör uppgift 3 nu.'));
+  pass('lesson questions use the Work agent with saved lesson context');
+  await page.locator('.lesson-back').click();
+  assert.equal(await page.getByRole('button',{name:'Screenshot',exact:true}).count(),0);assert.equal(await page.getByRole('button',{name:'Transcription',exact:true}).count(),0);
+  const message=page.getByRole('textbox',{name:'Message',exact:true});await page.getByRole('button',{name:'Dictate',exact:true}).click();await page.getByRole('button',{name:'Finish dictation',exact:true}).waitFor();await page.waitForTimeout(1200);await page.getByRole('button',{name:'Finish dictation',exact:true}).click();
+  await page.waitForFunction(()=>document.querySelector('textarea[aria-label="Message"]')?.value.includes('Do exercise three now.'));
+  assert.equal(await page.locator('.user-message').count(),0);await message.fill('Do the fixture task');
+  await app.evaluate(()=>{global.__lessonTest.agentTool=true;});await page.locator('.send-btn').click();
+  await page.waitForFunction(()=>document.body.textContent.includes('Running node'));
+  await message.fill('New context: use blue');await page.locator('.send-btn').click();
+  await page.getByText('Fixture answer: New context: use blue',{exact:true}).waitFor({timeout:20000});
+  const steered=await page.evaluate(async()=>{const chats=await window.schoolwork.listChats();return window.schoolwork.getChat(chats[0].id);});
+  assert(steered.messages.some(m=>m.role==='tool' && m.content.includes('fixture complete')));assert.equal(steered.task.state,'completed');
+  pass('Work dictation fills editable text without sending; guidance arrives during a real tool run without cancelling it');
+  await page.screenshot({path:path.join(shots,'work-dictation-steering.png')});
+  await page.getByRole('button',{name:'Follow a lesson'}).click();await page.getByRole('button',{name:'Ny session',exact:true}).click();
   await page.getByRole('button',{name:'Svenska',exact:true}).click();
+  await page.waitForFunction(()=>document.querySelector('.lesson-title')?.value==='Ny lektion');
+  const importId=(await page.evaluate(()=>window.schoolwork.lessonList())).find(s=>s.title==='Ny lektion' && !s.segments.length).id;
   const wav=Buffer.alloc(44+3200);wav.write('RIFF',0);wav.writeUInt32LE(wav.length-8,4);wav.write('WAVEfmt ',8);wav.writeUInt32LE(16,16);wav.writeUInt16LE(1,20);wav.writeUInt16LE(1,22);wav.writeUInt32LE(16000,24);wav.writeUInt32LE(32000,28);wav.writeUInt16LE(2,32);wav.writeUInt16LE(16,34);wav.write('data',36);wav.writeUInt32LE(3200,40);
   await page.locator('input[type="file"]').setInputFiles({name:'lesson.wav',mimeType:'audio/wav',buffer:wav});
-  await page.getByText('Gör uppgift 3 nu. Lämna in rapporten den 16 oktober.',{exact:true}).waitFor();
-  const imported=(await page.evaluate(()=>window.schoolwork.lessonList()))[0];assert.equal(imported.mode,'transcription');assert.equal(imported.segments.length,1);assert.equal(imported.segments[0].model,'kb-whisper-large');
-  pass('audio-file import uses Swedish Whisper in ordinary transcription mode');
+  await waitIPC(page,async id=> (await window.schoolwork.lessonList()).find(s=>s.id===id)?.segments.length===1,importId);
+  const imported=(await page.evaluate(()=>window.schoolwork.lessonList())).find(s=>s.id===importId);assert.equal(imported.mode,'lesson');assert.equal(imported.segments.length,1);assert.equal(imported.segments[0].model,'kb-whisper-large');
+  pass('audio-file import uses Swedish Whisper in the lesson workspace');
+  await waitIPC(page,async id=>{const s=(await window.schoolwork.lessonList()).find(s=>s.id===id);return s.analysedRevision===s.revision;},importId);
   assert.deepEqual(errors,[]);await app.close();app=await launch();const restored=await app.firstWindow();await restored.getByRole('button',{name:'Follow a lesson'}).waitFor();await restored.getByRole('button',{name:'Follow a lesson'}).click();
-  await restored.getByRole('button',{name:/^Matematik · fredag/}).click();await restored.getByText('Do exercise three now. Submit the report on 16 October.',{exact:true}).waitFor();
+  await restored.getByRole('button',{name:/^Matematik · fredag/}).click();await restored.getByRole('button',{name:'Transcript',exact:true}).click();await restored.locator('.lesson-continuous>p').waitFor();assert((await restored.locator('.lesson-continuous>p').textContent()).includes('Do exercise three now. Submit the report on 16 October.'));await restored.getByRole('button',{name:/^Tasks/}).click();
   assert.equal(await restored.getByRole('button',{name:'Complete task: Uppgift 3'}).getAttribute('aria-pressed'),'true');
   pass('lesson history, transcript and completed tasks survive an application restart');
   console.log(`PASS: ${results.length} lesson/model UI checks; remote TeachGPT/Google traffic simulated; real Electron IPC and microphone capture exercised.`);
-}finally{await app?.close();await fs.rm(data,{recursive:true,force:true});}
+}catch(error){console.error('LESSON_TEST_FAILURE',error);if(app){const page=await app.firstWindow().catch(()=>null);await page?.screenshot({path:path.join(shots,'failure.png')}).catch(()=>{});console.log('SAVED_SESSION_DIAGNOSTIC',await page?.evaluate(()=>window.schoolwork.lessonList()).catch(()=>[]));}throw error;}
+finally{if(app){app.process().kill();await app.close().catch(()=>{});}await fs.rm(data,{recursive:true,force:true});}

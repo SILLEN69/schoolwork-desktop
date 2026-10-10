@@ -1,0 +1,41 @@
+/* A reading workspace, not three independently scrolling dashboards. */
+.lesson-shell{--ln-bg:#111614;--ln-panel:#191f1c;--ln-line:#303a33;--ln-muted:#a0aea3}
+.lesson-rail{width:230px;padding:24px 18px;background:#141a16}
+.lesson-brand{margin-bottom:24px}.lesson-brand strong{font-size:22px}.lesson-brand small{font-size:10px;letter-spacing:1px}
+.lesson-back{margin-bottom:28px}.lesson-mode{font-size:13px}
+.lesson-main{padding:0 clamp(22px,5vw,72px) 32px;overflow-y:auto;display:block}
+.lesson-main>*{max-width:1050px;margin-left:auto;margin-right:auto}
+.lesson-topbar{min-height:58px}.lesson-topbar>div:first-child{font-size:11px;letter-spacing:.7px}
+.lesson-intro{padding:24px 0 20px}.lesson-eyebrow{display:none}.lesson-title{font-size:29px;letter-spacing:-.7px}.lesson-intro p{font-size:13px}
+.lesson-capture{padding:14px 18px;gap:16px;background:#20291f;border-color:#3d4b35}
+.lesson-record-status{min-width:0}.lesson-record-status strong{font-size:13px}.lesson-record-status small{font-size:11px}
+.lesson-consent{font-size:11px;line-height:1.65;margin-top:10px;margin-bottom:16px;color:#99a995}
+.lesson-tabs{display:flex;align-items:center;gap:6px;border-bottom:1px solid var(--ln-line);padding-bottom:10px;margin-bottom:16px}
+.lesson-tabs button{font-size:14px;color:var(--ln-muted);padding:9px 14px;border-radius:8px}
+.lesson-tabs button[aria-pressed=true]{background:#303e28;color:var(--ln-accent)}
+.lesson-tabs span{font-size:11px;background:#3c4c31;padding:2px 6px;border-radius:6px}
+.lesson-tabs select{margin-left:auto;background:var(--ln-panel);border:1px solid var(--ln-line);border-radius:7px;color:var(--ln-text);font:inherit;font-size:13px;padding:8px}
+.lesson-columns{display:block;min-height:0}.lesson-columns>.lesson-card{display:none}
+.lesson-columns[data-view=notes]>.lesson-summary,.lesson-columns[data-view=tasks]>.lesson-actions,.lesson-columns[data-view=transcript]>.lesson-transcript{display:block}
+.lesson-card{border-radius:12px;min-height:320px;overflow:visible;background:var(--ln-panel)}
+.lesson-card-head{padding:16px 24px}.lesson-card-head h2{font-size:14px}.lesson-card-head>span{font-size:11px}
+.lesson-scroll{overflow:visible;max-height:none;display:block!important}
+.lesson-overview{padding:25px 28px;background:none}.lesson-overview>div{display:none}.lesson-overview h3{font-size:22px}.lesson-overview p{font-size:15px;line-height:1.8;color:#cfdbca}
+.lesson-summary-section{padding:20px 28px}.lesson-summary-section h3{font-size:15px}.lesson-summary-section li{font-size:14px;color:#b8c9b0;line-height:1.8}
+.lesson-card-foot{padding:14px 24px;min-height:52px;font-size:11px}.lesson-card-foot button,.lesson-card-foot label{font-size:12px}
+.lesson-continuous{padding:26px 28px}.lesson-continuous>p{white-space:pre-wrap;font-size:16px;line-height:1.95;color:#dae3d5;margin:0 0 24px;overflow-wrap:anywhere}
+.lesson-continuous details{font-size:12px;color:#a4b69a}.lesson-continuous summary{cursor:pointer}.lesson-continuous details p{line-height:1.8}.lesson-continuous time{font-variant-numeric:tabular-nums;color:#cce399;margin-right:6px}
+.lesson-task-group{padding:22px 26px}.lesson-group-title{font-size:11px;letter-spacing:.6px}.lesson-task{padding:16px 18px;margin-top:12px;background:#202a1f}
+.lesson-task strong{font-size:14px}.lesson-task p{font-size:13px}.lesson-task details,.lesson-due{font-size:12px}.lesson-task .lesson-text-button{font-size:12px!important}
+.lesson-subject-group{margin-bottom:18px}.lesson-subject-group h3{font-size:12px;font-weight:600;color:#c1dba2;display:flex;justify-content:space-between;margin:12px 8px 6px}.lesson-subject-group h3 span{color:#7f9970}
+.lesson-history-row strong{font-size:13px;max-width:155px}.lesson-history-row small{font-size:11px}.lesson-history-row>button:first-child{padding:11px 10px}.lesson-rail-label{font-size:10px;margin-top:22px}
+.lesson-calendar-status strong{font-size:12px}.lesson-calendar-status small{font-size:11px}.lesson-local{font-size:10px}
+.lesson-assistant{border:1px solid var(--ln-line);border-radius:12px;background:#1c241c;margin-top:20px;padding:14px}
+.lesson-assistant form{display:flex;gap:10px;align-items:center}.lesson-assistant input{flex:1;min-width:100px;background:transparent;color:#ecf3e4;border:0;outline:0;padding:10px;font-size:14px}
+.lesson-assistant>p{font-size:12px;color:#adc38f;margin:6px 8px 12px}.lesson-reply{padding:6px 12px 14px;max-height:400px;overflow:auto;font-size:14px;line-height:1.7}
+.lesson-outline,.lesson-primary{font-size:12px}.lesson-error,.lesson-notice{font-size:13px}.lesson-dialog p{font-size:13px}
+.voice-input.recording{background:#473029;border-color:#ae715b;color:#f1c3b1}.task-stop{border:1px solid #63443a;background:#35251f;color:#e9c6b2;border-radius:8px;flex:none}
+.composer-bottom{flex-wrap:wrap;gap:12px}.composer-tools{flex-wrap:wrap}.send-area{margin-left:auto}.composer .tool-pill{padding:7px 9px}.send-area>span{font-size:10px}
+@media(max-width:1050px){.lesson-rail{width:190px;padding:20px 12px}.lesson-history-row strong{max-width:130px}.lesson-main{padding:0 24px 24px}.lesson-capture-actions{flex-wrap:wrap}.lesson-wave{display:none}.lesson-columns{min-height:0!important}.lesson-actions{grid-column:auto}}
+@media(max-width:760px){.lesson-rail{width:160px;padding:16px 10px}.lesson-brand strong{font-size:19px}.lesson-history-row strong{max-width:112px}.lesson-main{padding:0 16px 20px}.lesson-capture{align-items:flex-start;flex-direction:column}.lesson-tabs{flex-wrap:wrap}.lesson-tabs select{width:100%;margin:0}.lesson-tabs button{font-size:12px;padding:8px}.lesson-assistant form{flex-wrap:wrap}.lesson-assistant input{flex-basis:100%}.lesson-overview,.lesson-continuous,.lesson-summary-section,.lesson-task-group{padding:20px}.lesson-card-foot{flex-wrap:wrap}.lesson-language button{padding:7px 9px}.send-area>span{display:none}}
+@media(max-width:520px){.lesson-rail{width:125px}.lesson-brand{margin-left:0}.lesson-brand>span{display:none}.lesson-brand strong{font-size:17px}.lesson-brand small{display:none}.lesson-history-row strong{max-width:85px}.lesson-delete{padding:3px!important}.lesson-main{padding:0 10px 16px}.lesson-intro{flex-wrap:wrap}.lesson-title{font-size:23px}}

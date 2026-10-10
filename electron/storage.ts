@@ -44,6 +44,10 @@ export class SchoolWorkStore {
         pending_request_json TEXT, error TEXT, created_at INTEGER NOT NULL, updated_at INTEGER NOT NULL
       );
       CREATE INDEX IF NOT EXISTS tasks_state_created ON tasks(state, created_at);
+      CREATE TABLE IF NOT EXISTS task_inputs (
+        request_id TEXT PRIMARY KEY, task_id TEXT NOT NULL REFERENCES tasks(id) ON DELETE CASCADE,
+        message_id TEXT NOT NULL REFERENCES messages(id) ON DELETE CASCADE, applied INTEGER NOT NULL DEFAULT 0
+      );
       CREATE TABLE IF NOT EXISTS tool_executions (
         id TEXT PRIMARY KEY, task_id TEXT NOT NULL REFERENCES tasks(id), call_id TEXT NOT NULL,
         name TEXT NOT NULL, arguments_json TEXT NOT NULL, status TEXT NOT NULL,
@@ -238,6 +242,28 @@ export class SchoolWorkStore {
       hasError ? 1 : 0, hasError ? patch.error ?? null : null, Date.now(), id,
     );
   }
+  steerTask(input:{taskId:string;conversationId:string;clientRequestId:string;text:string;attachmentIds:string[]}) {
+    return this.transaction(()=>{
+      const task=this.getTask(input.taskId);
+      if(!task || task.conversationId!==input.conversationId || !['running','queued'].includes(task.state)) throw new Error('This task is no longer running. Send a new message instead.');
+      const existing=this.db.prepare('SELECT task_id FROM task_inputs WHERE request_id=?').get(input.clientRequestId) as any;
+      if(existing){if(existing.task_id!==input.taskId)throw new Error('Request belongs to another task.');return input.taskId;}
+      const id=crypto.randomUUID(),now=Date.now(),sequence=this.lastMessageSequence(input.conversationId)+1;
+      this.db.prepare('INSERT INTO messages(id,conversation_id,sequence,role,content,client_request_id,created_at) VALUES(?,?,?,?,?,?,?)').run(id,input.conversationId,sequence,'user',input.text,input.clientRequestId,now);
+      for(const attachmentId of input.attachmentIds) {
+        const linked=this.db.prepare('UPDATE image_attachments SET message_id=? WHERE id=? AND conversation_id=? AND message_id IS NULL').run(id,attachmentId,input.conversationId);
+        if(!linked.changes)throw new Error('Attachment ownership changed. Nothing was sent.');
+      }
+      this.db.prepare('INSERT INTO task_inputs(request_id,task_id,message_id) VALUES(?,?,?)').run(input.clientRequestId,input.taskId,id);
+      this.db.prepare('UPDATE conversations SET updated_at=? WHERE id=?').run(now,input.conversationId);
+      return input.taskId;
+    });
+  }
+  pendingInputs(taskId:string): StoredMessage[] {
+    const ids=new Set((this.db.prepare('SELECT message_id FROM task_inputs WHERE task_id=? AND applied=0').all(taskId) as any[]).map(r=>r.message_id));
+    const task=this.getTask(taskId);return task?this.getMessages(task.conversationId).filter(m=>ids.has(m.id)):[];
+  }
+  appliedInput(messageId:string){this.db.prepare('UPDATE task_inputs SET applied=1 WHERE message_id=?').run(messageId);}
 
   beginToolExecution(input: { id: string; taskId: string; callId: string; name: string; arguments: unknown; status?: string; startedAt: number }) {
     const inserted = this.db.prepare('INSERT OR IGNORE INTO tool_executions(id,task_id,call_id,name,arguments_json,status,result_json,started_at,finished_at) VALUES(?,?,?,?,?,?,?,?,NULL)')

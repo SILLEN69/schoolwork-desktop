@@ -119,7 +119,7 @@ export async function executeProjectTool(name: keyof typeof projectInputs, raw: 
       after = before;
       for (const edit of name === 'patch_file' ? [args] : args.edits) {
         const at = after.indexOf(edit.search);
-        if (at < 0 || after.indexOf(edit.search, at + 1) >= 0) throw new Error('Each edit must match exactly once. No changes were written.');
+        if (at < 0 || after.indexOf(edit.search, at + 1) >= 0) throw new Error(`Each edit must match exactly once (${at<0?'no match':'multiple matches'} for this edit). No changes were written. Read the current range, copy exact text including real newlines, then retry one targeted edit.`);
         after = after.slice(0, at) + edit.replacement + after.slice(at + edit.search.length);
       }
     }

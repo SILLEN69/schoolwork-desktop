@@ -8,6 +8,8 @@ if (!window.schoolwork) {
   const key = "schoolwork-preview-chats";
   const desktopOnly = async (): Promise<never> => { throw new Error('Öppna SchoolWork-appen för ljud och Google Calendar. / Open the desktop app for audio and Google Calendar.'); };
   window.schoolwork = {
+    connectionList:async()=>[],connectionSave:desktopOnly,connectionRemove:desktopOnly,connectionTest:desktopOnly,calendarDrive:desktopOnly,
+    steer:desktopOnly,lessonRefine:desktopOnly,lessonChat:desktopOnly,calendarCheck:desktopOnly,calendarImport:desktopOnly,
     lessonList: async () => [], lessonCreate: desktopOnly, lessonUpdate: desktopOnly, lessonDelete: desktopOnly,
     lessonAudio: desktopOnly, lessonRetry: desktopOnly, lessonDiscard: desktopOnly, lessonCancel: desktopOnly, lessonAnalyse: desktopOnly,
     calendarStatus: async () => ({configured:false,connected:false,connecting:false,calendarId:'primary'}),

@@ -3,6 +3,7 @@ import {readFileSync,statSync} from 'node:fs';
 import {createHash} from 'node:crypto';
 const repo=process.env.GITHUB_REPOSITORY || 'SILLEN69/schoolwork-desktop';
 const version=JSON.parse(readFileSync('package.json','utf8')).version;
+const notes=`docs/release-${version.split('.').slice(0,2).join('.')}.md`;
 const tag=process.env.RELEASE_TAG || process.env.GITHUB_REF_NAME || `v${version}`;
 if(!/^[\w.-]+\/[\w.-]+$/.test(repo)||tag!==`v${version}`)throw new Error('Repository/tag does not match this package.');
 function gh(args){
@@ -18,7 +19,7 @@ if(ids.length>1||ids.some(id=>!/^\d+$/.test(id)))throw new Error('Ambiguous rele
 const names=[`SchoolWork-${version}-x64-setup.exe`,`SchoolWork-${version}-x64-portable.exe`,`SchoolWork-${version}-x64-setup.exe.blockmap`,'latest.yml',`SHA256SUMS-${tag}.txt`];
 const files=names.map(name=>`release/${name}`);
 if(!ids.length){
- gh(['release','create',tag,...files,'docs/release-0.9.md','docs/lesson-studio-plan.md','--repo',repo,'--title',`SchoolWork ${version} — Lesson Studio`,'--notes-file','docs/release-0.9.md','--draft','--verify-tag']);
+ gh(['release','create',tag,...files,notes,'docs/workflow-0.10.md','--repo',repo,'--title',`SchoolWork ${version} — Lessons, voice & connected work`,'--notes-file',notes,'--draft','--verify-tag']);
  const createdIds=gh(['api',`repos/${repo}/releases?per_page=100`,'--paginate','--jq',`.[] | select(.tag_name == "${tag}") | .id`]).split(/\r?\n/).filter(Boolean);
  if(createdIds.length!==1||!/^\d+$/.test(createdIds[0]))throw new Error('Created draft could not be located.');
  ids.push(createdIds[0]);
@@ -30,7 +31,7 @@ for(let i=0;i<names.length;i++){
  if(!asset&&release.draft){gh(['release','upload',tag,file,'--repo',repo]);release=api(`releases/${ids[0]}`);asset=release.assets.find(a=>a.name===name);}
  if(!asset||asset.state!=='uploaded'||asset.size!==statSync(file).size||asset.digest!==hash)throw new Error(`Missing or mismatched uploaded asset: ${name}`);
 }
-for(const file of ['docs/release-0.9.md','docs/lesson-studio-plan.md']){
+for(const file of [notes,'docs/workflow-0.10.md']){
  const name=file.split('/').at(-1);
  if(!release.assets.some(a=>a.name===name)&&release.draft)gh(['release','upload',tag,file,'--repo',repo]);
 }

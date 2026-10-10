@@ -10,11 +10,11 @@
   <img alt="MIT license" src="https://img.shields.io/badge/license-MIT-243329?style=flat-square">
 </p>
 
-<p align="center"><a href="https://github.com/SILLEN69/schoolwork-desktop/releases/latest"><strong>Download v0.9.0</strong></a> · <a href="#first-time-setup">Get started</a> · <a href="#what-schoolwork-can-do">Features</a> · <a href="#screen-control-see-act-check">Screen control</a> · <a href="#talk-to-schoolwork-from-your-phone">Telegram</a></p>
+<p align="center"><a href="https://github.com/SILLEN69/schoolwork-desktop/releases/latest"><strong>Download v0.10.0</strong></a> · <a href="#first-time-setup">Get started</a> · <a href="#what-schoolwork-can-do">Features</a> · <a href="#screen-control-see-act-check">Screen control</a> · <a href="#talk-to-schoolwork-from-your-phone">Telegram</a></p>
 
 SchoolWork is a Windows assistant for students and teachers with access to **TeachGPT at Stockholm Science and Innovation School (SSIS)**. Explain a concept, investigate a bug or build a project: SchoolWork helps the selected school model find relevant files, edit code, run tests and report what happened. Your conversations and Markdown memory stay on your computer; model requests go to TeachGPT.
 
-**Current release: v0.9.0 for Windows x64.** It adds Lesson Studio, Swedish/English Whisper transcription and reviewed Google Calendar assignments alongside the screen, image and Telegram features shown below. Every installation needs its own eligible TeachGPT account and API key. SchoolWork is an independent open-source project, not an official school application.
+**Current release: v0.10.0 for Windows x64.** It adds Work composer dictation, safe-step task steering, subject-grouped lessons with a continuous transcript, Calendar fixes, optional read-only Google Drive and embedded HTTP MCP connections. See [release notes](docs/release-0.10.md) and [workflow design, verification and limitations](docs/workflow-0.10.md). Every installation needs its own eligible TeachGPT account and API key. SchoolWork is an independent open-source project, not an official school application.
 
 The 0.7 release adds bounded observation loops, one-call memory saves, chronological chat and actual task-specific Telegram replies. Its one-time upgrade migration enables application launching, screen viewing and input; later user revocations stay saved. See [0.7 implementation and verification](docs/agent-efficiency-0.7.md).
 

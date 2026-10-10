@@ -10,7 +10,6 @@ import {
   History,
   ImagePlus,
   Monitor,
-  Mic,
   GraduationCap,
   LoaderCircle,
   MoreHorizontal,
@@ -30,6 +29,9 @@ import WorkPanel from "./WorkPanel";
 import DesktopSettings from "./DesktopSettings";
 import TelegramSettings from "./TelegramSettings";
 import LessonWorkspace from "./LessonWorkspace";
+import VoiceInput from './VoiceInput';
+import ConnectionsSettings from './ConnectionsSettings';
+import './studio.css';
 import { isSpeechModel } from "../speechModels";
 import UpdateNotice from './UpdateNotice';
 import ImageAttachments, { imageFileData } from "./ImageAttachments";
@@ -370,7 +372,15 @@ export default function App() {
   };
   const submit = async () => {
     const text = draft.trim();
-    if ((!text && !pendingImages.length) || loading || importing) return;
+    if ((!text && !pendingImages.length) || importing || submitting.current) return;
+    if(loading && taskRef.current) {
+      submitting.current=true;const chatId=id,taskId=taskRef.current,images=[...pendingImages];
+      try {
+        await window.schoolwork.steer({taskId,chatId,userText:text,attachmentIds:images.map(a=>a.id),clientRequestId:crypto.randomUUID()});
+        if(selectedId.current===chatId){setDraft('');setPendingImages([]);setMessages(m=>[...m,{role:'user',content:text,attachments:images}]);}
+      }catch(e:any){setError(e.message);}finally{submitting.current=false;}
+      return;
+    }
     const images = [...pendingImages];
     stickToBottom.current = true;
     const submittedId = id;
@@ -429,7 +439,7 @@ export default function App() {
       setPendingImages((images) => [...images, attachment]);
   };
   const importFiles = async (files: File[]) => {
-    if (importing || loading) return;
+    if (importing) return;
     setImporting(true);
     const conversationId = id;
     try {
@@ -476,18 +486,6 @@ export default function App() {
       setError(e.message);
     }
   };
-  const captureScreen = async () => {
-    setImporting(true);
-    const conversationId = id;
-    try {
-      addCapture(await window.schoolwork.captureScreen({ conversationId }));
-      setError("");
-    } catch (e: any) {
-      setError(e.message);
-    } finally {
-      setImporting(false);
-    }
-  };
   const stopControl = async () => {
     try {
       await window.schoolwork.stopDesktop();
@@ -517,7 +515,7 @@ export default function App() {
       setError(e.message);
     }
   };
-  if (lessonMode) return <LessonWorkspace initialMode={lessonMode} summaryModel={settings.model} configured={settings.configured} onBack={() => setLessonMode(null)} />;
+  if (lessonMode) return <LessonWorkspace initialMode={lessonMode} summaryModel={settings.model} configured={settings.configured} onBack={() => setLessonMode(null)} onWork={chatId=>{setLessonMode(null);void chooseChat({id:chatId});}} />;
   return (
     <div className="shell">
       <aside className={"sidebar " + (sidebarCollapsed ? "collapsed" : "")}>
@@ -558,7 +556,6 @@ export default function App() {
           </button>
         </div>
         <button className="nav-item" onClick={() => setLessonMode("lesson")}><GraduationCap size={16}/><span>{t("Follow a lesson", "Följ en lektion")}</span></button>
-        <button className="nav-item" onClick={() => setLessonMode("transcription")}><Mic size={16}/><span>{t("Transcription", "Transkribering")}</span></button>
         <button
           className="nav-item memory-nav"
           onClick={() => setShowMemory(true)}
@@ -939,8 +936,8 @@ export default function App() {
                 }
               }}
               placeholder={t(
-                "Describe the outcome you want…",
-                "Beskriv resultatet du vill ha…",
+                loading?"Add context or steer the next step…":"Describe the outcome you want…",
+                loading?"Lägg till sammanhang eller styr nästa steg…":"Beskriv resultatet du vill ha…",
               )}
               rows={2}
             />
@@ -969,22 +966,13 @@ export default function App() {
                 </button>
                 <button
                   className="tool-pill"
-                  disabled={loading || importing}
+                  disabled={importing}
                   onClick={() => void chooseImages()}
                 >
                   <ImagePlus size={14} />
                   {t("Attach image", "Bifoga bild")}
                 </button>
-                <button
-                  className="tool-pill"
-                  disabled={
-                    loading || importing || !settings.capabilities?.viewScreen
-                  }
-                  onClick={() => void captureScreen()}
-                >
-                  <Monitor size={14} />
-                  {t("Screenshot", "Skärmbild")}
-                </button>
+                <VoiceInput key={id} chatId={id} language={language} onText={text=>setDraft(d=>(d.trimEnd()?d.trimEnd()+' ':'')+text)} onError={setError}/>
                 {importing && (
                   <LoaderCircle
                     size={16}
@@ -1018,20 +1006,21 @@ export default function App() {
                     "Enter skickar · Shift + Enter gör ny rad",
                   )}
                 </span>
+                {loading && <button className="icon task-stop" onClick={cancel} title={t('Stop task','Stoppa uppgift')} aria-label={t('Stop task','Stoppa uppgift')}><Square size={14}/></button>}
                 <button
                   className="send-btn"
-                  onClick={loading ? cancel : submit}
+                  onClick={submit}
                   disabled={
                     importing ||
-                    (!loading && !draft.trim() && !pendingImages.length)
+                    (!draft.trim() && !pendingImages.length)
                   }
                   title={
                     loading
-                      ? t("Cancel task", "Avbryt uppgift")
+                      ? t("Add context", "Lägg till sammanhang")
                       : t("Send task", "Skicka uppgift")
                   }
                 >
-                  {loading ? <Square size={14} /> : <Send size={15} />}
+                  <Send size={15} />
                 </button>
               </div>
             </div>
@@ -1207,6 +1196,7 @@ export default function App() {
               refresh={refresh}
             />
             <TelegramSettings swedish={isSv} />
+            <ConnectionsSettings swedish={isSv}/>
             <div className="setting-block">
               <label>{t("Working folder", "Arbetsmapp")}</label>
               <p>

@@ -1,5 +1,10 @@
 import { expect, it } from 'vitest';
 import { ProgressGuard, capabilityInstructions, isDesktopAutomationCommand } from './progressGuard';
+it('stops repeating a passing check and resets after a new edit',()=>{
+ const g=new ProgressGuard(),args={executable:'node',args:['app.check.js'],purpose:'test'},result={ok:true,data:{exitCode:0}};
+ expect(g.observe('run_process',args,result)).toBeUndefined();expect(g.observe('run_process',args,result)?.stop).toBe(false);g.observe('run_process',args,result);expect(g.observe('run_process',args,result)?.stop).toBe(true);
+ g.observe('edit_file',{path:'app.js'},{ok:true});expect(g.observe('run_process',args,result)).toBeUndefined();
+});
 it('distinguishes expired observations from covering windows on the same target',()=>{
   const g=new ProgressGuard();
   g.observe('click',{}, {ok:false,data:{code:'FOCUS_REQUIRED',windowId:'1'}});

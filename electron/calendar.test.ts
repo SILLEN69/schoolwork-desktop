@@ -1,9 +1,14 @@
 import { afterEach, beforeEach, it, expect, vi } from 'vitest';
-import { GoogleCalendar } from './calendar';
+import { GoogleCalendar,googleApiError } from './calendar';
 import type { Metadata } from './lessons';
 let db:Metadata, values:Map<string,string>, calendar:GoogleCalendar, opened:string, fetcher:ReturnType<typeof vi.fn>;
 const client={clientId:'123-test.apps.googleusercontent.com',clientSecret:'test-client-secret',calendarId:'primary'};
 const encrypt=(text:string)=>Buffer.from(text).toString('base64'),decrypt=(text:string)=>Buffer.from(text,'base64').toString();
+it('distinguishes disabled API, missing scope, quotas and school administrator restrictions',async()=>{
+ const response=(reason:string)=>Response.json({error:{errors:[{reason}]}},{status:403});
+ expect(await googleApiError(response('accessNotConfigured'))).toContain('disabled');expect(await googleApiError(response('insufficientPermissions'))).toContain('Reconnect');
+ expect(await googleApiError(response('quotaExceeded'))).toContain('rate limit');expect(await googleApiError(response('forbidden'))).toContain('school');
+});
 beforeEach(()=>{ values=new Map();db={getMetadata:k=>values.get(k),setMetadata:(k,v)=>{values.set(k,v);}};opened='';
   fetcher=vi.fn(async(url:unknown,init?:RequestInit)=>{
     if(String(url).endsWith('/token')) { const form=init?.body as URLSearchParams;expect(form.get('client_secret')).toBe(client.clientSecret);return Response.json({access_token:'test-access',expires_in:3600,refresh_token:form.get('grant_type')==='authorization_code'?'test-refresh':undefined,scope:'https://www.googleapis.com/auth/calendar.events'}); }
@@ -25,7 +30,7 @@ import crypto from 'node:crypto';
 function cryptoHash(text:string){return crypto.createHash('sha256').update(text).digest('base64url');}
 it('creates reviewed all-day events and uses stable IDs to recover conflicts',async()=>{
   await connect();const input={sessionId:'session',taskId:'task',title:'Rapport',date:'2026-10-16',details:'Inlämning'};
-  const result=await calendar.add(input);const request=fetcher.mock.calls.find(c=>String(c[0]).includes('/calendar/v3/'));const event=JSON.parse(request![1].body);expect(event.start).toEqual({date:'2026-10-16'});expect(event.end).toEqual({date:'2026-10-17'});expect(event.summary).toBe('Rapport');
+  const result=await calendar.add(input);expect(result.id).toMatch(/^[0-9a-v]{5,1024}$/);const request=fetcher.mock.calls.find(c=>String(c[0]).includes('/calendar/v3/'));const event=JSON.parse(request![1].body);expect(event.start).toEqual({date:'2026-10-16'});expect(event.end).toEqual({date:'2026-10-17'});expect(event.summary).toBe('Rapport');
   fetcher.mockImplementation(async(url,init)=>{if(init?.method==='POST')return new Response('',{status:409});expect(String(url)).toContain('/events/'+result.id);return Response.json(result);});
   expect((await calendar.add(input)).id).toBe(result.id);
 });

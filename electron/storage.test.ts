@@ -8,6 +8,17 @@ import { SchoolWorkStore } from './storage';
 function temporary() { return fs.mkdtempSync(path.join(os.tmpdir(), 'schoolwork-store-')); }
 
 describe('durable conversation store', () => {
+  it('queues guidance durably, deduplicates request IDs and rolls back bad attachments',()=>{
+    const dir=temporary(),taskId=crypto.randomUUID(),conversationId=crypto.randomUUID(),requestId=crypto.randomUUID();let store=new SchoolWorkStore(dir);
+    store.startTask({id:taskId,conversationId,clientRequestId:crypto.randomUUID(),objective:'Original task',model:'Qwen3.8-27B',workspace:dir});
+    store.updateTask(taskId,'running',{});
+    const input={taskId,conversationId,clientRequestId:requestId,text:'Use my new context',attachmentIds:[]};store.steerTask(input);store.steerTask(input);
+    expect(store.pendingInputs(taskId)).toHaveLength(1);expect(store.getMessages(conversationId)).toHaveLength(2);
+    expect(()=>store.steerTask({...input,conversationId:crypto.randomUUID(),clientRequestId:crypto.randomUUID()})).toThrow();
+    expect(()=>store.steerTask({...input,clientRequestId:crypto.randomUUID(),attachmentIds:[crypto.randomUUID()]})).toThrow();expect(store.getMessages(conversationId)).toHaveLength(2);
+    store.close();store=new SchoolWorkStore(dir);expect(store.pendingInputs(taskId)[0].content).toBe('Use my new context');store.appliedInput(store.pendingInputs(taskId)[0].id);expect(store.pendingInputs(taskId)).toEqual([]);
+    store.close();fs.rmSync(dir,{recursive:true,force:true});
+  });
   it('atomically persists routing and permission snapshots with tasks and rolls them back on failure', () => {
     const dir = temporary(); const store = new SchoolWorkStore(dir);
     const input = { id: crypto.randomUUID(), conversationId: crypto.randomUUID(), clientRequestId: crypto.randomUUID(), objective: 'phone task', model: 'vision', workspace: dir };

@@ -6,7 +6,7 @@ if(!data || !path.isAbsolute(data)) throw new Error('Use test:lessons with an is
 app.setPath('userData',data);
 app.commandLine.appendSwitch('use-fake-device-for-media-stream');
 app.commandLine.appendSwitch('use-fake-ui-for-media-stream');
-global.__lessonTest={audioModels:[],summaryRequests:0,calendarWrites:0,modelSaveDelay:0,settingsDelay:0,rejectModel:false,failAudio:false};
+global.__lessonTest={audioModels:[],summaryRequests:0,calendarWrites:0,agentRequests:[],agentTool:false,modelSaveDelay:0,settingsDelay:0,rejectModel:false,failAudio:false};
 shell.openExternal=async(url)=>{if(String(url).startsWith('https://accounts.google.com/')){global.__lessonTest.oauthUrl=url;return;}throw new Error('Unexpected browser launch in isolated test');};
 const handle=ipcMain.handle.bind(ipcMain);
 ipcMain.handle=(channel,listener)=>handle(channel,async(...args)=>{
@@ -29,13 +29,19 @@ app.whenReady().then(()=>{
       return Response.json({text:init.body.get('language')==='sv'?'Gör uppgift 3 nu. Lämna in rapporten den 16 oktober.':'Do exercise three now. Submit the report on 16 October.'});
     }
     if(String(url).endsWith('/chat/completions')){
-      state.summaryRequests++;
       const request=JSON.parse(init.body),sv=request.messages[0].content.includes('Swedish');
+      if(!request.messages[0].content.startsWith('You take accurate lesson notes')){
+        state.agentRequests.push(request.messages);
+        if(state.agentTool){state.agentTool=false;return new Response('data: '+JSON.stringify({choices:[{delta:{tool_calls:[{index:0,id:'fixture-slow-tool',type:'function',function:{name:'run_process',arguments:JSON.stringify({executable:'node',args:['-e','setTimeout(()=>console.log("fixture complete"),1800)'],purpose:'other'})}}]},finish_reason:'tool_calls'}]})+'\n\ndata: [DONE]\n\n',{headers:{'Content-Type':'text/event-stream'}});}
+        const latest=request.messages.filter(m=>m.role==='user').at(-1);
+        return new Response('data: '+JSON.stringify({choices:[{delta:{content:'Fixture answer: '+(typeof latest.content==='string'?latest.content:'Image context received')},finish_reason:'stop'}]})+'\n\ndata: [DONE]\n\n',{headers:{'Content-Type':'text/event-stream'}});
+      }
+      state.summaryRequests++;
       const text=JSON.stringify({title:sv?'Algebra · ekvationer':'Algebra · equations',overview:sv?'Vi arbetar med ekvationer och planerar rapporten.':'We are working on equations and planning the report.',sections:[{heading:sv?'Ekvationer':'Equations',points:[sv?'Gör samma operation på båda sidor.':'Apply the same operation to both sides.']}],tasks:[{id:'class-task',title:sv?'Uppgift 3':'Exercise 3',details:sv?'Arbeta med övningen under lektionen.':'Work on the exercise in class.',kind:'lesson',dueDate:null,evidence:sv?'Gör uppgift 3 nu.':'Do exercise three now.'},{id:'assignment',title:sv?'Lämna in rapporten':'Submit the report',details:sv?'Lämna in rapporten efter lektionen.':'Submit the report after the lesson.',kind:'assignment',dueDate:'2026-10-16',evidence:sv?'Lämna in rapporten den 16 oktober.':'Submit the report on 16 October.'}]});
       return new Response('data: '+JSON.stringify({choices:[{delta:{content:text},finish_reason:'stop'}]})+'\n\ndata: [DONE]\n\n',{headers:{'Content-Type':'text/event-stream'}});
     }
     if(String(url).endsWith('/token'))return Response.json({access_token:'test-access',refresh_token:'test-refresh',expires_in:3600,scope:'https://www.googleapis.com/auth/calendar.events'});
-    if(String(url).includes('www.googleapis.com/calendar/v3/')){state.calendarWrites++;return Response.json({id:JSON.parse(init.body).id,htmlLink:'https://calendar.google.com/calendar/event?eid=test'});}
+    if(String(url).includes('www.googleapis.com/calendar/v3/')){if(init.method!=='POST')return Response.json({items:[]});state.calendarWrites++;const id=JSON.parse(init.body).id;if(!/^[0-9a-v]+$/.test(id))throw new Error('Invalid Google event ID');return Response.json({id,htmlLink:'https://calendar.google.com/calendar/event?eid=test'});}
     if(String(url).endsWith('/revoke'))return new Response('');
     throw new Error('Unexpected external request in isolated lesson test');
   };

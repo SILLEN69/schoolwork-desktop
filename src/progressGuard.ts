@@ -15,6 +15,7 @@ export class ProgressGuard {
   private observations = 0;
   private lastFrame = '';
   private unchangedFrames = 0;
+  private passingChecks=new Map<string,number>();
   observe(tool: string, args: Record<string, any>, outcome: {ok:boolean;summary?:string;data?:any}) {
     const subject = String(outcome.data?.windowId || outcome.data?.window?.windowId || args.windowId || args.displayId || args.path || '');
     const kind = outcome.data?.code || (/focus|foreground/i.test(outcome.summary || '') ? 'focus' : /off screen|bounds/i.test(outcome.summary || '') ? 'bounds' : 'failure');
@@ -24,6 +25,12 @@ export class ProgressGuard {
       if (count >= 3) return {stop:true,text:'yo, I hit the same '+tool+' problem 3 times. I’m stopping that loop; progress is saved. Fix the window/access issue before retrying.'};
       if (count === 2) return {stop:false,text:'Repeated '+tool+' failure. Do not retry this observation/approach again. Use a different available observation or finish with an honest limitation.'};
     } else {
+      if(['write_file','patch_file','edit_file'].includes(tool))this.passingChecks.clear();
+      if((['run_process','run_powershell'].includes(tool) && outcome.data?.exitCode===0 && ['test','build','lint'].includes(String(args.purpose))) || (tool==='check_preview' && outcome.data?.expectationPassed===true)) {
+        const signature=tool+':'+JSON.stringify(args),count=(this.passingChecks.get(signature)||0)+1;this.passingChecks.set(signature,count);
+        if(count>=4)return {stop:true,text:'This same check already passed without any new edits. I stopped the repeated verification loop. Review the saved plan or ask for a specific new check; the passing result is preserved.'};
+        if(count>=2)return {stop:false,text:'This check already passed and no new edit invalidated it. Do not run it again to fix a plan/completion blocker. Update the plan from evidence or give the user an honest final answer.'};
+      }
       for(const k of this.failures.keys()) if(k.startsWith(tool+':'+subject+':')) this.failures.delete(k);
       if(effects.has(tool)) { this.observations=0; this.unchangedFrames=0; this.lastFrame=''; }
       if(observations.has(tool)) this.observations++;

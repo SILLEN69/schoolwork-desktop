@@ -1,5 +1,11 @@
 import { it, expect } from 'vitest';
 import { VerificationGate, isCodeArtifact } from './verification';
+it('recognizes the real custom Node checks from today without accepting a printed claim',()=>{
+ const gate=new VerificationGate();const check=(args:string[])=>{gate.observe('write_file',{path:'index.html'},{ok:true});gate.observe('run_process',{executable:'node',args,purpose:'test'},{ok:true,data:{exitCode:0}});return gate.needed;};
+ expect(check(['C:\\Downloads\\_verify_whisper.js'])).toBe(false);expect(check(['whisper-test.check.mjs'])).toBe(false);
+ expect(check(['-e','require("node:assert").ok(true)'])).toBe(false);expect(check(['-e','console.log("tests passed")'])).toBe(true);
+ gate.observe('check_preview',{}, {ok:true,data:{expectationPassed:true,consoleErrors:[]}});expect(gate.needed).toBe(false);
+});
 it('does not require code tests for a saved memory, email draft or document', () => {
   const gate=new VerificationGate();
   for(const path of ['schoolwork-notes/user-profile.md','C:\\vault\\MEMORY.md','draft.eml','report.docx','notes.txt']) {
