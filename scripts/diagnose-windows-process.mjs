@@ -1,0 +1,15 @@
+import {spawn} from 'node:child_process';
+if(process.platform!=='win32') throw new Error('This diagnostic requires Windows.');
+const restricted=Object.fromEntries(['SystemRoot','WINDIR','TEMP','TMP','USERPROFILE','PATH','PATHEXT','APPDATA','LOCALAPPDATA','HOME','LANG'].filter(k=>process.env[k]).map(k=>[k,process.env[k]]));
+const simple="Write-Output 'diagnostic-ok'";
+const wrapped="$ErrorActionPreference='Stop'; try { & { Write-Output 'diagnostic-ok'\n }; if ($LASTEXITCODE -ne $null) { exit $LASTEXITCODE } } catch { [Console]::Error.WriteLine($_); exit 1 }";
+for(const [name,command,env,stdin] of [['full-simple',simple,process.env,'ignore'],['restricted-simple',simple,restricted,'ignore'],['full-wrapped',wrapped,process.env,'ignore'],['restricted-wrapped',wrapped,restricted,'ignore'],['restricted-wrapped-pipe',wrapped,restricted,'pipe']]) {
+ await new Promise(resolve=>{
+  const started=Date.now();let stdout='',stderr='',done=false,exited=false;
+  const child=spawn('powershell.exe',['-NoLogo','-NoProfile','-NonInteractive','-Command',command],{env,windowsHide:true,stdio:[stdin,'pipe','pipe']});
+  child.stdin?.end();child.stdout.on('data',b=>stdout+=b);child.stderr.on('data',b=>stderr+=b);
+  const finish=(event,code)=>{if(done)return;done=true;clearTimeout(timer);child.stdout.destroy();child.stderr.destroy();console.log('::notice::'+JSON.stringify({name,event,code,exited,ms:Date.now()-started,stdout:stdout.slice(0,300),stderr:stderr.slice(0,300)}));resolve();};
+  child.on('exit',()=>{exited=true;});child.on('close',c=>finish('close',c));child.on('error',e=>finish('error',e.code));
+  const timer=setTimeout(()=>{child.kill();finish('timeout',null);},8000);
+ });
+}
