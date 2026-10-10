@@ -17,7 +17,7 @@ it('returns nonzero exits and kills cancelled processes', async () => {
 it.skipIf(process.platform !== 'win32')('runs PowerShell without a script file and fails on command errors', async () => {
   const r = await executeProcess('run_powershell', { command: "Write-Output 'hello'" }, context(), () => {}); expect(r.ok).toBe(true); expect(r.data.stdout).toContain('hello');
   const bad = await executeProcess('run_powershell', { command: "throw 'seeded failure'" }, context(), () => {}); expect(bad.ok).toBe(false); expect(bad.data.stderr).toContain('seeded failure');
-});
+}, 30_000); // Two PowerShell starts can exceed Vitest's 5s default on hosted Windows runners.
 it('owns background processes, returns their output and stops them', async () => {
   const ctx = { ...context(), owner: 'test-conversation' };
   try {
