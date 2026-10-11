@@ -25,7 +25,7 @@ test('unknown channels and unsafe versions cannot be published', () => {
 });
 test('electron-builder merges the override into its on-disk GitHub provider', async () => {
   const {getConfig,validateConfiguration}=require('app-builder-lib/out/util/config/config');
-  const override=releaseConfig(require('../package.json').version).publish;
+  const override=releaseConfig('0.10.1-beta.3').publish;
   const config=await getConfig(process.cwd(),null,{publish:override});
   validateConfiguration(config);
   assert.equal(config.publish[0].channel,'beta');
