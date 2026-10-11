@@ -53,6 +53,23 @@ function setup() {
   return { tools, ctx, request, stop };
 }
 describe("desktop action boundaries", () => {
+  it('animates only validated input and preserves exact physical coordinates',async()=>{
+    const {tools:original,ctx,request}=setup(),before=vi.fn(async()=>{});
+    const tools=new DesktopTools(original.bridge,before);
+    const shot=await tools.execute('capture_screen',{windowId:'123'},ctx);
+    await expect(tools.execute('click',{screenshotId:shot.data.screenshotId,x:2000,y:1},ctx)).rejects.toThrow('outside');
+    expect(before).not.toHaveBeenCalled();
+    await tools.execute('click',{screenshotId:shot.data.screenshotId,x:80,y:40},ctx);
+    expect(before).toHaveBeenCalledWith('task','click',expect.objectContaining({x:-100,y:130}),ctx.signal);
+    expect(request.mock.calls.filter(([name])=>name==='click')).toHaveLength(1);
+  });
+  it('cancellation during pointer animation never sends native input',async()=>{
+    const {tools:original,ctx,request}=setup(),abort=new AbortController();ctx.signal=abort.signal;
+    const tools=new DesktopTools(original.bridge,async()=>{abort.abort();});
+    const shot=await tools.execute('capture_screen',{windowId:'123'},ctx);
+    await expect(tools.execute('click',{screenshotId:shot.data.screenshotId,x:1,y:1},ctx)).rejects.toThrow();
+    expect(request.mock.calls.some(([name])=>name==='click')).toBe(false);
+  });
   it('rejects a replaced view even within its time limit',async()=>{
     const {tools,ctx}=setup();const old=await tools.execute('capture_screen',{windowId:'123'},ctx);
     await tools.execute('capture_screen',{windowId:'123'},ctx);

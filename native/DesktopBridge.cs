@@ -199,11 +199,19 @@ static class DesktopBridge {
         if (action=="click" || action=="scroll") {
             int x=Num(a,"x"),y=Num(a,"y"); var w=WindowInfo(target);
             if (x<Num(w,"left") || y<Num(w,"top") || x>=Num(w,"left")+Num(w,"width") || y>=Num(w,"top")+Num(w,"height")) throw new Exception("Point is outside the target window.");
-            if (!SetCursorPos(x,y)) throw new Exception("Pointer movement failed.");
-            CursorPoint p; GetCursorPos(out p); var covering=GetAncestor(WindowFromPoint(p),2);
-            if (covering!=target) throw new Exception("WINDOW_COVERED: Click was not sent. The point belongs to window "+covering.ToInt64()+". Use list_windows then prepare_desktop for the intended dialog/window; do not repeat the old coordinates.");
-            if(action=="scroll") { int amount=Num(a,"amount"); if (Math.Abs(amount)>2400) throw new Exception("Scroll amount is too large."); Send(MouseEvent(0x0800,unchecked((uint)amount))); }
-            else { string button=Str(a,"button","left"); uint down=button=="right"?8u:2u; int count=Num(a,"count",1); if(count<1 || count>2) throw new Exception("Invalid click count."); for(int i=0;i<count;i++) { Target(a,true); Send(MouseEvent(down),MouseEvent(down*2)); if(i+1<count) Thread.Sleep(60); } }
+            CursorPoint original; bool saved=GetCursorPos(out original);
+            try {
+                if (!SetCursorPos(x,y)) throw new Exception("Pointer movement failed.");
+                CursorPoint p; GetCursorPos(out p); var covering=GetAncestor(WindowFromPoint(p),2);
+                if (covering!=target) throw new Exception("WINDOW_COVERED: Click was not sent. The point belongs to window "+covering.ToInt64()+". Use list_windows then prepare_desktop for the intended dialog/window; do not repeat the old coordinates.");
+                if(action=="scroll") { int amount=Num(a,"amount"); if (Math.Abs(amount)>2400) throw new Exception("Scroll amount is too large."); Send(MouseEvent(0x0800,unchecked((uint)amount))); }
+                else { string button=Str(a,"button","left"); uint down=button=="right"?8u:2u; int count=Num(a,"count",1); if(count<1 || count>2) throw new Exception("Invalid click count."); for(int i=0;i<count;i++) { Target(a,true); Send(MouseEvent(down),MouseEvent(down*2)); if(i+1<count) Thread.Sleep(60); } }
+            } finally {
+                // Do not drag the owner's pointer along the visual AI animation,
+                // or overwrite a position they moved to while input was being sent.
+                CursorPoint current;
+                if(saved && GetCursorPos(out current) && current.X==x && current.Y==y) SetCursorPos(original.X,original.Y);
+            }
         } else if(action=="type_text") {
             if(a.ContainsKey("expectedFocus")) {
                 var current=FocusedControl(target) as Dictionary<string,object>;

@@ -16,6 +16,7 @@ import { autoUpdater } from 'electron-updater';
 import { Lessons, audioInputSchema } from "./lessons";
 import { GoogleCalendar } from "./calendar";
 import { publishedGoogleClient } from "./googleClient";
+import { DesktopPointer } from './desktopPointer';
 import { transcriptText, lessonSubjects } from '../src/lesson';
 import { Connections,connectionSchemas,connectionTools } from './connections';
 import { isSpeechModel } from "../src/speechModels";
@@ -121,6 +122,7 @@ let win: BrowserWindow | undefined;
 let discoveredModels: string[] = [];
 let attachments: Attachments;
 let desktop: DesktopTools;
+let desktopPointer: DesktopPointer;
 let desktopLearning: DesktopLearning;
 let telegram: TelegramLink;
 let updates: Updates;
@@ -398,6 +400,7 @@ const fail = (error: unknown) => ({
 });
 
 function emit(task: any, type: string, payload: Record<string, unknown> = {}) {
+  if(['stream-progress','thinking-progress','retry','tool-start','verification'].includes(type))desktopPointer?.note(task.id,redactMemoryText(String(payload.text||'')));
   payload = { ...payload, afterMessageSequence: store.lastMessageSequence(task.conversationId) };
   const event = store.addEvent({
     id: crypto.randomUUID(),
@@ -560,6 +563,7 @@ function key(): string {
   return readTeachGPTCredential(settings.get("encryptedKey"));
 }
 function stopDesktop() {
+  desktopPointer?.stop();
   desktop?.stop();
 }
 function emergencyStop() {
@@ -614,6 +618,7 @@ function makeWindow() {
     void win.loadURL(process.env.VITE_DEV_SERVER_URL);
   else void win.loadFile(path.join(__dirname, "../dist/index.html"));
   win.on("closed", () => {
+    desktopPointer?.stop();
     win = undefined;
   });
 }
@@ -735,11 +740,14 @@ async function executeTool(
   }
   if (!taskCapabilities(task.id).controlScreen && isDesktopAutomationCommand(name,args)) throw new Error('Screen input is disabled for this task. PowerShell GUI-input workarounds are not allowed; start a new task with screen control enabled.');
   if (name in desktopInputs) {
-    const outcome = await desktop.execute(
+    await desktopPointer?.hideForObservation(signal);
+    const perform = () => desktop.execute(
       name as keyof typeof desktopInputs,
       args,
       { owner: task.id, capabilities: taskCapabilities(task.id), signal },
     );
+    const outcome = ['click','scroll','type_text','key_press'].includes(name) ? await perform() : await desktopPointer.observe(signal,perform);
+    if(['click','scroll','type_text','key_press'].includes(name))desktopPointer?.finished(task.id,name,Boolean(outcome.ok));
     if (outcome.data?.imageData)
       win?.webContents.send("chat:event", {
         type: "screenshot",
@@ -1460,6 +1468,7 @@ async function runTask(task: any) {
         !nativeCalls.length && typeof message.content === "string"
           ? parseFallbackAction(message.content)
           : null;
+      desktopPointer?.explain(task.id,fallback ? '' : redactMemoryText(message.content));
       const calls = nativeCalls.length
         ? nativeCalls.map((c: any) => ({
             id: String(c.id || crypto.randomUUID()),
@@ -1864,6 +1873,7 @@ async function runTask(task: any) {
     emit(task, "error", { text: message, retry: true });
   } finally {
     clearInterval(heartbeat);
+    desktopPointer?.finishTask(task.id);
     desktop.forgetOwner(task.id);
     desktopLearning.finish(task.id);
     active.delete(task.id);
@@ -2317,13 +2327,15 @@ function registerIpc() {
       capabilities: capabilities(),
       signal: AbortSignal.timeout(20000),
     };
-    if (input.windowId)
-      await desktop.execute("focus_window", { windowId: input.windowId }, ctx);
-    const outcome = await desktop.execute(
-      "capture_screen",
-      { windowId: input.windowId, displayId: input.displayId },
-      ctx,
-    );
+    const outcome = await desktopPointer.observe(ctx.signal,async () => {
+      if (input.windowId)
+        await desktop.execute("focus_window", { windowId: input.windowId }, ctx);
+      return desktop.execute(
+        "capture_screen",
+        { windowId: input.windowId, displayId: input.displayId },
+        ctx,
+      );
+    });
     return attachments.import(
       input.conversationId,
       "Screenshot.png",
@@ -2735,7 +2747,8 @@ else {
           "SchoolWork.DesktopBridge.exe",
         )
       : path.join(__dirname, "../dist-native/SchoolWork.DesktopBridge.exe");
-    desktop = new DesktopTools(new DesktopBridge(helperPath));
+    desktopPointer = new DesktopPointer();
+    desktop = new DesktopTools(new DesktopBridge(helperPath),(owner,name,args,signal)=>desktopPointer.beforeInput(owner,name,args,signal));
     desktopLearning = new DesktopLearning(store);
     telegram = new TelegramLink(
       store,

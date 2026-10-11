@@ -143,7 +143,7 @@ export function desktopFailure(error: unknown) {
 }
 export class DesktopTools {
   private observations = new Map<string, Observation>();
-  constructor(readonly bridge: DesktopBridge) {}
+  constructor(readonly bridge: DesktopBridge,private beforeInput?:(owner:string,name:string,args:{x:number;y:number},signal:AbortSignal)=>Promise<void>) {}
   stop() {
     this.observations.clear();
     this.bridge.stop();
@@ -258,7 +258,11 @@ export class DesktopTools {
       observed.consumed=true;
       for(const old of this.observations.values()) if(old.owner===ctx.owner && old!==observed)old.superseded=true;
       let data:any;
-      try {data=await this.bridge.request(name, nativeArgs, ctx.signal);} catch(error) {
+      try {
+        await this.beforeInput?.(ctx.owner,name,nativeArgs,ctx.signal);
+        ctx.signal.throwIfAborted();
+        data=await this.bridge.request(name, nativeArgs, ctx.signal);
+      } catch(error) {
         ctx.signal.throwIfAborted();
         throw new DesktopActionError(desktopFailure(error)?.code || 'INPUT_FAILED',error instanceof Error?error.message:String(error),target.windowId);
       }

@@ -42,7 +42,7 @@ export default function ConversationTimeline({ conversationId, fallback, swedish
       {row.message.role==='assistant'&&<div className="msg-avatar"><Workflow size={15}/></div>}
       <div className="msg-body">{row.message.role==='user' ? <div className="user-bubble">{row.message.content}<ImageAttachments attachments={row.message.attachments||[]}/></div> : <><div className="msg-meta">SchoolWork {row.message.model&&<span>· {row.message.model}</span>}</div><MessageMarkdown text={row.message.content}/></>}</div>
     </div> : <div className="execution-log" key={row.key} data-timeline="activity"><details className={row.end?.payload?.ok===false?'step-failed':row.end?'step-done':''}>
-      <summary><span className="step-state" aria-hidden="true">{row.end?row.end.payload?.ok===false?'!':'✓':'›'}</span><span>{row.start.text.split('\n')[0]||row.start.type}</span><time>{row.end?.payload?.durationMs!==undefined?(row.end.payload.durationMs/1000).toFixed(1)+'s':new Date(row.start.createdAt).toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'})}</time></summary>
+      <summary><span className="step-state" aria-hidden="true">{row.end?row.end.payload?.ok===false?'!':'✓':'›'}</span><span title={row.start.text.split('\n')[0]}>{row.start.text.split('\n')[0]||row.start.type}</span><time>{row.end?.payload?.durationMs!==undefined?(row.end.payload.durationMs/1000).toFixed(1)+'s':new Date(row.start.createdAt).toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'})}</time></summary>
       <pre>{row.end?.text||row.start.text}</pre>
     </details></div>)}
   </>;

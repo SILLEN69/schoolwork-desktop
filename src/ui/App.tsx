@@ -334,7 +334,6 @@ export default function App() {
     setLoading(false);
     setId(c.id);
     selectedId.current = c.id;
-    setShowHistory(false);
     setError("");
     try {
       const full = await window.schoolwork.getChat(c.id);
@@ -555,7 +554,7 @@ export default function App() {
             <ChevronRight size={14} className="nav-end" />
           </button>
         </div>
-        <button className="nav-item" onClick={() => setLessonMode("lesson")}><GraduationCap size={16}/><span>{t("Follow a lesson", "Följ en lektion")}</span></button>
+        <button className="nav-item lesson-nav" onClick={() => setLessonMode("lesson")}><GraduationCap size={16}/><span>{t("Follow a lesson", "Följ en lektion")}</span></button>
         <button
           className="nav-item memory-nav"
           onClick={() => setShowMemory(true)}
@@ -564,7 +563,7 @@ export default function App() {
           <span>{t("Memory vault", "Minnesvalv")}</span>
         </button>
         {showHistory && (
-          <div className="history-list">
+          <div className="history-list" role="region" aria-label={t("Recent chats", "Senaste chattar")}>
             {chats.map((c) => (
               <button
                 key={c.id}
