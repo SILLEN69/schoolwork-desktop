@@ -16,6 +16,7 @@ export class ProgressGuard {
   private lastFrame = '';
   private unchangedFrames = 0;
   private passingChecks=new Map<string,number>();
+  private repeatedReads=new Map<string,number>();
   observe(tool: string, args: Record<string, any>, outcome: {ok:boolean;summary?:string;data?:any}) {
     const subject = String(outcome.data?.windowId || outcome.data?.window?.windowId || args.windowId || args.displayId || args.path || '');
     const kind = outcome.data?.code || (/focus|foreground/i.test(outcome.summary || '') ? 'focus' : /off screen|bounds/i.test(outcome.summary || '') ? 'bounds' : 'failure');
@@ -25,7 +26,17 @@ export class ProgressGuard {
       if (count >= 3) return {stop:true,text:'yo, I hit the same '+tool+' problem 3 times. I’m stopping that loop; progress is saved. Fix the window/access issue before retrying.'};
       if (count === 2) return {stop:false,text:'Repeated '+tool+' failure. Do not retry this observation/approach again. Use a different available observation or finish with an honest limitation.'};
     } else {
-      if(['write_file','patch_file','edit_file'].includes(tool))this.passingChecks.clear();
+      if(['write_file','patch_file','edit_file'].includes(tool)){this.passingChecks.clear();this.repeatedReads.clear();}
+      if(tool==='read_file'||tool==='read_files') {
+        const files=tool==='read_file'?[outcome.data]:outcome.data?.files||[];
+        for(const file of files) {
+          if(!file?.sha256)continue;
+          const signature=JSON.stringify([file.path,file.sha256,file.startLine,file.endLine,file.text?.length]);
+          const count=(this.repeatedReads.get(signature)||0)+1;this.repeatedReads.set(signature,count);
+          if(count>=8)return {stop:true,text:'The same unchanged file excerpt was read eight times without a new edit. I stopped that loop and saved progress. Review the recorded excerpt and choose a concrete next action before resuming.'};
+          if(count===3)return {stop:false,text:'This exact file excerpt is unchanged and has already been read. Reuse the recorded result; choose an edit, a different relevant range or a real verification command instead of reading it again.'};
+        }
+      }
       if((['run_process','run_powershell'].includes(tool) && outcome.data?.exitCode===0 && ['test','build','lint'].includes(String(args.purpose))) || (tool==='check_preview' && outcome.data?.expectationPassed===true)) {
         const signature=tool+':'+JSON.stringify(args),count=(this.passingChecks.get(signature)||0)+1;this.passingChecks.set(signature,count);
         if(count>=4)return {stop:true,text:'This same check already passed without any new edits. I stopped the repeated verification loop. Review the saved plan or ask for a specific new check; the passing result is preserved.'};

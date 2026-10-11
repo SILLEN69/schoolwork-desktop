@@ -1,5 +1,33 @@
 import { it, expect } from 'vitest';
-import { VerificationGate, isCodeArtifact } from './verification';
+import { VerificationGate, isCodeArtifact, isVerificationCommand } from './verification';
+it('recognizes the saved successful PowerShell directory-prefixed lint check', () => {
+  const gate = new VerificationGate();
+  gate.observe('edit_file', {path:'Composition.tsx'}, {ok:true});
+  const args = {command:'Set-Location "C:\\workspace\\remotion-startup"; npm run lint 2>&1'};
+  gate.observe('run_powershell', args, {ok:true,data:{exitCode:0}});
+  expect(gate.needed).toBe(false);
+  gate.observe('edit_file', {path:'Composition.tsx'}, {ok:true});
+  gate.observe('run_powershell', args, {ok:false,data:{exitCode:1}});
+  expect(gate.needed).toBe(true);
+  gate.observe('run_powershell', args, {ok:true,data:{exitCode:0,timedOut:true}});
+  expect(gate.needed).toBe(true);
+});
+it('accepts literal directory setup and invocation operators without accepting printed or nested claims', () => {
+  for(const command of [
+    "cd 'C:\\project with spaces'; npm.cmd run lint",
+    "Set-Location -LiteralPath 'C:\\project';\nnode --check app.js",
+    'npx.cmd tsc --noEmit',
+    '& "C:\\Program Files\\nodejs\\npm.cmd" run build',
+  ]) expect(isVerificationCommand('run_powershell',{command}),command).toBe(true);
+  for(const command of [
+    'Write-Output "npm run lint"',
+    "Set-Location 'C:\\project'; echo npm run lint",
+    "Set-Location 'C:\\project'; # npm run lint",
+    "Set-Location 'C:\\project'; if ($false) { npm run lint }",
+    "Get-Content file; npm run lint",
+    'Set-Location "$(Write-Output npm)"; npm run lint',
+  ]) expect(isVerificationCommand('run_powershell',{command}),command).toBe(false);
+});
 it('recognizes the real custom Node checks from today without accepting a printed claim',()=>{
  const gate=new VerificationGate();const check=(args:string[])=>{gate.observe('write_file',{path:'index.html'},{ok:true});gate.observe('run_process',{executable:'node',args,purpose:'test'},{ok:true,data:{exitCode:0}});return gate.needed;};
  expect(check(['C:\\Downloads\\_verify_whisper.js'])).toBe(false);expect(check(['whisper-test.check.mjs'])).toBe(false);
