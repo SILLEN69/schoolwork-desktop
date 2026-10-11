@@ -47,10 +47,14 @@ try{
   pass('assignment date is reviewed before any calendar write');
   await page.getByRole('button',{name:'Anslut Google Calendar',exact:true}).click();
   assert.equal(await page.getByRole('textbox',{name:'OAuth client ID',exact:true}).count(),0);
-  await page.getByRole('button',{name:'Avancerat: egen Google-app',exact:true}).click();
-  await page.getByRole('textbox',{name:'OAuth client ID',exact:true}).fill('123-test.apps.googleusercontent.com');
-  await page.getByLabel('OAuth client secret',{exact:true}).fill('test-client-secret');
-  await page.getByRole('button',{name:'Spara anslutningsinställningar'}).click();
+  const googleReady=await page.evaluate(()=>window.schoolwork.calendarStatus());
+  if(!googleReady.configured){
+    await page.getByRole('button',{name:'Avancerat: egen Google-app',exact:true}).click();
+    await page.getByRole('textbox',{name:'OAuth client ID',exact:true}).fill('123-test.apps.googleusercontent.com');
+    await page.getByLabel('OAuth client secret',{exact:true}).fill('test-client-secret');
+    await page.getByRole('button',{name:'Spara anslutningsinställningar'}).click();
+  } else assert.equal(googleReady.configurationSource,'schoolwork');
+  await page.screenshot({path:path.join(shots,'google-sign-in.png')});
   await page.getByRole('button',{name:'Logga in med Google'}).click();
   const auth=new URL(await app.evaluate(()=>global.__lessonTest.oauthUrl)),callback=new URL(auth.searchParams.get('redirect_uri'));
   callback.searchParams.set('state',auth.searchParams.get('state'));callback.searchParams.set('code','test-only-code');
