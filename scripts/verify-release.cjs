@@ -2,7 +2,7 @@
 const fs=require('node:fs'),path=require('node:path'),crypto=require('node:crypto'),assert=require('node:assert/strict');
 const root=path.resolve(process.argv[2]||'release');
 const version=require('../package.json').version;
-const manifest=fs.readFileSync(path.join(root,'latest.yml'),'utf8');
+const manifest=fs.readFileSync(path.join(root,require('./release-config.cjs').releaseConfig(version).manifest),'utf8');
 const setup=`SchoolWork-${version}-x64-setup.exe`;
 assert.match(manifest,new RegExp('^version: '+version.replaceAll('.','\\.')+'\\s*$','m'));
 assert.equal(manifest.match(/^path: (.+)$/m)?.[1].trim(),setup);
