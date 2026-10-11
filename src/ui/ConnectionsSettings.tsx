@@ -8,7 +8,7 @@ export default function ConnectionsSettings({swedish}:{swedish:boolean}){
   const [google,setGoogle]=useState(false),[calendar,setCalendar]=useState<CalendarStatus>({configured:false,connected:false,connecting:false,calendarId:'primary'});
   const t=(sv:string,en:string)=>swedish?sv:en;
   useEffect(()=>{window.schoolwork.connectionList().then(setItems).catch(e=>setError(e.message));},[]);
-  useEffect(()=>{if(!google)return;let alive=true;const load=()=>window.schoolwork.calendarStatus().then(s=>{if(alive)setCalendar(s);});void load();const timer=setInterval(load,1500);return()=>{alive=false;clearInterval(timer);};},[google]);
+  useEffect(()=>{if(!google)return;let alive=true;const load=()=>window.schoolwork.calendarStatus().then(s=>{if(alive)setCalendar(s);}).catch(e=>{if(alive)setError(e.message);});void load();const timer=setInterval(load,1500);return()=>{alive=false;clearInterval(timer);};},[google]);
   return <section className="connections-settings"><h3><Plug size={17}/> {t('Anslutna appar','Connected apps')}</h3><p>{t('Använd direkta anslutningar i stället för skärmklick när det går.','Use direct connections instead of screen clicks where available.')}</p>
     <button className="tool-pill" onClick={()=>setGoogle(true)}>Google Calendar {t('& Drive','& Drive')}</button>
     <p>{t('MCP: lägg till en server du litar på. När den är aktiverad får agenten använda dess verktyg för dina uppgifter. Servern kan läsa eller ändra data enligt sitt konto.','MCP: add a server you trust. Enabling it lets the agent use its tools for your tasks. It may read or change data using its connected account.')}</p>

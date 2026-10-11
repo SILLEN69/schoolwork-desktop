@@ -6,6 +6,8 @@ release*/
 work/
 BUILD_STATE.md
 .env*
+client_secret*.json
+publisher-client.json
 *.db
 *.db-*
 *.sqlite3

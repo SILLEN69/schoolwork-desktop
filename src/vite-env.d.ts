@@ -23,6 +23,7 @@ interface Window {
     calendarStatus: () => Promise<import('./lesson').CalendarStatus & {error?:string}>;
     calendarConfigure: (input:{clientId:string;clientSecret:string;calendarId?:string}) => Promise<import('./lesson').CalendarStatus>;
     calendarConnect: () => Promise<import('./lesson').CalendarStatus>;
+    calendarCancelConnect: () => Promise<import('./lesson').CalendarStatus>;
     calendarDisconnect: () => Promise<import('./lesson').CalendarStatus>;
     calendarAdd: (input:{id:string;taskId:string;title:string;date:string}) => Promise<import('./lesson').LessonSession>;
     updateStatus: () => Promise<import('./updateState').UpdateState>;

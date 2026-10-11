@@ -61,6 +61,10 @@ jobs:
       - name: Install Electron with checksum verification
         run: node node_modules/electron/install.js
       - name: Build application and native Windows helper
+        env:
+          SCHOOLWORK_GOOGLE_REQUIRED: '1'
+          SCHOOLWORK_GOOGLE_CLIENT_ID: ${{ vars.SCHOOLWORK_GOOGLE_CLIENT_ID }}
+          SCHOOLWORK_GOOGLE_CLIENT_SECRET: ${{ secrets.SCHOOLWORK_GOOGLE_CLIENT_SECRET }}
         run: npm run build
       - name: Run unit tests including Windows-specific checks
         run: npm test -- --maxWorkers=4

@@ -45,7 +45,7 @@ Use it according to your teacher's rules for AI assistance. Ask for explanations
 | **Ask and explain** | Swedish or English conversations, selected TeachGPT models, rendered equations, tables and highlighted code. |
 | **Build and debug** | Project mapping, file search, bounded reads, targeted edits, backups, real test commands and local website checks. |
 | **Follow a lesson** | Swedish-first audio capture, timestamped transcript, structured notes and class tasks; English transcription switch. Live school audio API access still needs verification. |
-| **Plan assignments** | Review detected assignment dates and add them to connected Google Calendar. Requires your own Google Desktop OAuth client; see [setup](docs/release-0.9.md). |
+| **Plan assignments** | Review detected assignment dates and add them to connected Google Calendar. Current v0.10.0 needs a custom Google client; the upcoming build adds publisher-configured browser sign-in. See [Google setup and availability](docs/google-sign-in.md). |
 | **Keep context** | Saved tasks, progress timers, checkpoints and a local linked Markdown memory vault. |
 | **Use your desktop** | Windows app/window inspection, point-in-time screenshots, monitor selection, mouse and keyboard actions. |
 | **Show a problem** | PNG/JPEG attachments, screenshot questions and a per-model vision test. Image understanding depends on the selected model. |

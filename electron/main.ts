@@ -15,6 +15,7 @@ import Store from "electron-store";
 import { autoUpdater } from 'electron-updater';
 import { Lessons, audioInputSchema } from "./lessons";
 import { GoogleCalendar } from "./calendar";
+import { publishedGoogleClient } from "./googleClient";
 import { transcriptText, lessonSubjects } from '../src/lesson';
 import { Connections,connectionSchemas,connectionTools } from './connections';
 import { isSpeechModel } from "../src/speechModels";
@@ -2104,6 +2105,7 @@ function registerIpc() {
   });
   ipcMain.handle('calendar:configure', (event, raw) => { trusted(event); return calendar.configure(raw); });
   ipcMain.handle('calendar:connect', event => { trusted(event); return calendar.connect(); });
+  ipcMain.handle('calendar:cancel-connect', event => { trusted(event); return calendar.cancelConnect(); });
   ipcMain.handle('calendar:disconnect', event => { trusted(event); return calendar.disconnect(); });
   ipcMain.handle('calendar:add', async (event, raw) => {
     trusted(event); const data=z.object({id:z.string().uuid(),taskId:z.string().min(1).max(80),title:z.string().trim().min(1).max(240),date:z.string().regex(/^\d{4}-\d{2}-\d{2}$/)}).parse(raw);
@@ -2841,7 +2843,7 @@ else {
       updateTimer=setInterval(()=>void updates.check(false),6*60*60*1000);updateTimer.unref();
     }
     lessons = new Lessons(store, path.join(app.getPath('userData'), 'lesson-audio'), key);
-    calendar = new GoogleCalendar(store, encryptTeachGPTCredential, readTeachGPTCredential, shell.openExternal);
+    calendar = new GoogleCalendar(store, encryptTeachGPTCredential, readTeachGPTCredential, shell.openExternal, fetch, publishedGoogleClient);
     connections=new Connections(store,encryptTeachGPTCredential,readTeachGPTCredential);
     session.defaultSession.setPermissionCheckHandler((contents, permission, _origin, details) => contents === win?.webContents && details.isMainFrame && (permission === 'clipboard-sanitized-write' || permission === 'media' && details.mediaType === 'audio'));
     session.defaultSession.setPermissionRequestHandler((contents, permission, callback, details) => callback(contents === win?.webContents && details.isMainFrame && (permission === 'clipboard-sanitized-write' || permission === 'media' && 'mediaTypes' in details && details.mediaTypes?.length === 1 && details.mediaTypes[0] === 'audio')));

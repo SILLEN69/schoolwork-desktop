@@ -3,6 +3,7 @@ import crypto from 'node:crypto';
 import { z } from 'zod';
 import type { Metadata } from './lessons';
 import { nextDate, validDate, type CalendarStatus } from '../src/lesson';
+import { parseGoogleDesktopClient, type GoogleDesktopClient } from './googleClient';
 const scope = 'https://www.googleapis.com/auth/calendar.events';
 const driveScope='https://www.googleapis.com/auth/drive.readonly';
 const clientSchema = z.object({ clientId: z.string().trim().regex(/^[0-9]+-[A-Za-z0-9_-]+\.apps\.googleusercontent\.com$/, 'Use a Google OAuth Desktop app client ID.'),
@@ -28,21 +29,29 @@ export class GoogleCalendar {
   private access?: { token: string; until: number };
   private tokenRequest?: Promise<string>;
   private lastError?: string;
+  private sharedClient?: GoogleDesktopClient;
+  private connectAbort?: AbortController;
   constructor(private db: Metadata, private encrypt: (value: string) => string, private decrypt: (value: string) => string,
-    private open: (url: string) => Promise<void>, private fetcher: typeof fetch = fetch) {}
+    private open: (url: string) => Promise<void>, private fetcher: typeof fetch = fetch, sharedClient?: GoogleDesktopClient) {
+    this.sharedClient = parseGoogleDesktopClient(sharedClient);
+  }
   status(): CalendarStatus & { error?: string } {
-    return { configured: Boolean(this.db.getMetadata('google:client-id') && this.db.getMetadata('google:client-secret')),
+    const localClient = Boolean(this.db.getMetadata('google:client-id') && this.db.getMetadata('google:client-secret'));
+    return { configured: localClient || Boolean(this.sharedClient),
+      configurationSource: localClient ? (this.db.getMetadata('google:client-source') === 'schoolwork' ? 'schoolwork' : 'custom') : this.sharedClient ? 'schoolwork' : 'unavailable',
       connected: Boolean(this.db.getMetadata('google:refresh')), connecting: this.connecting,
       calendarId: this.db.getMetadata('google:calendar-id') || 'primary', error: this.lastError,driveEnabled:this.db.getMetadata('google:drive-enabled')==='true' };
   }
   configure(raw: CalendarInput) {
     const data = clientSchema.parse(raw); this.stop(); this.generation++;
     this.db.setMetadata('google:client-id', data.clientId); this.db.setMetadata('google:client-secret', this.encrypt(data.clientSecret));
+    this.db.setMetadata('google:client-source', 'custom');
     this.db.setMetadata('google:calendar-id', data.calendarId); this.db.setMetadata('google:refresh', '');
     this.db.setMetadata('google:drive-enabled',JSON.stringify(data.driveEnabled));
     this.access = undefined; this.lastError = undefined; return this.status();
   }
-  stop() { this.server?.close(); this.server = undefined; if (this.timer) clearTimeout(this.timer); this.timer = undefined; this.connecting = false; }
+  stop() { this.connectAbort?.abort(); this.connectAbort = undefined; this.server?.close(); this.server?.closeAllConnections(); this.server = undefined; if (this.timer) clearTimeout(this.timer); this.timer = undefined; this.connecting = false; }
+  cancelConnect() { this.generation++; this.stop(); this.lastError = undefined; return this.status(); }
   async disconnect() {
     const encrypted = this.db.getMetadata('google:refresh'); this.stop(); this.generation++;
     this.db.setMetadata('google:refresh', ''); this.access = undefined; this.lastError = undefined;
@@ -53,16 +62,21 @@ export class GoogleCalendar {
     return this.status();
   }
   async connect() {
-    if (!this.status().configured) throw new Error('Configure a Google OAuth Desktop app client first.');
+    if (!this.status().configured) throw new Error('Google sign-in is not available in this build. Update SchoolWork when its publisher enables Google sign-in. Advanced users can configure a Google OAuth Desktop app client.');
     if (this.connecting) return this.status();
+    if (!this.db.getMetadata('google:client-id') && this.sharedClient) {
+      this.configure({ ...this.sharedClient, calendarId: this.status().calendarId, driveEnabled: this.status().driveEnabled });
+      this.db.setMetadata('google:client-source', 'schoolwork');
+    }
     const generation = ++this.generation;
+    const abort = new AbortController(); this.connectAbort = abort;
     const state = crypto.randomBytes(32).toString('hex'), verifier = crypto.randomBytes(48).toString('base64url');
     const challenge = crypto.createHash('sha256').update(verifier).digest('base64url');
     this.lastError = undefined; this.connecting = true;
     let redirect = '', handling = false;
     this.server = http.createServer(async (request, response) => {
       const url = new URL(request.url || '/', 'http://127.0.0.1');
-      if (url.pathname !== '/oauth/callback' || url.searchParams.get('state') !== state) { response.writeHead(400); response.end('Invalid OAuth callback.'); return; }
+      if (request.method !== 'GET' || url.pathname !== '/oauth/callback' || url.searchParams.get('state') !== state) { response.writeHead(400); response.end('Invalid OAuth callback.'); return; }
       if (generation !== this.generation) { response.writeHead(400); response.end('This connection attempt expired.'); return; }
       if (handling) { response.writeHead(409); response.end('This callback is already being handled.'); return; }
       handling = true;
@@ -70,14 +84,18 @@ export class GoogleCalendar {
       try {
         if (url.searchParams.get('error')) throw new Error('Google sign-in was declined.');
         const code = url.searchParams.get('code'); if (!code) throw new Error('Google did not return an authorisation code.');
-        const tokens = await this.exchange({ code, redirect_uri: redirect, code_verifier: verifier, grant_type: 'authorization_code' });
+        const tokens = await this.exchange({ code, redirect_uri: redirect, code_verifier: verifier, grant_type: 'authorization_code' }, abort.signal);
         if (generation !== this.generation || !this.connecting) throw new Error('Connection attempt expired. Please reconnect.');
         if (!tokens.refresh_token) throw new Error('Google did not grant offline access. Reconnect and allow Calendar access.');
         this.db.setMetadata('google:refresh', this.encrypt(tokens.refresh_token));
         this.access = { token: tokens.access_token, until: Date.now() + (tokens.expires_in - 60) * 1000 };
         response.end('Google Calendar connected to SchoolWork. You can close this window.');
-      } catch (error) { this.lastError = error instanceof Error ? error.message : 'Google connection failed.'; response.writeHead(400); response.end('Connection failed. Return to SchoolWork for details.'); }
-      finally { this.stop(); }
+      } catch (error) { if (generation === this.generation) this.lastError = error instanceof Error ? error.message : 'Google connection failed.'; response.writeHead(400); response.end('Connection failed. Return to SchoolWork for details.'); }
+      finally { if (generation === this.generation) {
+        // Let the final browser response flush before closing sockets.
+        response.once('finish', () => { if (generation === this.generation) this.stop(); });
+        if (response.writableFinished) this.stop();
+      } }
     });
     try {
       await new Promise<void>((resolve, reject) => { this.server!.once('error', reject); this.server!.listen(0, '127.0.0.1', resolve); });
@@ -85,14 +103,14 @@ export class GoogleCalendar {
       redirect = `http://127.0.0.1:${address.port}/oauth/callback`;
       const params = new URLSearchParams({ client_id: this.db.getMetadata('google:client-id')!, redirect_uri: redirect, response_type: 'code', scope:scope+(this.status().driveEnabled?' '+driveScope:''),
         state, code_challenge: challenge, code_challenge_method: 'S256', access_type: 'offline', prompt: 'consent' });
-      this.timer = setTimeout(() => { this.lastError = 'Google sign-in timed out. Try connecting again.'; this.stop(); }, 180_000); this.timer.unref();
+      this.timer = setTimeout(() => { this.generation++; this.lastError = 'Google sign-in timed out. Try connecting again.'; this.stop(); }, 300_000); this.timer.unref();
       await this.open('https://accounts.google.com/o/oauth2/v2/auth?' + params); return this.status();
-    } catch (error) { this.stop(); throw error; }
+    } catch (error) { if (generation === this.generation) { this.lastError = 'Could not open Google sign-in. Try again.'; this.stop(); } throw error; }
   }
-  private async exchange(params: Record<string, string>) {
+  private async exchange(params: Record<string, string>, signal?: AbortSignal) {
     const generation = this.generation;
     const response = await this.fetcher('https://oauth2.googleapis.com/token', { method: 'POST', headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-      body: new URLSearchParams({ ...params, client_id: this.db.getMetadata('google:client-id')!, client_secret: this.decrypt(this.db.getMetadata('google:client-secret')!) }), signal: AbortSignal.timeout(20_000) });
+      body: new URLSearchParams({ ...params, client_id: this.db.getMetadata('google:client-id')!, client_secret: this.decrypt(this.db.getMetadata('google:client-secret')!) }), redirect:'error', signal: AbortSignal.any([AbortSignal.timeout(20_000), ...(signal ? [signal] : [])]) });
     if (!response.ok) { if (response.status === 400 && params.grant_type === 'refresh_token' && generation === this.generation) { this.db.setMetadata('google:refresh', ''); this.access = undefined; }
       throw new Error(`Google authorisation failed (HTTP ${response.status}). Reconnect your account.`); }
     const tokens = z.object({ access_token: z.string().min(1), expires_in: z.number().positive(), refresh_token: z.string().optional(), scope: z.string().optional() }).parse(await response.json());
@@ -138,7 +156,7 @@ export class GoogleCalendar {
     if(!response.ok){this.lastError=await googleApiError(response);throw new Error(this.lastError);}
     this.lastError=undefined;return this.status();
   }
-  enableDrive(enabled:boolean){this.db.setMetadata('google:drive-enabled',JSON.stringify(enabled));this.access=undefined;return this.status();}
+  enableDrive(enabled:boolean){if(this.connecting)throw new Error('Finish or cancel Google sign-in before changing permissions.');this.db.setMetadata('google:drive-enabled',JSON.stringify(enabled));this.access=undefined;return this.status();}
   private async readApi(url:string,signal:AbortSignal){
     const send=async()=>this.fetcher(url,{headers:{Authorization:'Bearer '+await this.token()},redirect:'error',signal:AbortSignal.any([signal,AbortSignal.timeout(20000)])});
     let r=await send();if(r.status===401){this.access=undefined;r=await send();}

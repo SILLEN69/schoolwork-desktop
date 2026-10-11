@@ -46,13 +46,15 @@ try{
   assert.equal(await page.locator('input[type="date"]').inputValue(),'2026-10-16');assert.equal(await app.evaluate(()=>global.__lessonTest.calendarWrites),0);
   pass('assignment date is reviewed before any calendar write');
   await page.getByRole('button',{name:'Anslut Google Calendar',exact:true}).click();
+  assert.equal(await page.getByRole('textbox',{name:'OAuth client ID',exact:true}).count(),0);
+  await page.getByRole('button',{name:'Avancerat: egen Google-app',exact:true}).click();
   await page.getByRole('textbox',{name:'OAuth client ID',exact:true}).fill('123-test.apps.googleusercontent.com');
   await page.getByLabel('OAuth client secret',{exact:true}).fill('test-client-secret');
   await page.getByRole('button',{name:'Spara anslutningsinställningar'}).click();
   await page.getByRole('button',{name:'Logga in med Google'}).click();
   const auth=new URL(await app.evaluate(()=>global.__lessonTest.oauthUrl)),callback=new URL(auth.searchParams.get('redirect_uri'));
   callback.searchParams.set('state',auth.searchParams.get('state'));callback.searchParams.set('code','test-only-code');
-  assert.equal((await fetch(callback)).status,200);await page.getByText('Konto anslutet',{exact:true}).waitFor();
+  assert.equal((await fetch(callback)).status,200);await page.getByText('Google-konto anslutet',{exact:true}).waitFor();
   await page.locator('.calendar-dialog-layer').getByRole('button',{name:'Stäng',exact:true}).click();
   await page.getByRole('button',{name:'Bekräfta och spara'}).click();await page.getByRole('button',{name:'Sparad i Calendar'}).waitFor();
   assert.equal(await app.evaluate(()=>global.__lessonTest.calendarWrites),1);

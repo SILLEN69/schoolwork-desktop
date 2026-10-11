@@ -13,11 +13,12 @@ beforeEach(()=>{ values=new Map();db={getMetadata:k=>values.get(k),setMetadata:(
   fetcher=vi.fn(async(url:unknown,init?:RequestInit)=>{
     if(String(url).endsWith('/token')) { const form=init?.body as URLSearchParams;expect(form.get('client_secret')).toBe(client.clientSecret);return Response.json({access_token:'test-access',expires_in:3600,refresh_token:form.get('grant_type')==='authorization_code'?'test-refresh':undefined,scope:'https://www.googleapis.com/auth/calendar.events'}); }
     if(String(url).endsWith('/revoke')) return new Response('');
+    if(!init?.body)return Response.json({items:[]});
     const event=JSON.parse(String(init?.body));return Response.json({id:event.id,htmlLink:'https://calendar.google.com/calendar/event?eid=test'});
   });
   calendar=new GoogleCalendar(db,encrypt,decrypt,async(url)=>{opened=url;},fetcher as typeof fetch);
 });
-afterEach(()=>{calendar.stop();});
+afterEach(()=>{calendar.stop();vi.useRealTimers();});
 async function connect() { calendar.configure(client);await calendar.connect();const url=new URL(opened),redirect=new URL(url.searchParams.get('redirect_uri')!);redirect.searchParams.set('state',url.searchParams.get('state')!);redirect.searchParams.set('code','test-code');const result=await fetch(redirect);expect(result.status).toBe(200); }
 it('requires a desktop client, uses loopback and PKCE, and rejects mismatched state',async()=>{
   await expect(calendar.connect()).rejects.toThrow(/Desktop app client/);calendar.configure(client);expect(values.get('google:client-secret')).not.toBe(client.clientSecret);
@@ -46,4 +47,43 @@ it('rejects impossible dates before contacting Google and disconnects locally',a
 });
 it('does not mark an account connected if Google refuses Calendar scope',async()=>{
   calendar.configure(client);fetcher.mockResolvedValue(Response.json({access_token:'test',refresh_token:'refresh',expires_in:3600,scope:'openid'}));await calendar.connect();const auth=new URL(opened),redirect=new URL(auth.searchParams.get('redirect_uri')!);redirect.searchParams.set('state',auth.searchParams.get('state')!);redirect.searchParams.set('code','test');expect((await fetch(redirect)).status).toBe(400);expect(calendar.status().connected).toBe(false);expect(calendar.status().error).toContain('permission');
+});
+it('uses the publisher desktop client with no per-user setup and isolates accounts by local storage',async()=>{
+  calendar=new GoogleCalendar(db,encrypt,decrypt,async url=>{opened=url;},fetcher as typeof fetch,client);
+  expect(calendar.status()).toMatchObject({configured:true,connected:false,configurationSource:'schoolwork'});
+  expect(values.size).toBe(0); // Merely opening Settings never rewrites credentials.
+  await calendar.connect();
+  const auth=new URL(opened),callback=new URL(auth.searchParams.get('redirect_uri')!);
+  expect(auth.searchParams.get('client_id')).toBe(client.clientId);
+  expect(auth.searchParams.get('scope')).not.toContain('drive');
+  callback.searchParams.set('state',auth.searchParams.get('state')!);callback.searchParams.set('code','synthetic-code');
+  expect((await fetch(callback)).status).toBe(200);
+  expect(calendar.status()).toMatchObject({connected:true,connecting:false,configurationSource:'schoolwork'});
+  expect(JSON.stringify(calendar.status())).not.toMatch(/test-refresh|test-client-secret|test-access|clientId/);
+  calendar.stop();
+  calendar=new GoogleCalendar(db,encrypt,decrypt,async()=>{},fetcher as typeof fetch,client);
+  expect(calendar.status().connected).toBe(true);
+  await calendar.check(); // Refresh persisted user grant after restart.
+  const otherValues=new Map<string,string>();
+  const other=new GoogleCalendar({getMetadata:k=>otherValues.get(k),setMetadata:(k,v)=>{otherValues.set(k,v);}},encrypt,decrypt,async()=>{},fetcher as typeof fetch,client);
+  expect(other.status()).toMatchObject({configured:true,connected:false});other.stop();
+});
+it('preserves existing custom clients and grants when a publisher client becomes available',async()=>{
+  await connect();calendar.stop();const snapshot=new Map(values);
+  calendar=new GoogleCalendar(db,encrypt,decrypt,async url=>{opened=url;},fetcher as typeof fetch,{...client,clientId:'456-publisher.apps.googleusercontent.com'});
+  expect(values).toEqual(snapshot);expect(calendar.status()).toMatchObject({connected:true,configurationSource:'custom'});
+  await calendar.connect();expect(new URL(opened).searchParams.get('client_id')).toBe(client.clientId);
+});
+it('cancels an in-flight exchange and rejects old callbacks without corrupting a new attempt',async()=>{
+  calendar.configure(client);await calendar.connect();
+  const auth=new URL(opened),callback=new URL(auth.searchParams.get('redirect_uri')!);callback.searchParams.set('state',auth.searchParams.get('state')!);callback.searchParams.set('code','old');
+  let entered!:()=>void;const started=new Promise<void>(resolve=>{entered=resolve;});let aborted=false;
+  fetcher.mockImplementation((_url,init)=>new Promise((_resolve,reject)=>{entered();init!.signal!.addEventListener('abort',()=>{aborted=true;reject(new Error('aborted'));},{once:true});}));
+  const pending=fetch(callback).catch(()=>undefined);await started;
+  expect(calendar.cancelConnect()).toMatchObject({connecting:false,connected:false});await pending;expect(aborted).toBe(true);
+  await calendar.connect();expect(calendar.status()).toMatchObject({connecting:true,error:undefined,connected:false});
+  expect(()=>calendar.enableDrive(true)).toThrow(/Finish or cancel/);
+  const nextAuth=new URL(opened),nextCallback=new URL(nextAuth.searchParams.get('redirect_uri')!);
+  nextCallback.searchParams.set('state',auth.searchParams.get('state')!);nextCallback.searchParams.set('code','old');
+  expect((await fetch(nextCallback)).status).toBe(400);expect(calendar.status().error).toBeUndefined();
 });

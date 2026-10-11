@@ -26,7 +26,7 @@ export type LessonSession = {
   analysis: Omit<LessonAnalysis, 'tasks'> & { tasks: LessonTask[] };
   analysedRevision: number; analysisAt?: number; analysisError?: string;
 };
-export type CalendarStatus = { configured: boolean; connected: boolean; connecting: boolean; calendarId: string; error?:string; driveEnabled?:boolean };
+export type CalendarStatus = { configured: boolean; connected: boolean; connecting: boolean; calendarId: string; error?:string; driveEnabled?:boolean; configurationSource?:'schoolwork'|'custom'|'unavailable' };
 export const emptyAnalysis = (): LessonAnalysis => ({ title: '', overview: '', sections: [], tasks: [] });
 export function transcriptText(session: LessonSession) {
   if (session.refinedTranscript?.revision === session.revision) return session.refinedTranscript.text;

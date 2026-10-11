@@ -22,6 +22,7 @@ contextBridge.exposeInMainWorld("schoolwork", {
   calendarStatus: () => ipcRenderer.invoke('calendar:status'),
   calendarConfigure: (input: unknown) => ipcRenderer.invoke('calendar:configure', input),
   calendarConnect: () => ipcRenderer.invoke('calendar:connect'),
+  calendarCancelConnect: () => ipcRenderer.invoke('calendar:cancel-connect'),
   calendarDisconnect: () => ipcRenderer.invoke('calendar:disconnect'),
   calendarAdd: (input: unknown) => ipcRenderer.invoke('calendar:add', input),
   updateStatus: () => ipcRenderer.invoke('updates:status'),

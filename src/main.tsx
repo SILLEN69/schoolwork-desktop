@@ -13,7 +13,7 @@ if (!window.schoolwork) {
     lessonList: async () => [], lessonCreate: desktopOnly, lessonUpdate: desktopOnly, lessonDelete: desktopOnly,
     lessonAudio: desktopOnly, lessonRetry: desktopOnly, lessonDiscard: desktopOnly, lessonCancel: desktopOnly, lessonAnalyse: desktopOnly,
     calendarStatus: async () => ({configured:false,connected:false,connecting:false,calendarId:'primary'}),
-    calendarConfigure: desktopOnly, calendarConnect: desktopOnly, calendarDisconnect: desktopOnly, calendarAdd: desktopOnly,
+    calendarConfigure: desktopOnly, calendarConnect: desktopOnly, calendarCancelConnect: desktopOnly, calendarDisconnect: desktopOnly, calendarAdd: desktopOnly,
     updateStatus: async () => ({phase:'unsupported',currentVersion:'preview',message:'Updates are available in the installed app.'}),
     updateAction: async () => ({phase:'unsupported',currentVersion:'preview'}),
     onUpdate: () => () => {},
