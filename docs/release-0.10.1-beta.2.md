@@ -1,4 +1,4 @@
-# SchoolWork 0.10.1-beta.1 — Google sign-in preview
+# SchoolWork 0.10.1-beta.2 — Google sign-in preview
 
 This is an opt-in beta, published from the `beta` branch. It is not a stable automatic update and has not been merged as a stable release.
 
@@ -9,7 +9,7 @@ This is an opt-in beta, published from the `beta` branch. It is not a stable aut
 
 ## Installation
 
-Download `SchoolWork-0.10.1-beta.1-x64-setup.exe` for a per-user Windows x64 installation, or the portable executable. Verify the download against `SHA256SUMS-v0.10.1-beta.1.txt`. Finish or pause active tasks and close SchoolWork normally before updating. These binaries are unsigned; do not disable Windows protections.
+Download `SchoolWork-0.10.1-beta.2-x64-setup.exe` for a per-user Windows x64 installation, or the portable executable. Verify the download against `SHA256SUMS-v0.10.1-beta.2.txt`. Finish or pause active tasks and close SchoolWork normally before updating. These binaries are unsigned; do not disable Windows protections.
 
 Each tester needs their own locally configured TeachGPT API key and school API access. Keys and user Google tokens are not included in the download.
 

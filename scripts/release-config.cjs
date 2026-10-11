@@ -6,7 +6,8 @@ function releaseConfig(version) {
   const candidates = [`docs/release-${version}.md`, `docs/release-${base}.md`, `docs/release-${base.split('.').slice(0, 2).join('.')}.md`];
   const notes = candidates.find(file => fs.existsSync(file));
   if (!notes) throw new Error('Release notes are missing.');
-  return { version, tag: `v${version}`, prerelease, manifest: prerelease ? 'beta.yml' : 'latest.yml', notes };
+  return { version, tag: `v${version}`, prerelease, manifest: prerelease ? 'beta.yml' : 'latest.yml', notes,
+    publish: {provider:'github',owner:'SILLEN69',repo:'schoolwork-desktop',channel:prerelease?'beta':'latest',releaseType:prerelease?'prerelease':'release'} };
 }
 module.exports = { releaseConfig };
 if (require.main === module) {
