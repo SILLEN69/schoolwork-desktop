@@ -26,4 +26,4 @@ if(process.platform==='linux') {
   };
 }
 await build({targets:Platform.WINDOWS.createTarget(['nsis','portable'],Arch.x64),publish:'never',
-  config:{publish:[release.publish],...(process.platform==='win32'?{electronDist:'node_modules/electron/dist'}:{}),...(process.env.SCHOOLWORK_PACKAGE_OUTPUT?{directories:{output:path.resolve(process.env.SCHOOLWORK_PACKAGE_OUTPUT)}}:{})}});
+  config:{publish:release.publish,...(process.platform==='win32'?{electronDist:'node_modules/electron/dist'}:{}),...(process.env.SCHOOLWORK_PACKAGE_OUTPUT?{directories:{output:path.resolve(process.env.SCHOOLWORK_PACKAGE_OUTPUT)}}:{})}});
