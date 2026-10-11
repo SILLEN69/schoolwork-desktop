@@ -17,6 +17,7 @@ import { Lessons, audioInputSchema } from "./lessons";
 import { GoogleCalendar } from "./calendar";
 import { publishedGoogleClient } from "./googleClient";
 import { DesktopPointer } from './desktopPointer';
+import { TaskNotifications } from './taskNotifications';
 import { transcriptText, lessonSubjects } from '../src/lesson';
 import { Connections,connectionSchemas,connectionTools } from './connections';
 import { isSpeechModel } from "../src/speechModels";
@@ -119,6 +120,11 @@ let store: SchoolWorkStore;
 let connections:Connections;
 let vault: MemoryVault;
 let win: BrowserWindow | undefined;
+const taskNotifications=new TaskNotifications(()=>{
+  if(!win)makeWindow();
+  if(win?.isMinimized())win.restore();
+  win?.show();win?.focus();
+});
 let discoveredModels: string[] = [];
 let attachments: Attachments;
 let desktop: DesktopTools;
@@ -418,6 +424,10 @@ function emit(task: any, type: string, payload: Record<string, unknown> = {}) {
     taskId: task.id,
     conversationId: task.conversationId,
   });
+  if(type==='answer'||type==='error'){
+    const current=store.getTask(task.id);
+    if(current)taskNotifications.notify(current,type,settings.get('language')==='sv');
+  }
   const phoneSession = store.getMetadata("telegram-task:" + task.id);
   if (telegram && phoneSession && ["answer", "checkpoint"].includes(type)) {
     try {
@@ -2737,6 +2747,7 @@ else {
     }
   });
   app.whenReady().then(async () => {
+    if(process.platform==='win32')app.setAppUserModelId('nu.ssis.schoolwork');
     store = new SchoolWorkStore(app.getPath("userData"));
     attachments = new Attachments(store, app.getPath("userData"));
     await attachments.initialize();
