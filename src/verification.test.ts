@@ -1,5 +1,14 @@
 import { it, expect } from 'vitest';
 import { VerificationGate, isCodeArtifact, isVerificationCommand } from './verification';
+it('invalidates an earlier passing check when a later real check fails, without requiring unrelated inspection work to become a coding task',()=>{
+ const gate=new VerificationGate(),args={command:'npm run lint'};
+ gate.observe('run_powershell',args,{ok:false,data:{exitCode:1}});expect(gate.needed).toBe(false);
+ gate.observe('edit_file',{path:'app.js'},{ok:true});
+ gate.observe('run_powershell',args,{ok:true,data:{exitCode:0}});expect(gate.needed).toBe(false);
+ gate.observe('run_powershell',args,{ok:false,data:{exitCode:1}});expect(gate.needed).toBe(true);
+ gate.observe('run_powershell',args,{ok:true,data:{exitCode:0}});expect(gate.needed).toBe(false);
+ gate.observe('run_powershell',args,{ok:false,data:{exitCode:null,timedOut:true}});expect(gate.needed).toBe(true);
+});
 it('recognizes the saved successful PowerShell directory-prefixed lint check', () => {
   const gate = new VerificationGate();
   gate.observe('edit_file', {path:'Composition.tsx'}, {ok:true});

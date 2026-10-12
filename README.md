@@ -250,7 +250,7 @@ The development source now includes **0.9.0 Lesson Studio**, Swedish/English Whi
 
 For developers or school IT building and checking the application from source:
 
-**Requirements:** Windows x64, Git, Node.js **22.12 or later** with npm, and Windows .NET Framework 4.x with its x64 C# compiler. The build compiles the small desktop helper locally. Opening the released installer does not require this developer setup.
+**Requirements:** Windows x64, Git, Node.js **24 LTS or later** with npm, and Windows .NET Framework 4.x with its x64 C# compiler. The build compiles the small desktop helper locally. Opening the released installer does not require this developer setup.
 
 ```powershell
 git clone https://github.com/SILLEN69/schoolwork-desktop.git
@@ -259,7 +259,7 @@ npm ci
 npm run dev:app
 ```
 
-`dev:app` builds the frontend, backend and Windows helper before starting Electron and Vite. Configure your TeachGPT key in Settings. `npm run dev` alone is only a browser preview and cannot run local file, process or desktop tools.
+`dev:app` builds the frontend, backend and Windows helper before starting its own Vite server and Electron with an isolated `work/dev-profile`. Configure your TeachGPT key in that development profile. It fails clearly if the default port is occupied; `SCHOOLWORK_DEV_PORT=0` chooses a free port. `npm run dev` alone is only a browser preview and cannot run local file, process or desktop tools. See [exact development, recovery and animation commands](docs/development.md).
 
 ```powershell
 # Unit tests

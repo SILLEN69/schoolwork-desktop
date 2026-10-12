@@ -7,9 +7,11 @@ export function isCodeArtifact(file: unknown) {
 }
 export class VerificationGate {
   needed = false;
+  private edited = false;
   observe(tool: string, args: Record<string, unknown>, outcome: { ok: boolean; data?: any }) {
-    if (!outcome.ok) return;
-    if (['write_file', 'patch_file', 'edit_file'].includes(tool) && isCodeArtifact(args.path)) this.needed = true;
+    const check=tool==='check_preview'||(['run_powershell','run_process'].includes(tool)&&isVerificationCommand(tool,args));
+    if (!outcome.ok || outcome.data?.timedOut) {if(this.edited&&check)this.needed=true;return;}
+    if (['write_file', 'patch_file', 'edit_file'].includes(tool) && isCodeArtifact(args.path)) {this.needed = true;this.edited=true;}
     if (tool==='check_preview' && outcome.data?.expectationPassed === true && outcome.data?.consoleErrors?.length === 0) this.needed = false;
     if (['run_powershell', 'run_process'].includes(tool) && outcome.data?.exitCode === 0 && !outcome.data?.timedOut && isVerificationCommand(tool, args)) this.needed = false;
   }

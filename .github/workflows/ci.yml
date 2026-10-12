@@ -1,0 +1,42 @@
+name: Validate source changes
+on:
+  push:
+    branches: [main, beta]
+  pull_request:
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: check-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  checks:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-24.04, windows-2022]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: npm
+      - run: npm ci
+      - name: Verify assets, type-check and build (no publisher credentials)
+        run: npm run build
+      - run: npm test -- --maxWorkers=4
+      - run: node --test scripts/check-release-config.cjs scripts/check-startup-assets.test.mjs scripts/build-native.test.mjs
+      - if: runner.os == 'Windows'
+        run: node scripts/test-agent-recovery.mjs
+      - if: runner.os == 'Windows'
+        run: node scripts/test-ui-motion.mjs
+      - if: runner.os == 'Windows'
+        run: node scripts/test-development.mjs
+      - uses: actions/upload-artifact@v4
+        if: always() && runner.os == 'Windows'
+        with:
+          name: motion-verification
+          path: work/motion-verification/
+          if-no-files-found: ignore

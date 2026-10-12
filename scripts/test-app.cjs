@@ -192,12 +192,13 @@ Here is the calculation in code:
       }
       if(action)toolCalls=[{index:0,id:marker+'-'+step,type:'function',function:{name:action[0],arguments:JSON.stringify(action[1])}}];
     }
-    if (requested.includes('#verification-prefix') || requested.includes('#verification-batch')) {
-      const batch=requested.includes('#verification-batch'),key=batch?'verification-batch':'verification-prefix';
+    if (requested.includes('#verification-prefix') || requested.includes('#verification-batch') || requested.includes('#verification-recheck')) {
+      const batch=requested.includes('#verification-batch'),recheck=requested.includes('#verification-recheck'),key=batch?'verification-batch':recheck?'verification-recheck':'verification-prefix';
       const step=counts.get(key)||0;counts.set(key,step+1);
       const actions=[['write_file',{path:'checked.js',content:'const value = 42;\n'}]];
       if(batch)actions.push(['write_file',{path:'package.json',content:JSON.stringify({private:true,scripts:{lint:'node --check checked.js'}})}]);
       actions.push(batch?['run_process',{executable:'npm.cmd',args:['run','lint'],purpose:'lint',timeoutMs:15000}]:['run_powershell',{command:"Set-Location '"+dir.replace(/'/g,"''")+"'; node --check checked.js",timeoutMs:15000}]);
+      if(recheck)actions.push(['run_process',{executable:'node',args:['-e','throw new Error("synthetic failed check")'],purpose:'test',timeoutMs:10000}]);
       if(step<actions.length){const [name,args]=actions[step];toolCalls=[{index:0,id:key+'-'+step,type:'function',function:{name,arguments:JSON.stringify(args)}}];content='Checking the saved JavaScript syntax.';}
       else content='Saved the file and its syntax check passed.';
     }

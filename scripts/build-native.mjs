@@ -35,7 +35,8 @@ if (process.platform !== "win32" && !(crossCompiler && referenceDir)) {
     { stdio: "inherit", windowsHide: true },
   );
   if (result.error) throw result.error;
-  process.exitCode = result.status || 0;
+  if (result.status === null) throw new Error('Native compiler did not finish (signal: '+(result.signal||'unknown')+'). Rebuild before packaging; a previous binary is not evidence of success.');
+  process.exitCode = result.status;
   if (result.status === 0) {
     const hash = file => crypto.createHash('sha256').update(readFileSync(file)).digest('hex');
     writeFileSync('dist-native/build.json', JSON.stringify({sourceSha256:hash('native/DesktopBridge.cs'),binarySha256:hash('dist-native/SchoolWork.DesktopBridge.exe'),target:'windows-x64-netframework4'}));

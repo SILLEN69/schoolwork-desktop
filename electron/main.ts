@@ -493,16 +493,15 @@ function checkedCodingTask(taskId: string) {
   let edited = false;
   const rows = store.db
     .prepare(
-      "SELECT name,arguments_json,result_json FROM tool_executions WHERE task_id=? AND status='succeeded' ORDER BY finished_at",
+      "SELECT name,arguments_json,result_json FROM tool_executions WHERE task_id=? AND status IN ('succeeded','failed') AND result_json IS NOT NULL ORDER BY finished_at,rowid",
     )
     .all(taskId) as any[];
   for (const row of rows) {
-      if (["write_file", "patch_file", "edit_file"].includes(row.name) && isCodeArtifact(JSON.parse(row.arguments_json).path))
-      edited = true;
     try {
       const outcome = JSON.parse(row.result_json);
-      if (!outcome?.ok) return false;
-      gate.observe(row.name, JSON.parse(row.arguments_json), outcome);
+      const args=JSON.parse(row.arguments_json);
+      if (outcome?.ok && ["write_file", "patch_file", "edit_file"].includes(row.name) && isCodeArtifact(args.path))edited=true;
+      gate.observe(row.name, args, outcome);
     } catch {
       return false;
     }
@@ -1175,7 +1174,7 @@ async function runTask(task: any) {
     let verificationReminders = 0;
     const completedOperations = store.db
       .prepare(
-        "SELECT name,arguments_json,result_json FROM tool_executions WHERE task_id=? AND status='succeeded' ORDER BY finished_at",
+        "SELECT name,arguments_json,result_json FROM tool_executions WHERE task_id=? AND status IN ('succeeded','failed') AND result_json IS NOT NULL ORDER BY finished_at,rowid",
       )
       .all(task.id) as any[];
     for (const operation of completedOperations)

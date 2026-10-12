@@ -26,9 +26,9 @@ Investigate stalled SchoolWork and development sessions first, then improve moti
 
 ## Next three tasks
 
-1. Make source setup, CI and development-profile recovery reproducible; check dependency advisories and stale-build failure handling.
-2. Correct pointer explanation-only content and observation/idle stability without weakening capture exclusion.
-3. Add notification delivery diagnostics and an accessible fallback/test flow; verify terminal outcomes and OS limitations honestly.
+1. Correct pointer explanation-only content and observation/idle stability without weakening capture exclusion.
+2. Add notification delivery diagnostics and an accessible fallback/test flow; verify terminal outcomes and OS limitations honestly.
+3. Audit remaining performance, accessibility and cancellation paths, then verify the integrated changes without unnecessary release/deployment.
 
 ## Milestone 1: confirmed execution blockers repaired
 
@@ -49,6 +49,17 @@ Investigate stalled SchoolWork and development sessions first, then improve moti
 - Checks: animation lint/type check passes; H.264 video/JPEG render passes; app type check/production frontend build passes. Real isolated Electron verifies actual local playback, one-time completion, inert background, keyboard skip, injected media failure, stalled playback timeout, reduced motion and Settings replay. No renderer errors. Expected pending desktop-discovery cancellation is logged during test-window shutdown; this does not establish a runtime regression and remains a cleanup candidate.
 - Evidence screenshots live in ignored `work/motion-verification`. No private screenshots, credentials, browser profiles or runtime data are committed. Existing audio-generation helper scripts remain local and are not connected to this muted intro.
 - Windows shortcut inspection confirms the installed SchoolWork Start Menu shortcut already has the expected `nu.ssis.schoolwork` AUMID. Registry reads did not establish notification suppression; the original missing-banner cause remains unproven.
+
+## Milestone 3: repeatable source development and recovery
+
+- Development now starts its own strict-port Vite server before Electron, selects the correct platform binary, clears inherited Electron Node mode and uses an isolated development profile. A real forked launcher smoke check verifies an OS-selected free port, HTTP 200, separate initialized SQLite profile and shutdown of both owned processes. No installed app is stopped.
+- Removed unused concurrently/wait-on dependencies. Node 24 is declared in package metadata and matches CI/docs. New CI validates beta/main pushes and PRs on Linux/Windows without publishing or publisher credentials; YAML syntax parses. Remote CI execution is not claimed before a future push.
+- A terminated C# compiler now fails the build rather than accepting a previous helper. A controlled signal regression and the animation consistency regression both pass.
+- A late failed check invalidates an earlier pass after an edit. Reconstruction now includes failed completed operations in deterministic order, so a restart does not silently lose that failure. The real isolated agent regression verifies the pending result; failed checks never become completed tasks.
+- Full unit suite passes: 173 tests in 28 files. The first broader run incorrectly discovered Node-runner CLI tests through Vitest; scripts are now excluded from Vitest and executed explicitly through node:test/CI. This mismatch was diagnosed and repaired, not ignored.
+- Fresh `npm ci` installed 480 packages in an isolated copy; full fresh TypeScript/frontend/backend/native build passed. This is a new dependency installation on the current Windows machine, not clean-Windows installation acceptance. Existing deprecation/large-chunk warnings remain documented.
+- Production npm audit reports zero advisories. The animation lint dependency chain has one unpatched braces issue propagated through ten dev packages: https://github.com/advisories/GHSA-vfj7-8cjw-p6xm . Latest published braces is 3.0.3 and no fixed version exists at inspection. Do not suppress the report by inventing an upgrade.
+- Exact install/build/test/animation/recovery instructions are in `docs/development.md`. No API key, publisher JSON, profile or private log was committed. Local source commits remain ahead of remote beta; no publication/merge occurred.
 
 ## Resume commands
 
