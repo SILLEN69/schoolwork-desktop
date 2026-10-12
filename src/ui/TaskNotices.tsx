@@ -14,8 +14,6 @@ export default function TaskNotices({swedish,onOpen}:{swedish:boolean;onOpen:(co
         setNotices(items=>items.filter(item=>item.conversationId!==event.conversationId));return;
       }
       if(!event.id||!event.outcome||seen.has(event.id))return;
-      // The user is already looking at the app; the chat shows the result.
-      if(event.outcome==='completed'&&document.hasFocus())return;
       seen.add(event.id);if(seen.size>256)seen.delete(seen.values().next().value!);
       setNotices(items=>[...items.filter(item=>item.conversationId!==event.conversationId),{id:event.id!,conversationId:event.conversationId,outcome:event.outcome!}].slice(-3));
     });

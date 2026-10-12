@@ -7,6 +7,8 @@ const path = require("node:path");
 const dir = process.env.SCHOOLWORK_TEST_DATA;
 if (!dir) throw new Error("Use test:desktop to start the isolated fixture.");
 app.setPath("userData", dir);
+// Lets focused-flow tests toggle OS window focus for the "user is away" notice paths.
+global.__testFocus={blur:()=>{require("electron").BrowserWindow.getAllWindows().forEach(w=>w.blur());},focus:()=>{require("electron").BrowserWindow.getAllWindows().forEach(w=>{if(w.isMinimized())w.restore();w.focus();});}};
 // Synthetic agent scenarios must not send unrelated Windows banners.
 if(process.env.SCHOOLWORK_TEST_NATIVE_NOTIFICATIONS!=='1')Notification.isSupported=()=>false;
 app.whenReady().then(() => {

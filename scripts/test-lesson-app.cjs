@@ -8,6 +8,9 @@ app.setPath('userData',data);
 app.commandLine.appendSwitch('use-fake-device-for-media-stream');
 app.commandLine.appendSwitch('use-fake-ui-for-media-stream');
 global.__lessonTest={audioModels:[],summaryRequests:0,calendarWrites:0,agentRequests:[],agentTool:false,modelSaveDelay:0,settingsDelay:0,rejectModel:false,failAudio:false};
+// Lets the test drop OS focus (completion toast only renders while the user is away).
+global.__lessonTest.blurAllWindows=()=>{require('electron').BrowserWindow.getAllWindows().forEach(w=>w.blur());};
+global.__lessonTest.focusAllWindows=()=>{require('electron').BrowserWindow.getAllWindows().forEach(w=>{if(w.isMinimized())w.restore();w.focus();});};
 shell.openExternal=async(url)=>{if(String(url).startsWith('https://accounts.google.com/')){global.__lessonTest.oauthUrl=url;return;}throw new Error('Unexpected browser launch in isolated test');};
 const handle=ipcMain.handle.bind(ipcMain);
 ipcMain.handle=(channel,listener)=>handle(channel,async(...args)=>{

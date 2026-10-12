@@ -432,7 +432,10 @@ function emit(task: any, type: string, payload: Record<string, unknown> = {}) {
   if(type==='answer'||type==='error'){
     const current=store.getTask(task.id);
     if(current&&((type==='answer'&&current.state==='completed')||(type==='error'&&['waiting_retry','failed'].includes(current.state)))){
-      win?.webContents.send('notifications:event',{kind:'outcome',id:event.id,taskId:task.id,conversationId:task.conversationId,outcome:type==='answer'?'completed':'error'});
+      // The in-app completion toast is a "user is away" affordance: while the
+      // window has focus the chat already shows the result, so only push the
+      // notice when the window is not focused. Errors always surface.
+      if(!(type==='answer'&&win?.isFocused()))win?.webContents.send('notifications:event',{kind:'outcome',id:event.id,taskId:task.id,conversationId:task.conversationId,outcome:type==='answer'?'completed':'error'});
       if(win&&!win.isFocused())win.flashFrame(true);
       taskNotifications.notify(current,type,settings.get('language')==='sv');
     }

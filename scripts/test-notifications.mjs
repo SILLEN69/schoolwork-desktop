@@ -11,7 +11,12 @@ try{
   app=await electron.launch({executablePath:path.resolve('node_modules/electron/dist/electron.exe'),args:[path.resolve('scripts/test-app.cjs'),'--user-data-dir='+data],env:{...process.env,SCHOOLWORK_TEST_DATA:data,SCHOOLWORK_TEST_EXE:process.execPath},timeout:30000});
   const page=await app.firstWindow(),errors=[];page.on('pageerror',error=>errors.push(error.message));
   await page.waitForFunction(()=>Boolean(window.schoolwork));await page.locator('.startup-splash').waitFor({state:'detached'});
-  for(const [marker,state,title] of [['#verification-prefix','completed','Task complete'],['#provider-failure','waiting_retry','Task needs attention']]){
+  // Completion notices are a "user is away" affordance: they only render while
+  // the window is unfocused (the chat already shows the result). Error notices
+  // always surface. The completion case defocuses the window; the error case
+  // refocuses it and proves the present-user path.
+  for(const [marker,state,title,away] of [['#verification-prefix','completed','Task complete',true],['#provider-failure','waiting_retry','Task needs attention',false]]){
+    await app.evaluate(away?()=>global.__testFocus.blur():()=>global.__testFocus.focus());
     const owner=randomUUID();await page.evaluate(({owner,marker})=>window.schoolwork.send({chatId:owner,userText:marker,model:'Test-vision'}),{owner,marker});
     await page.waitForFunction(async({owner,state})=>(await window.schoolwork.getChat(owner)).task?.state===state,{owner,state},{timeout:25000});
     const notice=page.locator('.task-notice').filter({has:page.getByText(title,{exact:true})});await notice.waitFor();

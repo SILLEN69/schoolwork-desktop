@@ -91,6 +91,11 @@ try{
   const message=page.getByRole('textbox',{name:'Message',exact:true});await page.getByRole('button',{name:'Dictate',exact:true}).click();await page.getByRole('button',{name:'Finish dictation',exact:true}).waitFor();await page.waitForTimeout(1200);await page.getByRole('button',{name:'Finish dictation',exact:true}).click();
   await page.waitForFunction(()=>document.querySelector('textarea[aria-label="Message"]')?.value.includes('Do exercise three now.'));
   assert.equal(await page.locator('.user-message').count(),0);await message.fill('Do the fixture task');
+  // The in-app completion toast is a "user is away" affordance: while the window
+  // has focus the chat already shows the result and no toast is sent. Defocus the
+  // window at the main-process level so the fixture task's completion exercises
+  // the dismissible-notice path.
+  await app.evaluate(()=>global.__lessonTest.blurAllWindows());
   await app.evaluate(()=>{global.__lessonTest.agentTool=true;});await page.locator('.send-btn').click();
   await page.waitForFunction(()=>document.body.textContent.includes('Running node'));
   await message.fill('New context: use blue');await page.locator('.send-btn').click();
@@ -106,6 +111,8 @@ try{
     await page.locator('.task-notice .notice-dismiss').first().click();
   }
   await page.waitForFunction(()=>document.querySelectorAll('.task-notice').length===0);
+  // The user is back at the app: restore focus for the remaining workflow.
+  await app.evaluate(()=>global.__lessonTest.focusAllWindows());
   await page.getByRole('button',{name:'Follow a lesson'}).click();await page.getByRole('button',{name:'Ny session',exact:true}).click();
   await page.getByRole('button',{name:'Svenska',exact:true}).click();
   await page.waitForFunction(()=>document.querySelector('.lesson-title')?.value==='Ny lektion');
