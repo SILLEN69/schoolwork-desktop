@@ -10,17 +10,17 @@
   <img alt="MIT license" src="https://img.shields.io/badge/license-MIT-243329?style=flat-square">
 </p>
 
-<p align="center"><a href="https://github.com/SILLEN69/schoolwork-desktop/releases/latest"><strong>Download v0.10.0</strong></a> · <a href="#first-time-setup">Get started</a> · <a href="#what-schoolwork-can-do">Features</a> · <a href="#screen-control-see-act-check">Screen control</a> · <a href="#talk-to-schoolwork-from-your-phone">Telegram</a></p>
+<p align="center"><a href="https://github.com/SILLEN69/schoolwork-desktop/releases/latest"><strong>Download v0.10.1</strong></a> · <a href="#first-time-setup">Get started</a> · <a href="#what-schoolwork-can-do">Features</a> · <a href="#screen-control-see-act-check">Screen control</a> · <a href="#talk-to-schoolwork-from-your-phone">Telegram</a></p>
 
 SchoolWork is a Windows assistant for students and teachers with access to **TeachGPT at Stockholm Science and Innovation School (SSIS)**. Explain a concept, investigate a bug or build a project: SchoolWork helps the selected school model find relevant files, edit code, run tests and report what happened. Your conversations and Markdown memory stay on your computer; model requests go to TeachGPT.
 
-**Current release: v0.10.0 for Windows x64.** It adds Work composer dictation, safe-step task steering, subject-grouped lessons with a continuous transcript, Calendar fixes, optional read-only Google Drive and embedded HTTP MCP connections. See [release notes](docs/release-0.10.md) and [workflow design, verification and limitations](docs/workflow-0.10.md). Every installation needs its own eligible TeachGPT account and API key. SchoolWork is an independent open-source project, not an official school application.
+**Current release: v0.10.1 for Windows x64.** It adds a button-free branded startup, public pointer explanations, task notifications, command/recovery fixes and publisher-configured Google sign-in to the existing lessons and Work flows. See [release notes](docs/release-0.10.1.md) and [workflow design, verification and limitations](docs/workflow-0.10.md). Every installation needs its own eligible TeachGPT account and API key. SchoolWork is an independent open-source project, not an official school application.
 
 The 0.7 release adds bounded observation loops, one-call memory saves, chronological chat and actual task-specific Telegram replies. Its one-time upgrade migration enables application launching, screen viewing and input; later user revocations stay saved. See [0.7 implementation and verification](docs/agent-efficiency-0.7.md).
 
 Version 0.8.1 fixes desktop action handoff through file dialogs and provides [in-app update prompts](docs/release-0.8.md), with distinct release/network errors. **Install the latest release manually if upgrading from 0.7 or earlier**; 0.8.0 installations can use the complete GitHub update feed. Portable builds continue to use GitHub downloads. For sharing with a teacher, read the [pilot guide and deployment limits](docs/teacher-pilot.md).
 
-**[Installer and portable downloads](https://github.com/SILLEN69/schoolwork-desktop/releases/tag/v0.10.0)** · **[Installation script](Install-SchoolWork.ps1)** · **[Source setup](#run-the-latest-source)** · **[Report a problem](https://github.com/SILLEN69/schoolwork-desktop/issues)**
+**[Installer and portable downloads](https://github.com/SILLEN69/schoolwork-desktop/releases/tag/v0.10.1)** · **[Installation script](Install-SchoolWork.ps1)** · **[Source setup](#run-the-latest-source)** · **[Report a problem](https://github.com/SILLEN69/schoolwork-desktop/issues)**
 
 ![SchoolWork showing a physics explanation, rendered maths and Python code in its chat workspace](docs/images/workspace.png)
 
@@ -45,7 +45,7 @@ Use it according to your teacher's rules for AI assistance. Ask for explanations
 | **Ask and explain** | Swedish or English conversations, selected TeachGPT models, rendered equations, tables and highlighted code. |
 | **Build and debug** | Project mapping, file search, bounded reads, targeted edits, backups, real test commands and local website checks. |
 | **Follow a lesson** | Swedish-first audio capture, timestamped transcript, structured notes and class tasks; English transcription switch. Live school audio API access still needs verification. |
-| **Plan assignments** | Review detected assignment dates and add them to connected Google Calendar. Current v0.10.0 needs a custom Google client; the upcoming build adds publisher-configured browser sign-in. See [Google setup and availability](docs/google-sign-in.md). |
+| **Plan assignments** | Review detected assignment dates and add them to connected Google Calendar. Version 0.10.1 includes publisher-configured browser sign-in. Google branding and scope verification remain pending. See [Google setup and availability](docs/google-sign-in.md). |
 | **Keep context** | Saved tasks, progress timers, checkpoints and a local linked Markdown memory vault. |
 | **Use your desktop** | Windows app/window inspection, point-in-time screenshots, monitor selection, mouse and keyboard actions. |
 | **Show a problem** | PNG/JPEG attachments, screenshot questions and a per-model vision test. Image understanding depends on the selected model. |
@@ -65,9 +65,9 @@ Current download links:
 
 | File | Purpose |
 |---|---|
-| [SchoolWork 0.10.0 installer](https://github.com/SILLEN69/schoolwork-desktop/releases/download/v0.10.0/SchoolWork-0.10.0-x64-setup.exe) | Normal per-user installation; no developer tools needed to open the app. |
-| [SchoolWork 0.10.0 portable](https://github.com/SILLEN69/schoolwork-desktop/releases/download/v0.10.0/SchoolWork-0.10.0-x64-portable.exe) | Launch without the installation wizard. "Portable" does not mean that all settings and chats stay beside the executable. |
-| [SHA-256 checksums](https://github.com/SILLEN69/schoolwork-desktop/releases/download/v0.10.0/SHA256SUMS-v0.10.0.txt) | Compare downloaded files with the published manifest. |
+| [SchoolWork 0.10.1 installer](https://github.com/SILLEN69/schoolwork-desktop/releases/download/v0.10.1/SchoolWork-0.10.1-x64-setup.exe) | Normal per-user installation; no developer tools needed to open the app. |
+| [SchoolWork 0.10.1 portable](https://github.com/SILLEN69/schoolwork-desktop/releases/download/v0.10.1/SchoolWork-0.10.1-x64-portable.exe) | Launch without the installation wizard. "Portable" does not mean that all settings and chats stay beside the executable. |
+| [SHA-256 checksums](https://github.com/SILLEN69/schoolwork-desktop/releases/download/v0.10.1/SHA256SUMS-v0.10.1.txt) | Compare downloaded files with the published manifest. |
 
 Packages are **unsigned**. On a managed school computer, follow your school's software-installation process if Windows or an administrator blocks them. The app does not require automatic administrator elevation.
 
@@ -81,7 +81,7 @@ Get-Content .\Install-SchoolWork.ps1
 .\Install-SchoolWork.ps1
 ```
 
-The script downloads **v0.10.0** by default, verifies the installer against its SHA-256 manifest, then opens the regular installation wizard. Pass `-Version v0.9.0` if you explicitly need an older public release. It does not change PowerShell execution policy. If scripts are blocked, use Option 1 or your school's approved method.
+The script downloads **v0.10.1** by default, verifies the installer against its SHA-256 manifest, then opens the regular installation wizard. Pass `-Version v0.9.0` if you explicitly need an older public release. It does not change PowerShell execution policy. If scripts are blocked, use Option 1 or your school's approved method.
 
 For an update, finish or pause your current work and close SchoolWork normally before running the newer installer. Keep backups of important projects. Downloading source code alone does not update an installed app.
 
@@ -246,7 +246,7 @@ For a bug report, use [GitHub Issues](https://github.com/SILLEN69/schoolwork-des
 
 ## Run the latest source
 
-The development source is **0.10.1**, adding a button-free branded startup, public pointer explanations, task notifications, command/recovery fixes and publisher-configured Google sign-in to the existing lessons and Work flows. See [0.10.1 source notes](docs/release-0.10.1.md). The public installer remains v0.10.0 until a separate release is published. Google is in Production but branding and scope verification are still required; see the [live status](docs/google-verification-status.md).
+The development source is **0.10.1**, adding a button-free branded startup, public pointer explanations, task notifications, command/recovery fixes and publisher-configured Google sign-in to the existing lessons and Work flows. See [0.10.1 source notes](docs/release-0.10.1.md). The matching Windows installer and portable application are published as v0.10.1. Google is in Production but branding and scope verification are still required; see the [live status](docs/google-verification-status.md).
 
 For developers or school IT building and checking the application from source:
 
