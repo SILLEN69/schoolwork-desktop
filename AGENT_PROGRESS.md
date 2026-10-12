@@ -26,9 +26,9 @@ Investigate stalled SchoolWork and development sessions first, then improve moti
 
 ## Next three tasks
 
-1. Fix verification recognition for the actual successful prefixed commands, prove failed/printed claims remain rejected, and add a real isolated agent-cycle regression.
-2. Repair Windows batch launcher execution and repeated unchanged file-reading loops; checkpoint and commit the validated reliability milestone.
-3. Investigate notification delivery, correct pointer content/stability, then integrate accessible cohesive motion and the preserved branded composition.
+1. Make source setup, CI and development-profile recovery reproducible; check dependency advisories and stale-build failure handling.
+2. Correct pointer explanation-only content and observation/idle stability without weakening capture exclusion.
+3. Add notification delivery diagnostics and an accessible fallback/test flow; verify terminal outcomes and OS limitations honestly.
 
 ## Milestone 1: confirmed execution blockers repaired
 
@@ -39,6 +39,16 @@ Investigate stalled SchoolWork and development sessions first, then improve moti
 - Real isolated Windows Electron agent cycles pass both Set-Location-prefixed syntax checking and npm.cmd lint. Each task finishes after one actual check, with one user input and no repeated completed tools. Provider transport is simulated; these are not live TeachGPT tests.
 - The first new integration-fixture run lacked a valid allowed-app entry and timed out waiting for a window. A concrete allowed path and explicit isolated user-data-dir are now supplied; the two scenarios then pass. Test subprocess output is surfaced for recovery.
 - Build used no publisher Google configuration (expected warning); custom user configuration is preserved. No installation, task resumption or OS notification settings were changed.
+
+## Milestone 2: verified branded startup and native UI motion
+
+- Preserved the externally edited 96-frame atom reveal and rendered it locally using pinned Remotion 4.0.534 after reading the Remotion render/markup skills and official interactivity documentation. MP4 is 191,877 bytes; reduced-motion JPEG is 19,370 bytes. Poster/frame 70 was visually inspected without clipping.
+- Desktop startup plays this exact local asset with no runtime Remotion dependency or inference/network call. The shell is inert while the intro is shown. Esc/button skip, completion/error exit and a non-resetting 4.2-second hard deadline prevent a media failure from blocking the app.
+- Reduced motion uses a still for about 0.4 seconds. Settings allows explicit replay. New chats do not replay the intro. Brief native opacity/translation/button feedback honors reduced motion.
+- Source/asset hashes prevent a stale animation from shipping after Studio edits; source hashes normalize CRLF/LF. `animation:studio` and `animation:render` are repeatable project scripts.
+- Checks: animation lint/type check passes; H.264 video/JPEG render passes; app type check/production frontend build passes. Real isolated Electron verifies actual local playback, one-time completion, inert background, keyboard skip, injected media failure, stalled playback timeout, reduced motion and Settings replay. No renderer errors. Expected pending desktop-discovery cancellation is logged during test-window shutdown; this does not establish a runtime regression and remains a cleanup candidate.
+- Evidence screenshots live in ignored `work/motion-verification`. No private screenshots, credentials, browser profiles or runtime data are committed. Existing audio-generation helper scripts remain local and are not connected to this muted intro.
+- Windows shortcut inspection confirms the installed SchoolWork Start Menu shortcut already has the expected `nu.ssis.schoolwork` AUMID. Registry reads did not establish notification suppression; the original missing-banner cause remains unproven.
 
 ## Resume commands
 

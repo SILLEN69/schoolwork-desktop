@@ -37,6 +37,8 @@ import UpdateNotice from './UpdateNotice';
 import ImageAttachments, { imageFileData } from "./ImageAttachments";
 import type { Attachment } from "../capabilities";
 import { rankTeachGPTModels } from "../modelRanking";
+import StartupIntro from './StartupIntro';
+import './motion.css';
 type Msg = {
   role: "user" | "assistant" | "tool";
   content: string;
@@ -67,6 +69,7 @@ const defaults = [
   "Meta-Llama-3.3-70B-Instruct-AWQ",
 ];
 export default function App() {
+  const [introReady,setIntroReady]=useState(false);
   const [id, setId] = useState(crypto.randomUUID()),
     [messages, setMessages] = useState<Msg[]>([]),
     [draft, setDraft] = useState(""),
@@ -516,7 +519,9 @@ export default function App() {
   };
   if (lessonMode) return <LessonWorkspace initialMode={lessonMode} summaryModel={settings.model} configured={settings.configured} onBack={() => setLessonMode(null)} onWork={chatId=>{setLessonMode(null);void chooseChat({id:chatId});}} />;
   return (
-    <div className="shell">
+    <>
+    {!introReady&&<StartupIntro onComplete={()=>setIntroReady(true)} swedish={isSv}/>}
+    <div className="shell" inert={!introReady}>
       <aside className={"sidebar " + (sidebarCollapsed ? "collapsed" : "")}>
         <div className="brand">
           <div className="brand-mark">
@@ -1110,6 +1115,11 @@ export default function App() {
               <UpdateNotice settings swedish={isSv}/>
             </div>
             <div className="setting-block">
+              <label>{t("Startup animation", "Startanimation")}</label>
+              <p>{t("A short, skippable logo intro. Reduced-motion preferences are respected.", "En kort logganimation som går att hoppa över. Anpassas efter din inställning för minskad rörelse.")}</p>
+              <button className="folder-choose" onClick={()=>{setShowSettings(false);setIntroReady(false);}}>{t("Preview startup animation", "Visa startanimation")}</button>
+            </div>
+            <div className="setting-block">
               <label>{t("TeachGPT API key", "TeachGPT API-nyckel")}</label>
               <p>
                 {t(
@@ -1261,5 +1271,6 @@ export default function App() {
         <MemoryView close={() => setShowMemory(false)} language={language} />
       )}
     </div>
+    </>
   );
 }

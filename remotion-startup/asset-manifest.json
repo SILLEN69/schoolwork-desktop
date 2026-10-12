@@ -1,0 +1,10 @@
+{
+  "remotionVersion": "4.0.534",
+  "sha256": {
+    "remotion-startup/src/Composition.tsx": "0c920f5ea154a9246986e26c6e9df802c3278231ef66a708fa4c16837de33c8a",
+    "remotion-startup/src/Root.tsx": "7989669de8801ac90f2b40b57bbf4494c775a4fa15e556bcb4949d98fcbd6bbe",
+    "remotion-startup/src/index.ts": "957e481dd33a29b4a55ae0e95dbf763b7e48c37c427ca4bd1275faf34bc07a74",
+    "src/assets/schoolwork-startup.mp4": "0f03ba9989541aae29f054a2fa0f6b6a008442eef2aa9fe92c850fe569ad80b5",
+    "src/assets/schoolwork-startup-poster.jpg": "2bab83a3ef56eebd5f027254a8979d288bea276737ab9e7ccc0a9ef4ef4b2a3e"
+  }
+}
