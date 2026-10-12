@@ -15,7 +15,9 @@ try {
   await page.locator('.startup-splash').waitFor();
   assert.equal(await page.locator('.shell').evaluate(node=>node.inert),true);
   await page.waitForFunction(()=>{const video=document.querySelector('.startup-media');return video instanceof HTMLVideoElement&&video.currentTime>0.1&&!video.paused&&video.muted;});
-  await page.waitForFunction(()=>document.querySelector('video.startup-media')?.currentTime>=2.25);
+  // Expect playback to reach the end of the current clip; the 96-frame/45fps
+  // startup is about 2.13s, so do not hard-code a longer playback time.
+  await page.waitForFunction(()=>{const video=document.querySelector('video.startup-media');return video instanceof HTMLVideoElement&&(video.ended||(Number.isFinite(video.duration)&&video.currentTime>=video.duration-0.05));});
   await page.screenshot({path:path.join(out,'startup.png')});
   await page.locator('.startup-splash').waitFor({state:'detached',timeout:5000});
   assert.equal(await page.locator('.shell').evaluate(node=>node.inert),false);
