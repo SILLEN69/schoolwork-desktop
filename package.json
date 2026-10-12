@@ -1,6 +1,6 @@
 {
   "name": "schoolwork-desktop",
-  "version": "0.10.1-beta.5",
+  "version": "0.10.1",
   "private": true,
   "description": "A local-first AI work assistant powered by TeachGPT",
   "main": "dist-electron/main.js",

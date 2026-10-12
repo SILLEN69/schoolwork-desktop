@@ -1,5 +1,16 @@
 # Autonomous engineering checkpoint
 
+## Beta-to-main promotion — 12 October 2026
+
+- Owner requests integrating beta into main, removing the visible startup Skip intro button, checking current Google OAuth publication and validating the combined app. This supersedes earlier beta-only/no-merge scope for this promotion; installer publication remains a separate tagged operation.
+- Preserved all five newer local OpenCode setup/checkpoint commits. Set package/lockfile to stable source version 0.10.1 and added current source notes. Existing public stable downloads and install script now consistently reference the published v0.10.0, rather than an unpublished installer.
+- Removed the intro button/CSS. The accessible dialog receives focus and retains Escape, ended/error exits, the hard deadline, reduced motion and explicit replay. The regression asserts no visible button and captures the current 2.13-second clip while playing. Isolated script fixtures now report the SchoolWork package version instead of Electron's version.
+- Passed: full Windows build; 176 unit tests; six release/asset/native-build checks; Electron motion, 12 lesson/model/audio/OAuth/Calendar/dictation/steering checks, pointer/sidebar, notification routing/fallback, agent recovery and development-launcher regressions. Real native Windows integration passed on two monitors, including capture/click/Unicode/key/scroll/UI Automation, bounded loops, saved history/attachments and Stop. Remote provider/Telegram/Google traffic in application regressions is simulated.
+- Visually inspected the button-free centered intro, narrow chat/sidebar, lessons/transcript and Settings. No clipping or renderer errors found in these captures. Existing chunk-size/dependency-comment warnings remain.
+- Local 0.10.1 installer/portable/blockmap/latest.yml packaging and installer SHA-512 integrity checks pass. This development build has no publisher Google configuration, so it is not a public shared-sign-in package. Existing release Actions retain the publisher configuration requirement. Installed SchoolWork and its user profile were preserved.
+- Live Google Cloud: SchoolWork Desktop is External / In production, with 1/100 unverified-app users. Branding/data access are unverified; branding still shows the previous homepage-ownership issue and requires re-verification. No Cloud permissions/client/review settings were changed. See docs/google-verification-status.md.
+- Promotion uses a reviewed PR and fresh CI results; no skip-ci marker is added and no release tag is pushed.
+
 ## OpenCode environment setup checkpoint — 12 October 2026
 
 - Set up the personal OpenCode (v2.0.27) environment for this repository. GitHub CLI 2.102.0 installed via winget; `gh auth login --web` completed for SILLEN69 (https protocol, token in keyring); `gh auth setup-git` configured. Repository access verified read-only (push/admin permissions, `git ls-remote`); no verification commit was published.

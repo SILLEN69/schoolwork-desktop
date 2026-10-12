@@ -1,5 +1,6 @@
 // Isolated real Electron app and IPC with simulated remote services. Never uses a personal profile.
 const { app, ipcMain, safeStorage, shell } = require('electron');
+app.getVersion = () => require('../package.json').version;
 const fs=require('node:fs'),path=require('node:path');
 const data=process.env.SCHOOLWORK_LESSON_TEST_DATA;
 if(!data || !path.isAbsolute(data)) throw new Error('Use test:lessons with an isolated test directory.');

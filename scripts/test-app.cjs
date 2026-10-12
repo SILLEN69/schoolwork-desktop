@@ -1,4 +1,6 @@
 const { app, safeStorage, Notification } = require("electron");
+// Script entrypoints otherwise report Electron's version rather than SchoolWork's.
+app.getVersion = () => require('../package.json').version;
 const fs = require("node:fs");
 const path = require("node:path");
 // Runs the real application/IPC in isolated test data. No personal data or live provider traffic.
