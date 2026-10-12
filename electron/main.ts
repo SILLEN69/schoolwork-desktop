@@ -120,10 +120,16 @@ let store: SchoolWorkStore;
 let connections:Connections;
 let vault: MemoryVault;
 let win: BrowserWindow | undefined;
-const taskNotifications=new TaskNotifications(()=>{
+const taskNotifications=new TaskNotifications((taskId)=>{
   if(!win)makeWindow();
   if(win?.isMinimized())win.restore();
   win?.show();win?.focus();
+  const task=store.getTask(taskId);
+  const target=win;
+  const send=()=>{if(task&&target&&!target.isDestroyed())target.webContents.send('notifications:event',{kind:'open',taskId,conversationId:task.conversationId});};
+  if(target?.webContents.isLoading())target.webContents.once('did-finish-load',send);else send();
+},(taskId,status)=>{
+  store?.addDiagnostic({taskId:taskId==='notification-test'?undefined:taskId,category:'notifications',message:status});
 });
 let discoveredModels: string[] = [];
 let attachments: Attachments;
@@ -425,7 +431,11 @@ function emit(task: any, type: string, payload: Record<string, unknown> = {}) {
   });
   if(type==='answer'||type==='error'){
     const current=store.getTask(task.id);
-    if(current)taskNotifications.notify(current,type,settings.get('language')==='sv');
+    if(current&&((type==='answer'&&current.state==='completed')||(type==='error'&&['waiting_retry','failed'].includes(current.state)))){
+      win?.webContents.send('notifications:event',{kind:'outcome',id:event.id,taskId:task.id,conversationId:task.conversationId,outcome:type==='answer'?'completed':'error'});
+      if(win&&!win.isFocused())win.flashFrame(true);
+      taskNotifications.notify(current,type,settings.get('language')==='sv');
+    }
   }
   const phoneSession = store.getMetadata("telegram-task:" + task.id);
   if (telegram && phoneSession && ["answer", "checkpoint"].includes(type)) {
@@ -611,6 +621,7 @@ function makeWindow() {
     },
   });
   win.webContents.setWindowOpenHandler(() => ({ action: "deny" }));
+  win.on('focus',()=>win?.flashFrame(false));
   win.webContents.on("will-navigate", (event, url) => {
     let allowed = url.startsWith("file://");
     try {
@@ -2457,6 +2468,16 @@ function registerIpc() {
         payload: JSON.parse(row.payload_json),
         text: String(JSON.parse(row.payload_json).text || ""),
       }));
+  });
+  ipcMain.handle('notifications:test',(event)=>{
+    trusted(event);
+    const toast=taskNotifications.notify({id:'notification-test',state:'completed',updatedAt:Date.now()},'answer',settings.get('language')==='sv');
+    return {requested:Boolean(toast)};
+  });
+  ipcMain.handle('notifications:settings',async(event)=>{
+    trusted(event);
+    if(process.platform!=='win32')return false;
+    await shell.openExternal('ms-settings:notifications');return true;
   });
   ipcMain.handle("settings:get", (event) => {
     trusted(event);

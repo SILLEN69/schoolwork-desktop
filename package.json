@@ -23,6 +23,7 @@
     "animation:render": "npm --prefix remotion-startup run render:startup",
     "test:motion": "npm run build && node scripts/test-ui-motion.mjs",
     "test:agent-recovery": "npm run build && node scripts/test-agent-recovery.mjs",
+    "test:notifications": "npm run build && node scripts/test-notifications.mjs",
     "check:release": "node --test scripts/check-release-config.cjs",
     "check:startup": "node --test scripts/check-startup-assets.test.mjs scripts/build-native.test.mjs"
   },

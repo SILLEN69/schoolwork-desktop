@@ -38,6 +38,7 @@ import ImageAttachments, { imageFileData } from "./ImageAttachments";
 import type { Attachment } from "../capabilities";
 import { rankTeachGPTModels } from "../modelRanking";
 import StartupIntro from './StartupIntro';
+import TaskNotices,{NotificationsSettings} from './TaskNotices';
 import './motion.css';
 type Msg = {
   role: "user" | "assistant" | "tool";
@@ -517,11 +518,11 @@ export default function App() {
       setError(e.message);
     }
   };
-  if (lessonMode) return <LessonWorkspace initialMode={lessonMode} summaryModel={settings.model} configured={settings.configured} onBack={() => setLessonMode(null)} onWork={chatId=>{setLessonMode(null);void chooseChat({id:chatId});}} />;
   return (
     <>
     {!introReady&&<StartupIntro onComplete={()=>setIntroReady(true)} swedish={isSv}/>}
-    <div className="shell" inert={!introReady}>
+      <TaskNotices swedish={isSv} onOpen={conversationId=>{setLessonMode(null);void chooseChat({id:conversationId});}}/>
+    {lessonMode?<LessonWorkspace initialMode={lessonMode} summaryModel={settings.model} configured={settings.configured} onBack={() => setLessonMode(null)} onWork={chatId=>{setLessonMode(null);void chooseChat({id:chatId});}} />:<div className="shell" inert={!introReady}>
       <aside className={"sidebar " + (sidebarCollapsed ? "collapsed" : "")}>
         <div className="brand">
           <div className="brand-mark">
@@ -1114,6 +1115,7 @@ export default function App() {
             <div className="setting-block">
               <UpdateNotice settings swedish={isSv}/>
             </div>
+            <NotificationsSettings swedish={isSv}/>
             <div className="setting-block">
               <label>{t("Startup animation", "Startanimation")}</label>
               <p>{t("A short, skippable logo intro. Reduced-motion preferences are respected.", "En kort logganimation som går att hoppa över. Anpassas efter din inställning för minskad rörelse.")}</p>
@@ -1270,7 +1272,7 @@ export default function App() {
       {showMemory && (
         <MemoryView close={() => setShowMemory(false)} language={language} />
       )}
-    </div>
+    </div>}
     </>
   );
 }

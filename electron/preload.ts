@@ -97,6 +97,13 @@ contextBridge.exposeInMainWorld("schoolwork", {
   openVault: () => ipcRenderer.invoke("memory:open-vault"),
   exportDiagnostics: (taskId: string) =>
     ipcRenderer.invoke("diagnostics:export", taskId),
+  testNotifications:()=>ipcRenderer.invoke('notifications:test'),
+  openNotificationSettings:()=>ipcRenderer.invoke('notifications:settings'),
+  onNotification:(callback:(event:any)=>void)=>{
+    const listener=(_event:Electron.IpcRendererEvent,data:unknown)=>callback(data);
+    ipcRenderer.on('notifications:event',listener);
+    return ()=>ipcRenderer.removeListener('notifications:event',listener);
+  },
   onEvent: (callback: (event: any) => void) => {
     const listener = (_event: Electron.IpcRendererEvent, data: unknown) =>
       callback(data);

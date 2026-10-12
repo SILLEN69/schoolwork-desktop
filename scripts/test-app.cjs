@@ -6,7 +6,7 @@ const dir = process.env.SCHOOLWORK_TEST_DATA;
 if (!dir) throw new Error("Use test:desktop to start the isolated fixture.");
 app.setPath("userData", dir);
 // Synthetic agent scenarios must not send unrelated Windows banners.
-Notification.isSupported=()=>false;
+if(process.env.SCHOOLWORK_TEST_NATIVE_NOTIFICATIONS!=='1')Notification.isSupported=()=>false;
 app.whenReady().then(() => {
   fs.writeFileSync(
     path.join(dir, "schoolwork-settings.json"),

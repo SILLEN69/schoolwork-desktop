@@ -70,6 +70,15 @@ Investigate stalled SchoolWork and development sessions first, then improve moti
 - Earlier pointer regression expected the old permanently hidden post-observation state; it was updated to assert the requested restored state while keeping the stricter hidden-during-capture assertions. The initial run's true-vs-false assertion was this changed expected behavior, not an ignored regression.
 - A brief deliberate hide remains during native observation/hit-testing to keep overlays out of model pixels; this does not create a second OS mouse or independent desktop.
 
+## Milestone 5: completion/error notifications (final requested scope)
+
+- Latest user instruction narrows work to finishing notifications and stopping; nothing may be published yet. All changes stay on local beta. No push, release, merge or installation was performed; the installed user application/profile were preserved.
+- Native requests now record requested, accepted, failed, unsupported and clicked outcomes without error bodies or task content. Asynchronous failure releases duplicate protection so a deliberate retry can work. Notification failure cannot change task state or interrupt execution.
+- Persisted completed/error outcomes also produce visible, dismissible notices in the app. View task and native notification clicks open the correct conversation. Unfocused windows flash the taskbar until focused. The notice listener stays mounted while navigating to lessons.
+- Settings now provides a Windows-notification test and a link to Windows notification settings. Test feedback reports a request, not guaranteed banner visibility. No Windows notification/DND setting is changed.
+- Focused verification passed: three notification unit tests; full TypeScript/frontend/backend/native build; real isolated Electron completion and provider-error outcomes, fallback notice visibility, correct conversation navigation, unavailable-native diagnostics and test-button feedback. A separate actual Windows/Electron native request emitted accepted. This proves native acceptance, not banner visibility under every user's Windows settings.
+- Reproduce: `npm test -- electron/taskNotifications.test.ts`; `npm run test:notifications`. After a current build, `node scripts/test-notifications.mjs --native` additionally requests one real Windows toast. Tests use isolated profiles and simulated provider traffic, never the personal profile/key.
+
 ## Resume commands
 
 ```powershell

@@ -20,8 +20,17 @@ it('notifies done and stopped errors once per outcome, keeps retries quiet, and 
   const toast=notifications.notify(task,'answer');notifications.notify(task,'answer');
   expect(mock.show).toHaveBeenCalledTimes(2);expect(mock.options[1].title).toContain('Task complete');
   toast!.emit('click');expect(open).toHaveBeenCalledOnce();
+  expect(open).toHaveBeenCalledWith('task');
   task.updatedAt=3;task.state='waiting_retry';notifications.notify(task,'error');
   expect(mock.show).toHaveBeenCalledTimes(3);
+});
+it('records delivery outcomes without private data and permits a retry after asynchronous native failure',()=>{
+  const report=vi.fn(),notifications=new TaskNotifications(()=>{},report),task={id:'task',state:'completed',updatedAt:1};
+  const toast=notifications.notify(task,'answer')!;
+  toast.emit('show');toast.emit('failed','private platform error');
+  expect(report.mock.calls).toEqual([['task','requested'],['task','accepted'],['task','failed']]);
+  expect(notifications.notify(task,'answer')).toBeDefined();expect(mock.show).toHaveBeenCalledTimes(2);
+  expect(()=>{const safe=new TaskNotifications(()=>{},()=>{throw new Error('logging failed');});safe.notify(task,'answer');}).not.toThrow();
 });
 it('unsupported or broken system notifications never interrupt a task',()=>{
   const notifications=new TaskNotifications(()=>{}),task={id:'task',state:'completed',updatedAt:1};
