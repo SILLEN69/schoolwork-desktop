@@ -1,0 +1,305 @@
+{
+  "duration": 34,
+  "musicDrop": 33.05,
+  "fade": [
+    33.05,
+    34
+  ],
+  "stockEffectsOnly": true,
+  "cues": [
+    {
+      "kind": "whoosh",
+      "targetTime": 2.56667,
+      "clipStartTime": 1.48585,
+      "source": "outputs\\showcase\\sound-library\\mixkit-1492.wav",
+      "gain": 0.12
+    },
+    {
+      "kind": "swish",
+      "targetTime": 6.43333,
+      "clipStartTime": 6.33354,
+      "source": "outputs\\showcase\\sound-library\\mixkit-1485.wav",
+      "gain": 0.12
+    },
+    {
+      "kind": "swish",
+      "targetTime": 10.3,
+      "clipStartTime": 10.20021,
+      "source": "outputs\\showcase\\sound-library\\mixkit-1485.wav",
+      "gain": 0.12
+    },
+    {
+      "kind": "swish",
+      "targetTime": 14.16667,
+      "clipStartTime": 14.06687,
+      "source": "outputs\\showcase\\sound-library\\mixkit-1485.wav",
+      "gain": 0.12
+    },
+    {
+      "kind": "whoosh",
+      "targetTime": 17.06667,
+      "clipStartTime": 15.98585,
+      "source": "outputs\\showcase\\sound-library\\mixkit-1492.wav",
+      "gain": 0.12
+    },
+    {
+      "kind": "whoosh",
+      "targetTime": 22.9,
+      "clipStartTime": 21.81919,
+      "source": "outputs\\showcase\\sound-library\\mixkit-1492.wav",
+      "gain": 0.12
+    },
+    {
+      "kind": "swish",
+      "targetTime": 30.13333,
+      "clipStartTime": 30.03354,
+      "source": "outputs\\showcase\\sound-library\\mixkit-1485.wav",
+      "gain": 0.12
+    },
+    {
+      "kind": "text",
+      "targetTime": 0.1,
+      "clipStartTime": 0.1,
+      "source": "outputs\\showcase\\sound-library\\kenney-interface\\Audio\\tick_001.ogg",
+      "gain": 0.075
+    },
+    {
+      "kind": "text",
+      "targetTime": 0.45,
+      "clipStartTime": 0.45,
+      "source": "outputs\\showcase\\sound-library\\kenney-interface\\Audio\\tick_001.ogg",
+      "gain": 0.075
+    },
+    {
+      "kind": "text",
+      "targetTime": 3.0,
+      "clipStartTime": 3.0,
+      "source": "outputs\\showcase\\sound-library\\kenney-interface\\Audio\\tick_001.ogg",
+      "gain": 0.075
+    },
+    {
+      "kind": "text",
+      "targetTime": 7.1,
+      "clipStartTime": 7.1,
+      "source": "outputs\\showcase\\sound-library\\kenney-interface\\Audio\\tick_001.ogg",
+      "gain": 0.075
+    },
+    {
+      "kind": "text",
+      "targetTime": 9.5,
+      "clipStartTime": 9.5,
+      "source": "outputs\\showcase\\sound-library\\kenney-interface\\Audio\\tick_001.ogg",
+      "gain": 0.075
+    },
+    {
+      "kind": "text",
+      "targetTime": 10.0,
+      "clipStartTime": 10.0,
+      "source": "outputs\\showcase\\sound-library\\kenney-interface\\Audio\\tick_001.ogg",
+      "gain": 0.075
+    },
+    {
+      "kind": "text",
+      "targetTime": 12.9,
+      "clipStartTime": 12.9,
+      "source": "outputs\\showcase\\sound-library\\kenney-interface\\Audio\\tick_001.ogg",
+      "gain": 0.075
+    },
+    {
+      "kind": "text",
+      "targetTime": 15.0,
+      "clipStartTime": 15.0,
+      "source": "outputs\\showcase\\sound-library\\kenney-interface\\Audio\\tick_001.ogg",
+      "gain": 0.075
+    },
+    {
+      "kind": "text",
+      "targetTime": 18.5,
+      "clipStartTime": 18.5,
+      "source": "outputs\\showcase\\sound-library\\kenney-interface\\Audio\\tick_001.ogg",
+      "gain": 0.075
+    },
+    {
+      "kind": "text",
+      "targetTime": 24.0,
+      "clipStartTime": 24.0,
+      "source": "outputs\\showcase\\sound-library\\kenney-interface\\Audio\\tick_001.ogg",
+      "gain": 0.075
+    },
+    {
+      "kind": "text",
+      "targetTime": 25.0,
+      "clipStartTime": 25.0,
+      "source": "outputs\\showcase\\sound-library\\kenney-interface\\Audio\\tick_001.ogg",
+      "gain": 0.075
+    },
+    {
+      "kind": "text",
+      "targetTime": 26.0,
+      "clipStartTime": 26.0,
+      "source": "outputs\\showcase\\sound-library\\kenney-interface\\Audio\\tick_001.ogg",
+      "gain": 0.075
+    },
+    {
+      "kind": "text",
+      "targetTime": 31.3,
+      "clipStartTime": 31.3,
+      "source": "outputs\\showcase\\sound-library\\kenney-interface\\Audio\\tick_001.ogg",
+      "gain": 0.075
+    },
+    {
+      "kind": "click",
+      "targetTime": 5.46667,
+      "clipStartTime": 5.46667,
+      "source": "outputs\\showcase\\sound-library\\kenney-interface\\Audio\\click_001.ogg",
+      "gain": 0.13
+    },
+    {
+      "kind": "click",
+      "targetTime": 6.93333,
+      "clipStartTime": 6.93333,
+      "source": "outputs\\showcase\\sound-library\\kenney-interface\\Audio\\click_001.ogg",
+      "gain": 0.13
+    },
+    {
+      "kind": "click",
+      "targetTime": 12.73333,
+      "clipStartTime": 12.73333,
+      "source": "outputs\\showcase\\sound-library\\kenney-interface\\Audio\\click_001.ogg",
+      "gain": 0.13
+    },
+    {
+      "kind": "click",
+      "targetTime": 16.6,
+      "clipStartTime": 16.6,
+      "source": "outputs\\showcase\\sound-library\\kenney-interface\\Audio\\click_001.ogg",
+      "gain": 0.13
+    },
+    {
+      "kind": "click",
+      "targetTime": 20.46667,
+      "clipStartTime": 20.46667,
+      "source": "outputs\\showcase\\sound-library\\kenney-interface\\Audio\\click_001.ogg",
+      "gain": 0.13
+    },
+    {
+      "kind": "click",
+      "targetTime": 28.2,
+      "clipStartTime": 28.2,
+      "source": "outputs\\showcase\\sound-library\\kenney-interface\\Audio\\click_001.ogg",
+      "gain": 0.13
+    },
+    {
+      "kind": "confirm",
+      "targetTime": 12.96667,
+      "clipStartTime": 12.96667,
+      "source": "outputs\\showcase\\sound-library\\kenney-interface\\Audio\\confirmation_001.ogg",
+      "gain": 0.12
+    },
+    {
+      "kind": "confirm",
+      "targetTime": 20.8,
+      "clipStartTime": 20.8,
+      "source": "outputs\\showcase\\sound-library\\kenney-interface\\Audio\\confirmation_001.ogg",
+      "gain": 0.12
+    },
+    {
+      "kind": "confirm",
+      "targetTime": 28.4,
+      "clipStartTime": 28.4,
+      "source": "outputs\\showcase\\sound-library\\kenney-interface\\Audio\\confirmation_001.ogg",
+      "gain": 0.12
+    },
+    {
+      "kind": "open",
+      "targetTime": 2.56667,
+      "clipStartTime": 2.56667,
+      "source": "outputs\\showcase\\sound-library\\kenney-interface\\Audio\\open_001.ogg",
+      "gain": 0.09
+    },
+    {
+      "kind": "scroll",
+      "targetTime": 14.3,
+      "clipStartTime": 14.3,
+      "source": "outputs\\showcase\\sound-library\\kenney-interface\\Audio\\scroll_001.ogg",
+      "gain": 0.07
+    },
+    {
+      "kind": "click",
+      "targetTime": 14.76,
+      "clipStartTime": 14.76,
+      "source": "outputs\\showcase\\sound-library\\kenney-interface\\Audio\\click_001.ogg",
+      "gain": 0.035
+    },
+    {
+      "kind": "click",
+      "targetTime": 14.91,
+      "clipStartTime": 14.91,
+      "source": "outputs\\showcase\\sound-library\\kenney-interface\\Audio\\click_001.ogg",
+      "gain": 0.035
+    },
+    {
+      "kind": "click",
+      "targetTime": 15.06,
+      "clipStartTime": 15.06,
+      "source": "outputs\\showcase\\sound-library\\kenney-interface\\Audio\\click_001.ogg",
+      "gain": 0.035
+    },
+    {
+      "kind": "click",
+      "targetTime": 15.21,
+      "clipStartTime": 15.21,
+      "source": "outputs\\showcase\\sound-library\\kenney-interface\\Audio\\click_001.ogg",
+      "gain": 0.035
+    },
+    {
+      "kind": "click",
+      "targetTime": 15.36,
+      "clipStartTime": 15.36,
+      "source": "outputs\\showcase\\sound-library\\kenney-interface\\Audio\\click_001.ogg",
+      "gain": 0.035
+    },
+    {
+      "kind": "click",
+      "targetTime": 15.51,
+      "clipStartTime": 15.51,
+      "source": "outputs\\showcase\\sound-library\\kenney-interface\\Audio\\click_001.ogg",
+      "gain": 0.035
+    },
+    {
+      "kind": "click",
+      "targetTime": 15.66,
+      "clipStartTime": 15.66,
+      "source": "outputs\\showcase\\sound-library\\kenney-interface\\Audio\\click_001.ogg",
+      "gain": 0.035
+    },
+    {
+      "kind": "click",
+      "targetTime": 15.81,
+      "clipStartTime": 15.81,
+      "source": "outputs\\showcase\\sound-library\\kenney-interface\\Audio\\click_001.ogg",
+      "gain": 0.035
+    },
+    {
+      "kind": "click",
+      "targetTime": 15.96,
+      "clipStartTime": 15.96,
+      "source": "outputs\\showcase\\sound-library\\kenney-interface\\Audio\\click_001.ogg",
+      "gain": 0.035
+    },
+    {
+      "kind": "click",
+      "targetTime": 16.11,
+      "clipStartTime": 16.11,
+      "source": "outputs\\showcase\\sound-library\\kenney-interface\\Audio\\click_001.ogg",
+      "gain": 0.035
+    },
+    {
+      "kind": "impact",
+      "targetTime": 0.45,
+      "clipStartTime": 0.45,
+      "source": "outputs\\showcase\\sound-library\\mixkit-3005.wav",
+      "gain": 0.075
+    }
+  ]
+}

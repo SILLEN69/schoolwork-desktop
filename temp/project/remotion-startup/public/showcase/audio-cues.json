@@ -1,0 +1,199 @@
+{
+  "bpm": 120,
+  "cuts": [
+    0,
+    2,
+    5,
+    8,
+    12,
+    16,
+    22,
+    27
+  ],
+  "events": [
+    {
+      "time": 0.1,
+      "kind": "text"
+    },
+    {
+      "time": 2.1,
+      "kind": "text"
+    },
+    {
+      "time": 1.8599999999999999,
+      "kind": "whoosh"
+    },
+    {
+      "time": 5.1,
+      "kind": "text"
+    },
+    {
+      "time": 4.86,
+      "kind": "whoosh"
+    },
+    {
+      "time": 8.1,
+      "kind": "text"
+    },
+    {
+      "time": 7.86,
+      "kind": "whoosh"
+    },
+    {
+      "time": 12.1,
+      "kind": "text"
+    },
+    {
+      "time": 11.86,
+      "kind": "whoosh"
+    },
+    {
+      "time": 16.1,
+      "kind": "text"
+    },
+    {
+      "time": 15.86,
+      "kind": "whoosh"
+    },
+    {
+      "time": 22.1,
+      "kind": "text"
+    },
+    {
+      "time": 21.86,
+      "kind": "whoosh"
+    },
+    {
+      "time": 27.1,
+      "kind": "text"
+    },
+    {
+      "time": 26.86,
+      "kind": "whoosh"
+    },
+    {
+      "time": 1.4,
+      "kind": "click"
+    },
+    {
+      "time": 3.1,
+      "kind": "click"
+    },
+    {
+      "time": 5.4,
+      "kind": "click"
+    },
+    {
+      "time": 7.8,
+      "kind": "click"
+    },
+    {
+      "time": 10.6,
+      "kind": "click"
+    },
+    {
+      "time": 15.133333,
+      "kind": "click"
+    },
+    {
+      "time": 20.0,
+      "kind": "click"
+    },
+    {
+      "time": 26.166667,
+      "kind": "click"
+    },
+    {
+      "time": 22.88,
+      "kind": "whoosh"
+    },
+    {
+      "time": 24.88,
+      "kind": "whoosh"
+    },
+    {
+      "time": 12.7,
+      "kind": "type"
+    },
+    {
+      "time": 12.83,
+      "kind": "type"
+    },
+    {
+      "time": 12.96,
+      "kind": "type"
+    },
+    {
+      "time": 13.090000000000002,
+      "kind": "type"
+    },
+    {
+      "time": 13.220000000000002,
+      "kind": "type"
+    },
+    {
+      "time": 13.350000000000003,
+      "kind": "type"
+    },
+    {
+      "time": 13.480000000000004,
+      "kind": "type"
+    },
+    {
+      "time": 13.610000000000005,
+      "kind": "type"
+    },
+    {
+      "time": 13.740000000000006,
+      "kind": "type"
+    },
+    {
+      "time": 13.870000000000006,
+      "kind": "type"
+    },
+    {
+      "time": 14.000000000000007,
+      "kind": "type"
+    },
+    {
+      "time": 14.130000000000008,
+      "kind": "type"
+    },
+    {
+      "time": 14.260000000000009,
+      "kind": "type"
+    },
+    {
+      "time": 14.39000000000001,
+      "kind": "type"
+    },
+    {
+      "time": 14.52000000000001,
+      "kind": "type"
+    },
+    {
+      "time": 14.650000000000011,
+      "kind": "type"
+    },
+    {
+      "time": 14.780000000000012,
+      "kind": "type"
+    },
+    {
+      "time": 10.95,
+      "kind": "confirm"
+    },
+    {
+      "time": 20.06,
+      "kind": "send"
+    },
+    {
+      "time": 20.65,
+      "kind": "confirm"
+    },
+    {
+      "time": 26.35,
+      "kind": "confirm"
+    }
+  ]
+}

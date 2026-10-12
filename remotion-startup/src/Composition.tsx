@@ -5,6 +5,7 @@ import {
   Interactive,
   interpolate,
   useCurrentFrame,
+  useVideoConfig,
 } from "remotion";
 
 export const MyComposition = () => (
@@ -12,9 +13,9 @@ export const MyComposition = () => (
     id="SchoolWorkStartup"
     component={SchoolWorkStartup}
     durationInFrames={96}
-    fps={30}
-    width={1280}
-    height={720}
+    fps={45}
+    width={3840}
+    height={2160}
   />
 );
 
@@ -75,6 +76,7 @@ const STARS = Array.from({ length: 16 }, (_, i) => {
 
 const SchoolWorkStartup: React.FC = () => {
   const frame = useCurrentFrame();
+  const { width, height } = useVideoConfig();
 
   // Orbits draw in, staggered
   const orbitDraw = (i: number) =>
@@ -133,8 +135,15 @@ const SchoolWorkStartup: React.FC = () => {
   const exitScale = interpolate(frame, [84, 95], [1, 1.04], clampOpts);
 
   return (
+    <div style={{position:"absolute",inset:0,backgroundColor:"#0f1213"}}>
     <AbsoluteFill
       style={{
+        width: 1280,
+        height: 720,
+        left: (width - 1280) / 2,
+        top: (height - 720) / 2,
+        transform: `scale(${Math.min(width / 1280, height / 720)})`,
+        transformOrigin: "center",
         backgroundColor: "#0f1213",
         color: CLOUD,
         alignItems: "center",
@@ -314,5 +323,6 @@ const SchoolWorkStartup: React.FC = () => {
         YOUR WORKSPACE, READY
       </Interactive.Div>
     </AbsoluteFill>
+    </div>
   );
 };

@@ -1,0 +1,65 @@
+{
+  "fps": 30,
+  "duration": 34,
+  "totalFrames": 1020,
+  "cutFrames": [
+    0,
+    77,
+    193,
+    309,
+    425,
+    512,
+    687,
+    904,
+    1020
+  ],
+  "tempoEstimateBpm": 124.1,
+  "detectedDropSeconds": 33.05,
+  "dropAccentFrame": 992,
+  "fadeMusic": [
+    33.05,
+    34.0
+  ],
+  "scenes": [
+    {
+      "scene": 1,
+      "startFrame": 0,
+      "durationFrames": 77
+    },
+    {
+      "scene": 2,
+      "startFrame": 77,
+      "durationFrames": 116
+    },
+    {
+      "scene": 3,
+      "startFrame": 193,
+      "durationFrames": 116
+    },
+    {
+      "scene": 4,
+      "startFrame": 309,
+      "durationFrames": 116
+    },
+    {
+      "scene": 5,
+      "startFrame": 425,
+      "durationFrames": 87
+    },
+    {
+      "scene": 6,
+      "startFrame": 512,
+      "durationFrames": 175
+    },
+    {
+      "scene": 7,
+      "startFrame": 687,
+      "durationFrames": 217
+    },
+    {
+      "scene": 8,
+      "startFrame": 904,
+      "durationFrames": 116
+    }
+  ]
+}

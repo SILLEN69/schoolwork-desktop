@@ -1,5 +1,13 @@
 # Autonomous engineering checkpoint
 
+## Transfer checkpoint — 12 October 2026
+
+- Owner now authorizes pushing all current beta source and media for continuation on another PC. This supersedes the earlier no-publication instruction for this source transfer only; no main merge, tag or installer release is requested.
+- Read `temp/HANDOFF.md`: all eight previously local commits, latest English/Swedish launch-ad changes, interactive scenes, CTA removal and startup 4K scaling are captured there.
+- Refreshed the current 3840x2160/45fps startup MP4, poster and source/asset manifest. `temp/project/` is a complete frozen source snapshot including working launch WAVs; `temp/videos/` holds finished exports; credentials and user profiles are excluded.
+- Vitest excludes `temp/**` to prevent duplicate snapshot tests being discovered during future work. No tests, lint or application/installer builds are run for this transfer. Push uses `[skip ci]`.
+- Canonical development stays at the repository root on beta. Future main merge/build/release instructions, prerequisites and evidence limits are in the handoff. Snapshot is for recovery, not a second implementation.
+
 Updated: 2026-10-12. Work stays on `beta`; no release, deployment, main merge or installed-app replacement is requested for this session.
 
 ## Mission and working rules

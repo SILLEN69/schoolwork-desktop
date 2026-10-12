@@ -1,10 +1,10 @@
 {
   "remotionVersion": "4.0.534",
   "sha256": {
-    "remotion-startup/src/Composition.tsx": "0c920f5ea154a9246986e26c6e9df802c3278231ef66a708fa4c16837de33c8a",
-    "remotion-startup/src/Root.tsx": "7989669de8801ac90f2b40b57bbf4494c775a4fa15e556bcb4949d98fcbd6bbe",
+    "remotion-startup/src/Composition.tsx": "22da6105cedd18a9bcf23a018d396ce54c60bb43fefa0cbe4cb4bd02a81371cd",
+    "remotion-startup/src/Root.tsx": "bc37a45d1520695eee5fd454183639855bc61c4232f2509b373d3688a65eae12",
     "remotion-startup/src/index.ts": "957e481dd33a29b4a55ae0e95dbf763b7e48c37c427ca4bd1275faf34bc07a74",
-    "src/assets/schoolwork-startup.mp4": "0f03ba9989541aae29f054a2fa0f6b6a008442eef2aa9fe92c850fe569ad80b5",
-    "src/assets/schoolwork-startup-poster.jpg": "2bab83a3ef56eebd5f027254a8979d288bea276737ab9e7ccc0a9ef4ef4b2a3e"
+    "src/assets/schoolwork-startup.mp4": "12879a511bc33cf2958d465f9bf76796f7d9d39139c6c2b5f312e60f3703806c",
+    "src/assets/schoolwork-startup-poster.jpg": "64be6a00e7250b34b5e25f613c7d09ed0afc0fd97b0a0b4ecb008af8a0cf5cf9"
   }
 }

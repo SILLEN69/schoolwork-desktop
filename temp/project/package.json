@@ -1,0 +1,108 @@
+{
+  "name": "schoolwork-desktop",
+  "version": "0.10.1-beta.5",
+  "private": true,
+  "description": "A local-first AI work assistant powered by TeachGPT",
+  "main": "dist-electron/main.js",
+  "author": "SchoolWork contributors",
+  "license": "MIT",
+  "overrides": {
+    "katex": "$katex"
+  },
+  "scripts": {
+    "dev": "vite",
+    "build": "node scripts/check-startup-assets.mjs && tsc -b && vite build && node scripts/build-desktop.mjs && node scripts/build-native.mjs",
+    "start": "electron .",
+    "dev:app": "npm run build && node scripts/start-dev.mjs",
+    "package:win": "npm run build && node scripts/package-win.mjs",
+    "test": "vitest run",
+    "test:desktop": "npm run build && node scripts/test-desktop.mjs",
+    "test:lessons": "npm run build && node scripts/test-lessons.mjs",
+    "test:pointer-ui": "npm run build && node scripts/test-pointer-ui.mjs",
+    "animation:studio": "npm --prefix remotion-startup run dev -- --no-open --port=3210",
+    "animation:render": "npm --prefix remotion-startup run render:startup",
+    "test:motion": "npm run build && node scripts/test-ui-motion.mjs",
+    "test:agent-recovery": "npm run build && node scripts/test-agent-recovery.mjs",
+    "test:notifications": "npm run build && node scripts/test-notifications.mjs",
+    "check:release": "node --test scripts/check-release-config.cjs",
+    "check:startup": "node --test scripts/check-startup-assets.test.mjs scripts/build-native.test.mjs"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/client": "2.3.1",
+    "electron-store": "^10.0.1",
+    "electron-updater": "6.8.9",
+    "katex": "^0.19.0",
+    "lucide-react": "^0.468.0",
+    "mdast-util-from-markdown": "^2.1.0",
+    "react": "^19.1.0",
+    "react-dom": "^19.1.0",
+    "react-markdown": "10.1.0",
+    "rehype-highlight": "^7.0.2",
+    "rehype-katex": "^7.0.1",
+    "remark-gfm": "4.0.1",
+    "remark-math": "^6.0.0",
+    "zod": "^4.0.0"
+  },
+  "devDependencies": {
+    "@types/node": "^24.0.0",
+    "@types/react": "^19.1.0",
+    "@types/react-dom": "^19.1.0",
+    "electron": "^44.5.1",
+    "electron-builder": "^26.0.12",
+    "esbuild": "^0.25.9",
+    "playwright": "^1.63.0",
+    "typescript": "^5.9.0",
+    "vite": "^7.1.0",
+    "vitest": "5.0.3"
+  },
+  "build": {
+    "publish": [
+      {
+        "provider": "github",
+        "owner": "SILLEN69",
+        "repo": "schoolwork-desktop",
+        "releaseType": "release"
+      }
+    ],
+    "appId": "nu.ssis.schoolwork",
+    "productName": "SchoolWork",
+    "directories": {
+      "output": "release"
+    },
+    "files": [
+      "dist/**",
+      "dist-electron/**",
+      "package.json",
+      "!**/.env*",
+      "!**/*.db"
+    ],
+    "extraResources": [
+      {
+        "from": "dist-native",
+        "to": "native",
+        "filter": [
+          "*.exe"
+        ]
+      }
+    ],
+    "win": {
+      "target": [
+        "nsis",
+        "portable"
+      ],
+      "artifactName": "SchoolWork-${version}-${arch}.${ext}"
+    },
+    "nsis": {
+      "artifactName": "SchoolWork-${version}-${arch}-setup.${ext}",
+      "oneClick": false,
+      "perMachine": false,
+      "allowToChangeInstallationDirectory": true
+    },
+    "portable": {
+      "artifactName": "SchoolWork-${version}-${arch}-portable.${ext}"
+    }
+  },
+  "engines": {
+    "node": ">=24.0.0"
+  }
+}
