@@ -40,7 +40,12 @@ export function Pointer({points,clicks=[],bubble}:{points:{frame:number;x:number
  const at=clicks.find(click=>frame>=click&&frame<click+20),pulse=at===undefined?0:frame-at;
  return <div style={{position:'absolute',left:interpolate(frame,fs,xs,{...clamp,easing:ease}),top:interpolate(frame,fs,ys,{...clamp,easing:ease}),zIndex:20,pointerEvents:'none'}}>
  {at!==undefined&&<div style={{position:'absolute',width:80,height:80,left:-40,top:-40,borderRadius:100,border:'3px solid #c7f173',scale:interpolate(pulse,[0,20],[.3,1.4],clamp),opacity:interpolate(pulse,[0,20],[.8,0],clamp)}}/>}
- <svg width="50" height="60" viewBox="0 0 40 48" style={{filter:'drop-shadow(0 3px 4px #0005)'}}><path d="M3 2 5 38 15 29 24 44 32 39 23 24 37 23Z" fill="#C7F173" stroke="#223016" strokeWidth="2.4" strokeLinejoin="round"/><rect x="11" y="12" width="7" height="7" rx="2" fill="none" stroke="#223016" strokeWidth="1.3"/><rect x="16" y="17" width="7" height="7" rx="2" fill="none" stroke="#223016" strokeWidth="1.3"/></svg>
+ <svg width="46" height="56" viewBox="0 0 40 48" style={{filter:'drop-shadow(0 2px 3px #16351c50)',scale:at===undefined?1:interpolate(pulse,[0,3,8],[1,.94,1],clamp),transformOrigin:'4px 3px'}}>
+ <defs><linearGradient id="schoolwork-cursor" x1="0" y1="0" x2="1" y2="1"><stop stopColor="#dcffb3"/><stop offset="1" stopColor="#a5e85d"/></linearGradient><radialGradient id="schoolwork-cursor-halo"><stop stopColor="#baf57a" stopOpacity=".25"/><stop offset="1" stopColor="#baf57a" stopOpacity="0"/></radialGradient></defs>
+ <circle cx="14" cy="18" r="18" fill="url(#schoolwork-cursor-halo)"/>
+ <path d="M4 3c-.5-.6-1.4-.2-1.4.6l1.7 32.1c.1 1.1 1.4 1.6 2.2.9l8.1-7.7 7.7 13.7c.5.8 1.5 1.1 2.3.6l5.2-3c.8-.5 1.1-1.5.6-2.3L23 24.2l11.1-.3c1.1 0 1.6-1.4.8-2.1L4 3Z" fill="url(#schoolwork-cursor)" stroke="#24502b" strokeWidth="1.5" strokeLinejoin="round"/>
+ <path d="m5.3 6 1.4 25" stroke="#f4ffe4" strokeWidth="1.3" strokeLinecap="round" opacity=".7"/>
+ </svg>
  {bubble&&<div style={{position:'absolute',left:110,top:-15,width:300,padding:'14px 18px',borderRadius:'18px 18px 18px 3px',fontSize:25,lineHeight:1.3,background:'#f1f5eadd',color:'#25301e',boxShadow:'0 4px 24px #0002'}}>{bubble}</div>}
  </div>;
 }
