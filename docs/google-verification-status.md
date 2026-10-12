@@ -6,6 +6,7 @@ Last checked live in Google Cloud Console: 12 October 2026 (Europe/Stockholm).
 
 - Project: `schoolwork-desktop` (SchoolWork Desktop).
 - Audience: External. Publishing status: **In production**.
+- The SchoolWork Windows Desktop OAuth client already has **Use this client for an AI-powered agent** checked. Client classification is separate from branding/scope verification.
 - Google still displays **1 user / 100 user cap** for unapproved sensitive/restricted scopes.
 - Verification Center says branding is not shown to users and data access is not verified. Preparing scope verification is disabled until branding is verified and published.
 - Branding's View issues panel still shows the previous homepage-ownership failure and offers a re-verification request. No new review was submitted during this read-only check.

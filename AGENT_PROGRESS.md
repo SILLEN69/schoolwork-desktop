@@ -10,6 +10,7 @@
 - Local 0.10.1 installer/portable/blockmap/latest.yml packaging and installer SHA-512 integrity checks pass. This development build has no publisher Google configuration, so it is not a public shared-sign-in package. Existing release Actions retain the publisher configuration requirement. Installed SchoolWork and its user profile were preserved.
 - Live Google Cloud: SchoolWork Desktop is External / In production, with 1/100 unverified-app users. Branding/data access are unverified; branding still shows the previous homepage-ownership issue and requires re-verification. No Cloud permissions/client/review settings were changed. See docs/google-verification-status.md.
 - Promotion uses a reviewed PR and fresh CI results; no skip-ci marker is added and no release tag is pushed.
+- PR #3's first Linux checks passed; hosted Windows hit the batch-launcher test's 5-second Vitest deadline before its own 10-second command budget. The test now allows 30 seconds including cold PowerShell startup/cleanup, with exit-status/literal-argument/injection assertions unchanged. SchoolWork's current Desktop OAuth client is already marked for an AI-powered agent. Concurrent uncommitted animation/agent-skill files are preserved and excluded from this promotion.
 
 ## OpenCode environment setup checkpoint — 12 October 2026
 

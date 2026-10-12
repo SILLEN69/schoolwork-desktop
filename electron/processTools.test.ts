@@ -14,7 +14,7 @@ it.skipIf(process.platform!=='win32')('runs a Windows batch launcher in a spaced
     expect(r.data.exitCode).toBe(7);expect(r.ok).toBe(false);
     await expect(executeProcess('run_process',{executable,args:['& echo injected']},context(),()=>{})).rejects.toThrow('shell metacharacters');
   } finally {await fs.rm(dir,{recursive:true,force:true});}
-});
+}, 30_000); // Cold hosted PowerShell startup must fit the command's own 10s budget plus cleanup.
 it('passes arguments without shell interpretation and streams real output', async () => {
   const output: string[] = [];
   const r = await executeProcess('run_process', { executable: process.execPath, args: ['-e', 'console.log(process.argv[1])', 'spaces & symbols $value'] }, context(), text => output.push(text));
