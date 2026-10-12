@@ -1,0 +1,12 @@
+/* Short native UI transitions: only opacity/transform, never delays on tool input. */
+@keyframes schoolwork-enter{from{opacity:0;translate:0 6px}to{opacity:1;translate:0 0}}
+.settings-modal,.memory-window,.calendar-dialog{animation:schoolwork-enter 180ms cubic-bezier(.2,.8,.2,1) both}
+.conversation .message,.conversation .execution-log{animation:schoolwork-enter 160ms ease-out both}
+.new-chat,.nav-item,.history-row,.send,.primary-btn{transition:background-color 150ms,border-color 150ms,color 150ms,scale 120ms ease-out}
+.new-chat:active,.nav-item:active,.history-row:active,.send:active:not(:disabled),.primary-btn:active:not(:disabled){scale:.985}
+@media(prefers-reduced-motion:reduce){
+  .settings-modal,.memory-window,.calendar-dialog,.conversation .message,.conversation .execution-log{animation:none}
+  .sidebar,.right-panel,.new-chat,.nav-item,.history-row,.send,.primary-btn{transition:none}
+  .new-chat:active,.nav-item:active,.history-row:active,.send:active,.primary-btn:active{scale:1}
+  .spinner,.spin,.recording-dot{animation:none}
+}

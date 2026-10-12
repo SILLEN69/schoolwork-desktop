@@ -1,5 +1,17 @@
 import { expect, it } from 'vitest';
 import { ProgressGuard, capabilityInstructions, isDesktopAutomationCommand } from './progressGuard';
+it('bounds repeated unchanged excerpts across unrelated reads and allows changed content and ranges',()=>{
+ const g=new ProgressGuard();const file={path:'app.ts',sha256:'one',startLine:1,endLine:20,text:'excerpt'};
+ expect(g.observe('read_file',{}, {ok:true,data:file})).toBeUndefined();
+ g.observe('read_file',{}, {ok:true,data:file});
+ expect(g.observe('read_files',{}, {ok:true,data:{files:[file]}})?.stop).toBe(false);
+ g.observe('read_file',{}, {ok:true,data:{...file,path:'other.ts'}});
+ for(let i=0;i<4;i++)g.observe('read_file',{}, {ok:true,data:file});
+ expect(g.observe('read_file',{}, {ok:true,data:file})?.stop).toBe(true);
+ expect(g.observe('read_file',{}, {ok:true,data:{...file,sha256:'two'}})).toBeUndefined();
+ expect(g.observe('read_file',{}, {ok:true,data:{...file,startLine:21,endLine:40}})).toBeUndefined();
+ g.observe('edit_file',{}, {ok:true});expect(g.observe('read_file',{}, {ok:true,data:file})).toBeUndefined();
+});
 it('stops repeating a passing check and resets after a new edit',()=>{
  const g=new ProgressGuard(),args={executable:'node',args:['app.check.js'],purpose:'test'},result={ok:true,data:{exitCode:0}};
  expect(g.observe('run_process',args,result)).toBeUndefined();expect(g.observe('run_process',args,result)?.stop).toBe(false);g.observe('run_process',args,result);expect(g.observe('run_process',args,result)?.stop).toBe(true);

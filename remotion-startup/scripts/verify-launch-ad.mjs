@@ -1,0 +1,23 @@
+import {spawnSync} from 'node:child_process';
+import {createHash} from 'node:crypto';
+import {readFile,writeFile} from 'node:fs/promises';
+import path from 'node:path';
+const edition=process.argv.find(a=>a.startsWith('--edition='))?.slice(10)??'';
+if(edition&&!/^[a-z0-9-]{1,32}$/.test(edition))throw new Error('Invalid edition name');
+const suffix=edition?`-${edition}`:'';
+const final=path.resolve(`../../showcase/SchoolWork-Launch-Ad-Landscape${suffix}.mp4`);
+const binary=name=>path.resolve(`node_modules/@remotion/compositor-win32-x64-msvc/${name}.exe`);
+const run=(name,args)=>{
+ const r=spawnSync(binary(name),args,{encoding:'utf8',windowsHide:true});
+ if(r.status!==0)throw new Error(`${name} failed: ${r.stderr}`);
+ return r.stdout;
+};
+const probe=JSON.parse(run('ffprobe',['-v','error','-show_entries','format=duration,size:stream=codec_name,codec_type,width,height,avg_frame_rate,nb_frames,sample_rate,channels,duration','-of','json',final]));
+const video=probe.streams.find(s=>s.codec_type==='video'),audio=probe.streams.find(s=>s.codec_type==='audio');
+if(video.width!==1920||video.height!==1080||video.avg_frame_rate!=='30/1'||Number(video.nb_frames)!==1020)throw new Error('Video dimensions, frame rate, or frame count mismatch');
+if(Number(probe.format.duration)!==34||audio.sample_rate!=='48000'||audio.channels!==2)throw new Error('Duration or audio format mismatch');
+run('ffmpeg',['-hide_banner','-v','error','-err_detect','explode','-i',final,'-c:v','libx264','-preset','ultrafast','-c:a','pcm_s16le','-f','null','-']);
+const hash=createHash('sha256').update(await readFile(final)).digest('hex');
+const result={...probe,fullDecode:'passed',sha256:hash};
+await writeFile(path.resolve(`../../showcase/launch-verification${suffix}.json`),JSON.stringify(result,null,2));
+console.log(JSON.stringify(result,null,2));

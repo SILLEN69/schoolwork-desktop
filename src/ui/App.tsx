@@ -37,6 +37,9 @@ import UpdateNotice from './UpdateNotice';
 import ImageAttachments, { imageFileData } from "./ImageAttachments";
 import type { Attachment } from "../capabilities";
 import { rankTeachGPTModels } from "../modelRanking";
+import StartupIntro from './StartupIntro';
+import TaskNotices from './TaskNotices';
+import './motion.css';
 type Msg = {
   role: "user" | "assistant" | "tool";
   content: string;
@@ -67,6 +70,8 @@ const defaults = [
   "Meta-Llama-3.3-70B-Instruct-AWQ",
 ];
 export default function App() {
+  const [introReady,setIntroReady]=useState(false);
+  const [introPreview,setIntroPreview]=useState(false);
   const [id, setId] = useState(crypto.randomUUID()),
     [messages, setMessages] = useState<Msg[]>([]),
     [draft, setDraft] = useState(""),
@@ -334,7 +339,6 @@ export default function App() {
     setLoading(false);
     setId(c.id);
     selectedId.current = c.id;
-    setShowHistory(false);
     setError("");
     try {
       const full = await window.schoolwork.getChat(c.id);
@@ -515,9 +519,11 @@ export default function App() {
       setError(e.message);
     }
   };
-  if (lessonMode) return <LessonWorkspace initialMode={lessonMode} summaryModel={settings.model} configured={settings.configured} onBack={() => setLessonMode(null)} onWork={chatId=>{setLessonMode(null);void chooseChat({id:chatId});}} />;
   return (
-    <div className="shell">
+    <>
+    {!introReady&&<StartupIntro onComplete={()=>{setIntroReady(true);setIntroPreview(false);}} swedish={isSv} preview={introPreview}/>}
+      <TaskNotices swedish={isSv} onOpen={conversationId=>{setLessonMode(null);void chooseChat({id:conversationId});}}/>
+    {lessonMode?<LessonWorkspace initialMode={lessonMode} summaryModel={settings.model} configured={settings.configured} onBack={() => setLessonMode(null)} onWork={chatId=>{setLessonMode(null);void chooseChat({id:chatId});}} />:<div className="shell" inert={!introReady}>
       <aside className={"sidebar " + (sidebarCollapsed ? "collapsed" : "")}>
         <div className="brand">
           <div className="brand-mark">
@@ -555,7 +561,7 @@ export default function App() {
             <ChevronRight size={14} className="nav-end" />
           </button>
         </div>
-        <button className="nav-item" onClick={() => setLessonMode("lesson")}><GraduationCap size={16}/><span>{t("Follow a lesson", "Följ en lektion")}</span></button>
+        <button className="nav-item lesson-nav" onClick={() => setLessonMode("lesson")}><GraduationCap size={16}/><span>{t("Follow a lesson", "Följ en lektion")}</span></button>
         <button
           className="nav-item memory-nav"
           onClick={() => setShowMemory(true)}
@@ -564,7 +570,7 @@ export default function App() {
           <span>{t("Memory vault", "Minnesvalv")}</span>
         </button>
         {showHistory && (
-          <div className="history-list">
+          <div className="history-list" role="region" aria-label={t("Recent chats", "Senaste chattar")}>
             {chats.map((c) => (
               <button
                 key={c.id}
@@ -666,18 +672,9 @@ export default function App() {
               <div className="welcome-orb">
                 <Workflow size={25} />
               </div>
-              <div className="eyebrow">
-                {t("YOUR WORKSPACE, READY", "DIN ARBETSYTA ÄR REDO")}
-              </div>
               <h1>
                 {t("What would you like to get done?", "Vad vill du få gjort?")}
               </h1>
-              <p>
-                {t(
-                  "Research a question, build something, or work through files. SchoolWork can plan the steps and carry the task through.",
-                  "Undersök en fråga, bygg något eller arbeta med filer. SchoolWork kan planera stegen och utföra uppgiften.",
-                )}
-              </p>
               <div className="prompt-grid">
                 <button
                   onClick={() =>
@@ -1026,12 +1023,6 @@ export default function App() {
             </div>
           </div>
           <div className="footer-note">
-            <Shield size={12} />
-            {t(
-              "Your TeachGPT key stays encrypted on this device.",
-              "Din TeachGPT-nyckel krypteras på den här enheten.",
-            )}
-            <span>·</span>
             <button
               onClick={() => {
                 const next = language === "en" ? "sv" : "en";
@@ -1074,10 +1065,6 @@ export default function App() {
             onCapture={addCapture}
             onStop={() => void stopControl()}
           />
-          <div className="panel-bottom">
-            <Shield size={14} />
-            {t("School inference · Local files", "Skolans AI · Lokala filer")}
-          </div>
         </aside>
       )}
       {showSettings && (
@@ -1111,13 +1098,11 @@ export default function App() {
               <UpdateNotice settings swedish={isSv}/>
             </div>
             <div className="setting-block">
+              <label>{t("Startup animation", "Startanimation")}</label>
+              <button className="folder-choose" onClick={()=>{setShowSettings(false);setIntroPreview(true);setIntroReady(false);}}>{t("Play startup animation", "Visa startanimation")}</button>
+            </div>
+            <div className="setting-block">
               <label>{t("TeachGPT API key", "TeachGPT API-nyckel")}</label>
-              <p>
-                {t(
-                  "Stored encrypted on this Windows device. It is sent only to TeachGPT.",
-                  "Lagrats krypterat på den här Windows-enheten. Skickas endast till TeachGPT.",
-                )}
-              </p>
               <div className="key-row">
                 <input
                   type="password"
@@ -1126,8 +1111,8 @@ export default function App() {
                   placeholder={
                     settings.configured
                       ? t(
-                          "Key is configured · enter a new key to replace",
-                          "Nyckel konfigurerad · ange ny för att byta",
+                          "Replace key",
+                          "Byt nyckel",
                         )
                       : "Paste your TeachGPT API key"
                   }
@@ -1154,12 +1139,6 @@ export default function App() {
             </div>
             <div className="setting-block">
               <label>{t("Default model", "Standardmodell")}</label>
-              <p>
-                {t(
-                  "School-hosted models available through your TeachGPT account. Experimental models may be unavailable.",
-                  "Skolhostade modeller via ditt TeachGPT-konto. Experimentella modeller kan vara otillgängliga.",
-                )}
-              </p>
               <select
                 value={settings.model}
                 aria-label={t("Default model", "Standardmodell")}
@@ -1177,15 +1156,9 @@ export default function App() {
               </select>
               <p className="model-rank-note">
                 {t(
-                  "TeachGPT models ranked by the Artificial Analysis Intelligence Index where a matching entry exists. Qwen’s 34 is its highest tested reasoning setting; the exact TeachGPT preset may differ. This general index is a guide for complex project work, not a coding-success guarantee.",
-                  "TeachGPT-modeller rangordnade efter Artificial Analysis Intelligence Index där en matchning finns. Qwens 34 är högsta testade resonemangsläge; TeachGPT-inställningen kan skilja sig. Indexet är en generell vägledning för större projekt, inte en garanti för kodningsresultat.",
+                  "AA ranking · 5 Oct 2026 · TeachGPT settings may differ.",
+                  "AA-rankning · 5 okt 2026 · TeachGPT-inställningar kan skilja sig.",
                 )}{" "}
-                <span>
-                  {t(
-                    "Source checked 2026-10-05: artificialanalysis.ai/leaderboards/models",
-                    "Källa kontrollerad 2026-10-05: artificialanalysis.ai/leaderboards/models",
-                  )}
-                </span>
               </p>
             </div>
             <DesktopSettings
@@ -1201,8 +1174,8 @@ export default function App() {
               <label>{t("Working folder", "Arbetsmapp")}</label>
               <p>
                 {t(
-                  "Default folder for new tasks. Commands run with your Windows user permissions, not in a sandbox.",
-                  "Standardmapp för nya uppgifter. Kommandon körs med dina Windows-behörigheter, inte i en sandlåda.",
+                  "Commands use your Windows permissions; they are not sandboxed.",
+                  "Kommandon använder dina Windows-behörigheter utan sandlåda.",
                 )}
               </p>
               <select
@@ -1231,8 +1204,8 @@ export default function App() {
               </select>
               <p>
                 {t(
-                  "Changes apply to new tasks. Existing tasks keep their original access.",
-                  "Ändringar gäller nya uppgifter. Befintliga uppgifter behåller sin ursprungliga åtkomst.",
+                  "Applies to new tasks.",
+                  "Gäller nya uppgifter.",
                 )}
               </p>
               <button
@@ -1248,19 +1221,13 @@ export default function App() {
                 <span className="change-link">{t("Change", "Ändra")}</span>
               </button>
             </div>
-            <div className="settings-foot">
-              <Shield size={14} />
-              {t(
-                "SchoolWork is independent software. Your prompts and file excerpts go to TeachGPT for inference.",
-                "SchoolWork är fristående programvara. Dina instruktioner och filutdrag skickas till TeachGPT för AI-bearbetning.",
-              )}
-            </div>
           </section>
         </div>
       )}
       {showMemory && (
         <MemoryView close={() => setShowMemory(false)} language={language} />
       )}
-    </div>
+    </div>}
+    </>
   );
 }

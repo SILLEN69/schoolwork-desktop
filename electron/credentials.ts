@@ -10,5 +10,6 @@ export function encryptTeachGPTCredential(value: string): string {
 export function readTeachGPTCredential(encrypted: string | undefined): string {
   if (!safeStorage.isEncryptionAvailable()) throw new Error('Secure credential storage is unavailable on this device.');
   if (!encrypted) throw new Error('Add your TeachGPT API key in Settings.');
-  return safeStorage.decryptString(Buffer.from(encrypted, 'base64'));
+  try{return safeStorage.decryptString(Buffer.from(encrypted, 'base64'));}
+  catch{throw new Error('Saved TeachGPT key cannot be read in this profile. Add the key again in Settings.');}
 }

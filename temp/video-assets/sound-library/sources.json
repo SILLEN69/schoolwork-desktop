@@ -1,0 +1,34 @@
+{
+  "kenney": {
+    "source": "https://kenney.nl/assets/interface-sounds",
+    "download": "https://kenney.nl/media/pages/assets/interface-sounds/fa43c1dd4d-1677589452/kenney_interface-sounds.zip",
+    "license": "CC0",
+    "archiveSha256": "f2193d072726d6758a5f7871b2dcc54dcce0d5c35c6f0a62f92549b327c81232"
+  },
+  "mixkit": [
+    {
+      "id": 1492,
+      "source": "https://assets.mixkit.co/active_storage/sfx/1492/1492.wav",
+      "file": "mixkit-1492.wav",
+      "bytes": 235384,
+      "sha256": "02b8cd40b3761288d54f4d6706983a2f8c110182b669ae2cdf9aab02935a4e7a",
+      "license": "https://mixkit.co/license/modal/sfxFree/"
+    },
+    {
+      "id": 1485,
+      "source": "https://assets.mixkit.co/active_storage/sfx/1485/1485.wav",
+      "file": "mixkit-1485.wav",
+      "bytes": 126926,
+      "sha256": "706a25a0fba25d317071a441c1e09737aef64b4ac2618f59197d4ca735e6302f",
+      "license": "https://mixkit.co/license/modal/sfxFree/"
+    },
+    {
+      "id": 3005,
+      "source": "https://assets.mixkit.co/active_storage/sfx/3005/3005.wav",
+      "file": "mixkit-3005.wav",
+      "bytes": 173318,
+      "sha256": "2ae8c9395cb02fec01d1c24ba85e2251adde5a57b34ca890247d2ecd5bc12a83",
+      "license": "https://mixkit.co/license/modal/sfxFree/"
+    }
+  ]
+}

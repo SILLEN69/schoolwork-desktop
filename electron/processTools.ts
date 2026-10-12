@@ -6,6 +6,16 @@ import { resolveFile, type FileContext } from './projectTools';
 const common = { cwd: z.string().max(4096).optional(), timeoutMs: z.number().int().min(1000).max(600000).default(120000) };
 type Session = { owner: string; child: ChildProcess; output: string; exitCode: number | null; running: boolean; cwd: string };
 const sessions = new Map<string, Session>();
+function batchLaunch(executable:string, args:string[]) {
+  // Batch launchers cannot be passed directly to CreateProcess. PowerShell's
+  // literal invocation preserves spaces; reject cmd metacharacters rather than
+  // accidentally giving an argument a second meaning inside the batch shell.
+  if ([executable,...args].some(value=>/[&|<>^%!"\r\n\0]/.test(value)))
+    throw new Error('Windows batch arguments contain shell metacharacters. Use a native executable with separate arguments, or an explicit run_powershell command.');
+  const literal=(value:string)=>"'"+value.replace(/'/g,"''")+"'";
+  const script=`$ErrorActionPreference='Stop'; try { & ${literal(executable)} ${args.map(literal).join(' ')}; exit $LASTEXITCODE } catch { [Console]::Error.WriteLine($_); exit 1 }`;
+  return {executable:'powershell.exe',argv:['-NoLogo','-NoProfile','-NonInteractive','-EncodedCommand',Buffer.from(script,'utf16le').toString('base64')]};
+}
 function killTree(child: ChildProcess) {
   if (!child.pid) return;
   if (process.platform === 'win32') { const killer = spawn('taskkill.exe', ['/PID', String(child.pid), '/T', '/F'], { windowsHide: true }); killer.on('error', () => child.kill()); }
@@ -19,7 +29,7 @@ export const processInputs = {
   read_process: z.object({ sessionId: z.string().uuid() }),
   stop_process: z.object({ sessionId: z.string().uuid() }),
 };
-export const processToolSchemas = Object.entries(processInputs).map(([name, schema]) => ({ type: 'function', function: { name, description: name === 'start_process' ? 'Start a background development server and return a sessionId. Use read_process to inspect output, check_preview to verify readiness, and stop_process when no longer needed. Max 4 live sessions per conversation. node uses the bundled Electron Node runtime.' : name === 'read_process' ? 'Read bounded output and exit status from a server started in this conversation.' : name === 'stop_process' ? 'Stop an app-owned server and its child processes by sessionId.' : name === 'run_process' ? 'Run an executable directly with a separate argument array, no shell quoting. Prefer for node, python, git and test runners. Select build/test/lint purpose for an actual verification command, never for echo or a version check. Streams terminal output. On Windows use run_powershell for npm.cmd scripts.' : 'Run PowerShell commands with an optional working directory and streamed output. Uses command mode, no temporary .ps1 file or execution-policy change. Commands run with Windows user permissions, not a sandbox.', parameters: z.toJSONSchema(schema) } }));
+export const processToolSchemas = Object.entries(processInputs).map(([name, schema]) => ({ type: 'function', function: { name, description: name === 'start_process' ? 'Start a background development server and return a sessionId. Use read_process to inspect output, check_preview to verify readiness, and stop_process when no longer needed. Max 4 live sessions per conversation. node uses the bundled Electron Node runtime.' : name === 'read_process' ? 'Read bounded output and exit status from a server started in this conversation.' : name === 'stop_process' ? 'Stop an app-owned server and its child processes by sessionId.' : name === 'run_process' ? 'Run an executable directly with a separate argument array, no shell quoting. Prefer for node, python, git and test runners. Select build/test/lint purpose for an actual verification command, never for echo or a version check. Streams terminal output. Windows .cmd/.bat launchers support plain arguments, including npm.cmd scripts. Batch-shell metacharacters require a native executable or explicit run_powershell command.' : 'Run PowerShell commands with an optional working directory and streamed output. Uses command mode, no temporary .ps1 file or execution-policy change. Commands run with Windows user permissions, not a sandbox.', parameters: z.toJSONSchema(schema) } }));
 export async function executeProcess(name: keyof typeof processInputs, raw: unknown, ctx: FileContext & { owner?: string }, progress: (text: string) => void) {
   if (name === 'read_process' || name === 'stop_process') {
     const { sessionId } = processInputs[name].parse(raw); const session = sessions.get(sessionId);
@@ -30,8 +40,11 @@ export async function executeProcess(name: keyof typeof processInputs, raw: unkn
   const args: any = processInputs[name].parse(raw); const cwd = await resolveFile(ctx, args.cwd || '.');
   ctx.signal.throwIfAborted();
   const bundledNode = args.executable === 'node' && !!process.versions.electron;
-  const executable = name === 'run_powershell' ? 'powershell.exe' : bundledNode ? process.execPath : args.executable;
-  const argv = name === 'run_powershell' ? ['-NoLogo', '-NoProfile', '-NonInteractive', '-Command', `$ErrorActionPreference='Stop'; try { & { ${args.command}\n }; if ($LASTEXITCODE -ne $null) { exit $LASTEXITCODE } } catch { [Console]::Error.WriteLine($_); exit 1 }`] : args.args;
+  let executable = name === 'run_powershell' ? 'powershell.exe' : bundledNode ? process.execPath : args.executable;
+  let argv = name === 'run_powershell' ? ['-NoLogo', '-NoProfile', '-NonInteractive', '-Command', `$ErrorActionPreference='Stop'; try { & { ${args.command}\n }; if ($LASTEXITCODE -ne $null) { exit $LASTEXITCODE } } catch { [Console]::Error.WriteLine($_); exit 1 }`] : args.args;
+  if (process.platform==='win32' && name!=='run_powershell' && /\.(?:cmd|bat)$/i.test(executable)) {
+    ({executable,argv}=batchLaunch(executable,argv));
+  }
   // Windows PowerShell requires its module search path to initialize; retain it without inheriting credentials.
   const env = Object.fromEntries(['SystemRoot','WINDIR','TEMP','TMP','USERPROFILE','PATH','PATHEXT','APPDATA','LOCALAPPDATA','HOME','LANG','PSModulePath'].filter(k => process.env[k]).map(k => [k, process.env[k]! ]));
   if (bundledNode) env.ELECTRON_RUN_AS_NODE = '1';

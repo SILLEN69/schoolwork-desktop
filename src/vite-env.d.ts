@@ -113,6 +113,9 @@ interface Window {
     memoryGraph: (input?: any) => Promise<any>;
     openVault: () => Promise<string>;
     exportDiagnostics: (taskId: string) => Promise<string | null>;
+    testNotifications:()=>Promise<{requested:boolean}>;
+    openNotificationSettings:()=>Promise<boolean>;
+    onNotification:(cb:(event:{kind:'open'|'outcome';id?:string;taskId:string;conversationId:string;outcome?:'completed'|'error'})=>void)=>()=>void;
     onEvent: (cb: (e: any) => void) => () => void;
   };
 }

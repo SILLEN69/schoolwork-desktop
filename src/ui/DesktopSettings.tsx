@@ -43,8 +43,8 @@ export default function DesktopSettings({
       <label>{t("Applications & screen", "Appar och skärm")}</label>
       <p>
         {t(
-          "All desktop tools are available by default, without confirmation dialogs. The AI can release screen input when finished; your Stop always wins. You can restrict access below.",
-          "Alla skärmverktyg är tillgängliga som standard, utan bekräftelser. AI:n kan släppa skärminmatning när den är klar; ditt Stopp gäller alltid. Du kan begränsa åtkomst nedan.",
+          "Choose what the AI can control. Stop: Ctrl + Alt + Esc.",
+          "Välj vad AI:n får styra. Stopp: Ctrl + Alt + Esc.",
         )}
       </p>
       {capabilities && (
@@ -64,8 +64,8 @@ export default function DesktopSettings({
           </label>
           <p>
             {t(
-              "All-app mode removes the app allowlist. It does not bypass UAC, the lock screen, protected video, or higher-integrity windows. Stop remains available.",
-              "Alla-appar-läget tar bort applistan. Det kringgår inte UAC, låsskärmen, skyddad video eller högre behörigheter. Stopp fungerar fortfarande.",
+              "Does not bypass Windows security or administrator permissions.",
+              "Kringgår inte Windows-skydd eller administratörsbehörigheter.",
             )}
           </p>
           {(
@@ -136,8 +136,8 @@ export default function DesktopSettings({
       )}
       <p>
         {t(
-          "These switches govern desktop tools. PowerShell and process tools still have your Windows user permissions.",
-          "Inställningarna styr skärmverktygen. PowerShell och processverktyg körs fortfarande med dina Windows-behörigheter.",
+          "Screen controls only; commands retain your Windows permissions.",
+          "Gäller skärmverktyg; kommandon behåller dina Windows-behörigheter.",
         )}
       </p>
       <button
@@ -167,17 +167,10 @@ export default function DesktopSettings({
           </p>
         ))}
       </details>
-      <p>
-        {t(
-          "Learns successful primitive recoveries after a fresh observation. Patterns retain app identity, monitor layout and task evidence, never screenshots or typed text. They are hints to revalidate, not self-modifying code or permission.",
-          "Lär sig lyckade verktygsåterhämtningar efter en ny observation. Mönster sparar app, skärmlayout och uppgiftsevidens — inte skärmbilder eller skriven text. De måste kontrolleras igen och ändrar inte kod eller behörighet.",
-        )}
-      </p>
       <label>{t("Image understanding", "Bildförståelse")}</label>
       <p>
         {t("Vision support", "Bildstöd")}:{" "}
         {profile?.status || t("not tested", "inte testat")}
-        {profile?.detail && " · " + profile.detail}
       </p>
       <button
         className="panel-action"

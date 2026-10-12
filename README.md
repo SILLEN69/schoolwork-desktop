@@ -20,7 +20,7 @@ The 0.7 release adds bounded observation loops, one-call memory saves, chronolog
 
 Version 0.8.1 fixes desktop action handoff through file dialogs and provides [in-app update prompts](docs/release-0.8.md), with distinct release/network errors. **Install the latest release manually if upgrading from 0.7 or earlier**; 0.8.0 installations can use the complete GitHub update feed. Portable builds continue to use GitHub downloads. For sharing with a teacher, read the [pilot guide and deployment limits](docs/teacher-pilot.md).
 
-**[Installer and portable downloads](https://github.com/SILLEN69/schoolwork-desktop/releases/tag/v0.9.0)** · **[Installation script](Install-SchoolWork.ps1)** · **[Source setup](#run-the-latest-source)** · **[Report a problem](https://github.com/SILLEN69/schoolwork-desktop/issues)**
+**[Installer and portable downloads](https://github.com/SILLEN69/schoolwork-desktop/releases/tag/v0.10.0)** · **[Installation script](Install-SchoolWork.ps1)** · **[Source setup](#run-the-latest-source)** · **[Report a problem](https://github.com/SILLEN69/schoolwork-desktop/issues)**
 
 ![SchoolWork showing a physics explanation, rendered maths and Python code in its chat workspace](docs/images/workspace.png)
 
@@ -65,9 +65,9 @@ Current download links:
 
 | File | Purpose |
 |---|---|
-| [SchoolWork 0.9.0 installer](https://github.com/SILLEN69/schoolwork-desktop/releases/download/v0.9.0/SchoolWork-0.9.0-x64-setup.exe) | Normal per-user installation; no developer tools needed to open the app. |
-| [SchoolWork 0.9.0 portable](https://github.com/SILLEN69/schoolwork-desktop/releases/download/v0.9.0/SchoolWork-0.9.0-x64-portable.exe) | Launch without the installation wizard. "Portable" does not mean that all settings and chats stay beside the executable. |
-| [SHA-256 checksums](https://github.com/SILLEN69/schoolwork-desktop/releases/download/v0.9.0/SHA256SUMS-v0.9.0.txt) | Compare downloaded files with the published manifest. |
+| [SchoolWork 0.10.0 installer](https://github.com/SILLEN69/schoolwork-desktop/releases/download/v0.10.0/SchoolWork-0.10.0-x64-setup.exe) | Normal per-user installation; no developer tools needed to open the app. |
+| [SchoolWork 0.10.0 portable](https://github.com/SILLEN69/schoolwork-desktop/releases/download/v0.10.0/SchoolWork-0.10.0-x64-portable.exe) | Launch without the installation wizard. "Portable" does not mean that all settings and chats stay beside the executable. |
+| [SHA-256 checksums](https://github.com/SILLEN69/schoolwork-desktop/releases/download/v0.10.0/SHA256SUMS-v0.10.0.txt) | Compare downloaded files with the published manifest. |
 
 Packages are **unsigned**. On a managed school computer, follow your school's software-installation process if Windows or an administrator blocks them. The app does not require automatic administrator elevation.
 
@@ -81,7 +81,7 @@ Get-Content .\Install-SchoolWork.ps1
 .\Install-SchoolWork.ps1
 ```
 
-The script downloads **v0.9.0** by default, verifies the installer against its SHA-256 manifest, then opens the regular installation wizard. Pass `-Version v0.7.0` if you explicitly need the previous public release. It does not change PowerShell execution policy. If scripts are blocked, use Option 1 or your school's approved method.
+The script downloads **v0.10.0** by default, verifies the installer against its SHA-256 manifest, then opens the regular installation wizard. Pass `-Version v0.9.0` if you explicitly need an older public release. It does not change PowerShell execution policy. If scripts are blocked, use Option 1 or your school's approved method.
 
 For an update, finish or pause your current work and close SchoolWork normally before running the newer installer. Keep backups of important projects. Downloading source code alone does not update an installed app.
 
@@ -246,11 +246,11 @@ For a bug report, use [GitHub Issues](https://github.com/SILLEN69/schoolwork-des
 
 ## Run the latest source
 
-The development source now includes **0.9.0 Lesson Studio**, Swedish/English Whisper transcription, connected Google Calendar and immediate model selection. See the [implementation plan](docs/lesson-studio-plan.md) and [0.9.0 usage and verification notes](docs/release-0.9.md). The release includes cloud verification with simulated services; live school Whisper and Google sign-in still need target-laptop verification.
+The development source is **0.10.1**, adding a button-free branded startup, public pointer explanations, task notifications, command/recovery fixes and publisher-configured Google sign-in to the existing lessons and Work flows. See [0.10.1 source notes](docs/release-0.10.1.md). The public installer remains v0.10.0 until a separate release is published. Google is in Production but branding and scope verification are still required; see the [live status](docs/google-verification-status.md).
 
 For developers or school IT building and checking the application from source:
 
-**Requirements:** Windows x64, Git, Node.js **22.12 or later** with npm, and Windows .NET Framework 4.x with its x64 C# compiler. The build compiles the small desktop helper locally. Opening the released installer does not require this developer setup.
+**Requirements:** Windows x64, Git, Node.js **24 LTS or later** with npm, and Windows .NET Framework 4.x with its x64 C# compiler. The build compiles the small desktop helper locally. Opening the released installer does not require this developer setup.
 
 ```powershell
 git clone https://github.com/SILLEN69/schoolwork-desktop.git
@@ -259,7 +259,7 @@ npm ci
 npm run dev:app
 ```
 
-`dev:app` builds the frontend, backend and Windows helper before starting Electron and Vite. Configure your TeachGPT key in Settings. `npm run dev` alone is only a browser preview and cannot run local file, process or desktop tools.
+`dev:app` builds the frontend, backend and Windows helper before starting its own Vite server and Electron with an isolated `work/dev-profile`. Configure your TeachGPT key in that development profile. It fails clearly if the default port is occupied; `SCHOOLWORK_DEV_PORT=0` chooses a free port. `npm run dev` alone is only a browser preview and cannot run local file, process or desktop tools. See [exact development, recovery and animation commands](docs/development.md).
 
 ```powershell
 # Unit tests

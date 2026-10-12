@@ -30,7 +30,7 @@ export default function ActivityLog({ conversationId, swedish, compact = false }
     {error && <p role="alert">{error}</p>}
     {!entries.length && <p>{swedish ? 'Filer, kommandon och resultat visas här när arbetet börjar.' : 'Files, commands and results appear here as work starts.'}</p>}
     {groups.map(({ key, start, end, output }) => <details key={key} className={start.type === 'error' || end?.payload?.ok === false ? 'step-failed' : end ? 'step-done' : ''}>
-      <summary><span className="step-state" aria-hidden="true">{end ? end.payload?.ok === false ? '!' : '✓' : '›'}</span><span>{start.text.split('\n')[0] || start.type}</span><time>{end?.payload?.durationMs !== undefined ? (end.payload.durationMs / 1000).toFixed(1) + 's' : new Date(start.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</time></summary>
+      <summary><span className="step-state" aria-hidden="true">{end ? end.payload?.ok === false ? '!' : '✓' : '›'}</span><span title={start.text.split('\n')[0]}>{start.text.split('\n')[0] || start.type}</span><time>{end?.payload?.durationMs !== undefined ? (end.payload.durationMs / 1000).toFixed(1) + 's' : new Date(start.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</time></summary>
       <pre>{start.text}{end && end !== start ? '\n\n' + end.text : !end && output ? '\n\n' + output.text : ''}</pre>
     </details>)}
   </div>;

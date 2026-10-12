@@ -1,0 +1,2 @@
+# Preserve snapshot bytes so FILE_MANIFEST hashes survive cloning on Windows/Linux.
+* -text

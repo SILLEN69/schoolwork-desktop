@@ -16,6 +16,8 @@ import { autoUpdater } from 'electron-updater';
 import { Lessons, audioInputSchema } from "./lessons";
 import { GoogleCalendar } from "./calendar";
 import { publishedGoogleClient } from "./googleClient";
+import { DesktopPointer } from './desktopPointer';
+import { TaskNotifications } from './taskNotifications';
 import { transcriptText, lessonSubjects } from '../src/lesson';
 import { Connections,connectionSchemas,connectionTools } from './connections';
 import { isSpeechModel } from "../src/speechModels";
@@ -118,9 +120,21 @@ let store: SchoolWorkStore;
 let connections:Connections;
 let vault: MemoryVault;
 let win: BrowserWindow | undefined;
+const taskNotifications=new TaskNotifications((taskId)=>{
+  if(!win)makeWindow();
+  if(win?.isMinimized())win.restore();
+  win?.show();win?.focus();
+  const task=store.getTask(taskId);
+  const target=win;
+  const send=()=>{if(task&&target&&!target.isDestroyed())target.webContents.send('notifications:event',{kind:'open',taskId,conversationId:task.conversationId});};
+  if(target?.webContents.isLoading())target.webContents.once('did-finish-load',send);else send();
+},(taskId,status)=>{
+  store?.addDiagnostic({taskId:taskId==='notification-test'?undefined:taskId,category:'notifications',message:status});
+});
 let discoveredModels: string[] = [];
 let attachments: Attachments;
 let desktop: DesktopTools;
+let desktopPointer: DesktopPointer;
 let desktopLearning: DesktopLearning;
 let telegram: TelegramLink;
 let updates: Updates;
@@ -415,6 +429,14 @@ function emit(task: any, type: string, payload: Record<string, unknown> = {}) {
     taskId: task.id,
     conversationId: task.conversationId,
   });
+  if(type==='answer'||type==='error'){
+    const current=store.getTask(task.id);
+    if(current&&((type==='answer'&&current.state==='completed')||(type==='error'&&['waiting_retry','failed'].includes(current.state)))){
+      win?.webContents.send('notifications:event',{kind:'outcome',id:event.id,taskId:task.id,conversationId:task.conversationId,outcome:type==='answer'?'completed':'error'});
+      if(win&&!win.isFocused())win.flashFrame(true);
+      taskNotifications.notify(current,type,settings.get('language')==='sv');
+    }
+  }
   const phoneSession = store.getMetadata("telegram-task:" + task.id);
   if (telegram && phoneSession && ["answer", "checkpoint"].includes(type)) {
     try {
@@ -480,16 +502,15 @@ function checkedCodingTask(taskId: string) {
   let edited = false;
   const rows = store.db
     .prepare(
-      "SELECT name,arguments_json,result_json FROM tool_executions WHERE task_id=? AND status='succeeded' ORDER BY finished_at",
+      "SELECT name,arguments_json,result_json FROM tool_executions WHERE task_id=? AND status IN ('succeeded','failed') AND result_json IS NOT NULL ORDER BY finished_at,rowid",
     )
     .all(taskId) as any[];
   for (const row of rows) {
-      if (["write_file", "patch_file", "edit_file"].includes(row.name) && isCodeArtifact(JSON.parse(row.arguments_json).path))
-      edited = true;
     try {
       const outcome = JSON.parse(row.result_json);
-      if (!outcome?.ok) return false;
-      gate.observe(row.name, JSON.parse(row.arguments_json), outcome);
+      const args=JSON.parse(row.arguments_json);
+      if (outcome?.ok && ["write_file", "patch_file", "edit_file"].includes(row.name) && isCodeArtifact(args.path))edited=true;
+      gate.observe(row.name, args, outcome);
     } catch {
       return false;
     }
@@ -560,6 +581,7 @@ function key(): string {
   return readTeachGPTCredential(settings.get("encryptedKey"));
 }
 function stopDesktop() {
+  desktopPointer?.stop();
   desktop?.stop();
 }
 function emergencyStop() {
@@ -599,6 +621,7 @@ function makeWindow() {
     },
   });
   win.webContents.setWindowOpenHandler(() => ({ action: "deny" }));
+  win.on('focus',()=>win?.flashFrame(false));
   win.webContents.on("will-navigate", (event, url) => {
     let allowed = url.startsWith("file://");
     try {
@@ -614,6 +637,7 @@ function makeWindow() {
     void win.loadURL(process.env.VITE_DEV_SERVER_URL);
   else void win.loadFile(path.join(__dirname, "../dist/index.html"));
   win.on("closed", () => {
+    desktopPointer?.stop();
     win = undefined;
   });
 }
@@ -735,11 +759,16 @@ async function executeTool(
   }
   if (!taskCapabilities(task.id).controlScreen && isDesktopAutomationCommand(name,args)) throw new Error('Screen input is disabled for this task. PowerShell GUI-input workarounds are not allowed; start a new task with screen control enabled.');
   if (name in desktopInputs) {
-    const outcome = await desktop.execute(
+    const perform = () => desktop.execute(
       name as keyof typeof desktopInputs,
       args,
       { owner: task.id, capabilities: taskCapabilities(task.id), signal },
     );
+    const input=['click','scroll','type_text','key_press'].includes(name);
+    let outcome;
+    try {outcome=input?await perform():await desktopPointer.observe(signal,perform);}
+    catch(error){if(input&&!signal.aborted)desktopPointer.finished(task.id,name,false);throw error;}
+    if(['click','scroll','type_text','key_press'].includes(name))desktopPointer?.finished(task.id,name,Boolean(outcome.ok));
     if (outcome.data?.imageData)
       win?.webContents.send("chat:event", {
         type: "screenshot",
@@ -1157,7 +1186,7 @@ async function runTask(task: any) {
     let verificationReminders = 0;
     const completedOperations = store.db
       .prepare(
-        "SELECT name,arguments_json,result_json FROM tool_executions WHERE task_id=? AND status='succeeded' ORDER BY finished_at",
+        "SELECT name,arguments_json,result_json FROM tool_executions WHERE task_id=? AND status IN ('succeeded','failed') AND result_json IS NOT NULL ORDER BY finished_at,rowid",
       )
       .all(task.id) as any[];
     for (const operation of completedOperations)
@@ -1460,6 +1489,7 @@ async function runTask(task: any) {
         !nativeCalls.length && typeof message.content === "string"
           ? parseFallbackAction(message.content)
           : null;
+      desktopPointer?.explain(task.id,fallback ? '' : redactMemoryText(message.content));
       const calls = nativeCalls.length
         ? nativeCalls.map((c: any) => ({
             id: String(c.id || crypto.randomUUID()),
@@ -1864,6 +1894,7 @@ async function runTask(task: any) {
     emit(task, "error", { text: message, retry: true });
   } finally {
     clearInterval(heartbeat);
+    desktopPointer?.finishTask(task.id);
     desktop.forgetOwner(task.id);
     desktopLearning.finish(task.id);
     active.delete(task.id);
@@ -2317,13 +2348,15 @@ function registerIpc() {
       capabilities: capabilities(),
       signal: AbortSignal.timeout(20000),
     };
-    if (input.windowId)
-      await desktop.execute("focus_window", { windowId: input.windowId }, ctx);
-    const outcome = await desktop.execute(
-      "capture_screen",
-      { windowId: input.windowId, displayId: input.displayId },
-      ctx,
-    );
+    const outcome = await desktopPointer.observe(ctx.signal,async () => {
+      if (input.windowId)
+        await desktop.execute("focus_window", { windowId: input.windowId }, ctx);
+      return desktop.execute(
+        "capture_screen",
+        { windowId: input.windowId, displayId: input.displayId },
+        ctx,
+      );
+    });
     return attachments.import(
       input.conversationId,
       "Screenshot.png",
@@ -2436,6 +2469,16 @@ function registerIpc() {
         text: String(JSON.parse(row.payload_json).text || ""),
       }));
   });
+  ipcMain.handle('notifications:test',(event)=>{
+    trusted(event);
+    const toast=taskNotifications.notify({id:'notification-test',state:'completed',updatedAt:Date.now()},'answer',settings.get('language')==='sv');
+    return {requested:Boolean(toast)};
+  });
+  ipcMain.handle('notifications:settings',async(event)=>{
+    trusted(event);
+    if(process.platform!=='win32')return false;
+    await shell.openExternal('ms-settings:notifications');return true;
+  });
   ipcMain.handle("settings:get", (event) => {
     trusted(event);
     const workspace = settings.get("workspace") || app.getPath("documents");
@@ -2443,7 +2486,7 @@ function registerIpc() {
       workspace,
       fileAccess: settings.get("fileAccess") || "workspace",
       model: modelId(),
-      configured: Boolean(settings.get("encryptedKey")),
+      configured: (()=>{try{readTeachGPTCredential(settings.get('encryptedKey'));return true;}catch{return false;}})(),
       language: settings.get("language") || "en",
       vaultPath: vault.root,
       migrationWarning: store.migrationWarning,
@@ -2725,6 +2768,7 @@ else {
     }
   });
   app.whenReady().then(async () => {
+    if(process.platform==='win32')app.setAppUserModelId('nu.ssis.schoolwork');
     store = new SchoolWorkStore(app.getPath("userData"));
     attachments = new Attachments(store, app.getPath("userData"));
     await attachments.initialize();
@@ -2735,7 +2779,8 @@ else {
           "SchoolWork.DesktopBridge.exe",
         )
       : path.join(__dirname, "../dist-native/SchoolWork.DesktopBridge.exe");
-    desktop = new DesktopTools(new DesktopBridge(helperPath));
+    desktopPointer = new DesktopPointer();
+    desktop = new DesktopTools(new DesktopBridge(helperPath),(owner,name,args,signal)=>desktopPointer.beforeInput(owner,name,args,signal));
     desktopLearning = new DesktopLearning(store);
     telegram = new TelegramLink(
       store,

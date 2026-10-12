@@ -129,6 +129,9 @@ if (!window.schoolwork) {
     memoryGraph: async () => ({ nodes: [], edges: [] }),
     openVault: async () => "",
     exportDiagnostics: async () => null,
+    testNotifications:async()=>({requested:false}),
+    openNotificationSettings:async()=>false,
+    onNotification:()=>()=>{},
     onEvent: () => () => {},
   };
 }

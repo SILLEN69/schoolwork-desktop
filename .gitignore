@@ -14,3 +14,4 @@ publisher-client.json
 *.sqlite3-*
 *.log
 *.tsbuildinfo
+*.schoolwork.bak.*

@@ -34,8 +34,8 @@ export default function TelegramSettings({ swedish }: { swedish: boolean }) {
       <label>Telegram · {t("phone link", "telefonkoppling")}</label>
       <p>
         {t(
-          "Create a bot with @BotFather in Telegram. Paste its token here (never in chat), then link your private account. Send messages and PNG/JPEG photos to the AI from your phone. SchoolWork and your PC must stay on and online.",
-          "Skapa en bot med @BotFather i Telegram. Klistra in token här (aldrig i chatten), och koppla ditt privata konto. Skicka meddelanden och PNG/JPEG-bilder till AI:n från telefonen. SchoolWork och datorn måste vara på och online.",
+          "Create a bot with @BotFather, add its token here and pair your account. Keep SchoolWork online.",
+          "Skapa en bot med @BotFather, ange token här och koppla ditt konto. SchoolWork måste vara online.",
         )}
       </p>
       <input
@@ -115,14 +115,14 @@ export default function TelegramSettings({ swedish }: { swedish: boolean }) {
       </p>
       <p>
         {t(
-          "Only your paired account can chat or control tasks. /new starts fresh; reply to a notification or /use <full task id> to continue a desktop chat. /status, /retry and /stop still work. Send photos individually with an optional caption (under 10 MB, max 32 MP); albums/voice/video aren’t supported. The chat’s selected model must support vision. Busy chat? Stop first and resend, or /new.",
-          "Bara ditt kopplade konto kan chatta eller styra uppgifter. /new startar nytt; svara på en notis eller /use <fullständigt uppgifts-id> för att fortsätta en datorchatt. /status, /retry och /stop fungerar fortfarande. Skicka en bild åt gången, gärna med bildtext (under 10 MB, max 32 MP); album/röst/video stöds inte. Chattens valda modell måste stödja bilder. Upptagen chatt? Stoppa och skicka igen, eller /new.",
+          "Paired account only. /new · /status · /retry · /stop. One PNG/JPEG at a time, up to 10 MB/32 MP; requires a vision model.",
+          "Bara kopplat konto. /new · /status · /retry · /stop. En PNG/JPEG åt gången, högst 10 MB/32 MP; kräver bildmodell.",
         )}
       </p>
       <p>
         {t(
-          "Phone messages/photos are saved in SchoolWork and sent to TeachGPT. When linked, actual final replies from desktop and phone tasks go through Telegram, including results or error explanations—not just generic status. Actions get short result replies; questions can get detailed answers. Screenshots aren’t automatically uploaded to Telegram. Bot chats aren’t Secret Chats: don’t send sensitive data. Disconnect clears the link and pending replies, not saved chats/photos.",
-          "Telefonmeddelanden/bilder sparas i SchoolWork och skickas till TeachGPT. När telefonen är kopplad skickas riktiga slutsvar från både dator- och telefonuppgifter via Telegram, inklusive resultat eller fel—inte bara generell status. Åtgärder får korta resultatsvar; frågor kan få utförliga svar. Skärmbilder laddas inte automatiskt upp till Telegram. Botchattar är inte hemliga chattar: skicka inte känslig data. Frånkoppling tar bort kopplingen och väntande svar, inte sparade chattar/bilder.",
+          "Replies from PC and phone tasks go to Telegram. Messages/photos go to TeachGPT and are saved locally. Bot chats are not Secret Chats. Disconnect keeps saved chats.",
+          "Svar från dator- och telefonuppgifter skickas till Telegram. Meddelanden/bilder går till TeachGPT och sparas lokalt. Botchattar är inte hemliga chattar. Frånkoppling behåller sparade chattar.",
         )}
       </p>
       {(error || status.error) && (
