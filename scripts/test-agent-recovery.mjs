@@ -6,13 +6,19 @@ import fs from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
 import {randomUUID} from 'node:crypto';
+import {execFileSync} from 'node:child_process';
 
 if(process.platform!=='win32')throw new Error('This focused regression uses Windows PowerShell and batch launchers.');
+// npm environments can omit dependency install scripts. Use Electron's pinned,
+// checksum-verifying installer (also used by release CI) before GUI regressions.
+execFileSync(process.execPath,[path.resolve('node_modules/electron/install.js')],{stdio:'inherit',windowsHide:true});
+const electronExecutable=path.resolve('node_modules/electron/dist/electron.exe');
+console.log('Electron runtime ready ('+(await fs.stat(electronExecutable)).size+' bytes).');
 for(const marker of ['#verification-prefix','#verification-batch','#verification-recheck']) {
   const data=await fs.mkdtemp(path.join(os.tmpdir(),'schoolwork recovery '));
   let app;
   try {
-    app=await electron.launch({executablePath:path.resolve('node_modules/electron/dist/electron.exe'),args:[path.resolve('scripts/test-app.cjs'),'--user-data-dir='+data],env:{...process.env,SCHOOLWORK_TEST_DATA:data,SCHOOLWORK_TEST_EXE:process.execPath},timeout:30000});
+    app=await electron.launch({executablePath:electronExecutable,args:[path.resolve('scripts/test-app.cjs'),'--user-data-dir='+data],env:{...process.env,SCHOOLWORK_TEST_DATA:data,SCHOOLWORK_TEST_EXE:process.execPath},timeout:30000});
     app.process().stderr.on('data',chunk=>process.stderr.write(chunk));
     assert.equal(await app.evaluate(({app})=>app.getPath('userData')),data);
     const page=await app.firstWindow();const errors=[];page.on('pageerror',error=>errors.push(error.message));
