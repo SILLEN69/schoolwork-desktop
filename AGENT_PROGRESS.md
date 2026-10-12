@@ -26,9 +26,9 @@ Investigate stalled SchoolWork and development sessions first, then improve moti
 
 ## Next three tasks
 
-1. Correct pointer explanation-only content and observation/idle stability without weakening capture exclusion.
-2. Add notification delivery diagnostics and an accessible fallback/test flow; verify terminal outcomes and OS limitations honestly.
-3. Audit remaining performance, accessibility and cancellation paths, then verify the integrated changes without unnecessary release/deployment.
+1. Add notification delivery diagnostics and an accessible fallback/test flow; verify terminal outcomes and OS limitations honestly.
+2. Audit remaining performance, accessibility and cancellation paths, then verify the integrated changes without unnecessary release/deployment.
+3. Run a minimal safe live provider tool cycle through the existing credential service, if the current service is available; do not execute arbitrary generated actions.
 
 ## Milestone 1: confirmed execution blockers repaired
 
@@ -60,6 +60,15 @@ Investigate stalled SchoolWork and development sessions first, then improve moti
 - Fresh `npm ci` installed 480 packages in an isolated copy; full fresh TypeScript/frontend/backend/native build passed. This is a new dependency installation on the current Windows machine, not clean-Windows installation acceptance. Existing deprecation/large-chunk warnings remain documented.
 - Production npm audit reports zero advisories. The animation lint dependency chain has one unpatched braces issue propagated through ten dev packages: https://github.com/advisories/GHSA-vfj7-8cjw-p6xm . Latest published braces is 3.0.3 and no fixed version exists at inspection. Do not suppress the report by inventing an upgrade.
 - Exact install/build/test/animation/recovery instructions are in `docs/development.md`. No API key, publisher JSON, profile or private log was committed. Local source commits remain ahead of remote beta; no publication/merge occurred.
+
+## Milestone 4: public-only pointer and capture/idle stability
+
+- Removed generated tool/status/coordinate text from the pointer channel and bubble. The app timeline retains tool details; the bubble receives only filtered public assistant content. Empty or private-only updates retain the previous public note instead of blinking it away. No private reasoning is shown or invented.
+- Capture suppression now restores the overlay immediately after a completed observation. A separate input suppression flag keeps it hidden throughout native hit-testing and post-input capture, including concurrent explanation updates. Failure cleanup restores display safely; abort/generation changes cannot resurrect a stopped window.
+- Keyboard steps no longer force an arbitrary window-corner cursor target or needless movement delay. Pointer motion respects the actual overlay reduced-motion media preference. No input permissions or Google scopes changed.
+- Full app type check/build and focused real Electron pointer/UI checks pass: 45 chats at two sizes, public-only resizing bubble, idle stability, immediate post-capture restore, hidden capture/input during public updates, retained text after empty/private-only updates, no focus theft, Stop and cancellation cleanup. No real desktop input or live provider action was used in the display fixture.
+- Earlier pointer regression expected the old permanently hidden post-observation state; it was updated to assert the requested restored state while keeping the stricter hidden-during-capture assertions. The initial run's true-vs-false assertion was this changed expected behavior, not an ignored regression.
+- A brief deliberate hide remains during native observation/hit-testing to keep overlays out of model pixels; this does not create a second OS mouse or independent desktop.
 
 ## Resume commands
 

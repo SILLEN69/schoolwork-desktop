@@ -406,7 +406,6 @@ const fail = (error: unknown) => ({
 });
 
 function emit(task: any, type: string, payload: Record<string, unknown> = {}) {
-  if(['stream-progress','thinking-progress','retry','tool-start','verification'].includes(type))desktopPointer?.note(task.id,redactMemoryText(String(payload.text||'')));
   payload = { ...payload, afterMessageSequence: store.lastMessageSequence(task.conversationId) };
   const event = store.addEvent({
     id: crypto.randomUUID(),
@@ -749,13 +748,15 @@ async function executeTool(
   }
   if (!taskCapabilities(task.id).controlScreen && isDesktopAutomationCommand(name,args)) throw new Error('Screen input is disabled for this task. PowerShell GUI-input workarounds are not allowed; start a new task with screen control enabled.');
   if (name in desktopInputs) {
-    await desktopPointer?.hideForObservation(signal);
     const perform = () => desktop.execute(
       name as keyof typeof desktopInputs,
       args,
       { owner: task.id, capabilities: taskCapabilities(task.id), signal },
     );
-    const outcome = ['click','scroll','type_text','key_press'].includes(name) ? await perform() : await desktopPointer.observe(signal,perform);
+    const input=['click','scroll','type_text','key_press'].includes(name);
+    let outcome;
+    try {outcome=input?await perform():await desktopPointer.observe(signal,perform);}
+    catch(error){if(input&&!signal.aborted)desktopPointer.finished(task.id,name,false);throw error;}
     if(['click','scroll','type_text','key_press'].includes(name))desktopPointer?.finished(task.id,name,Boolean(outcome.ok));
     if (outcome.data?.imageData)
       win?.webContents.send("chat:event", {

@@ -4,14 +4,14 @@
 .ring{position:absolute;width:44px;height:44px;border:2px solid #cdeb86;border-radius:50%;opacity:0;transform:translate(-18px,-18px);box-shadow:0 0 12px #cdeb8633}
 .ring.pulse{animation:click .65s ease-out}@keyframes click{from{opacity:.95;scale:.35}to{opacity:0;scale:1.3}}
 .bubble{position:absolute;max-width:270px;width:max-content;padding:9px 12px;border:1px solid #d7ed9b80;border-radius:15px 15px 15px 4px;background:rgba(250,255,239,.91);color:#26301d;box-shadow:0 2px 12px #0002;font-size:12px;line-height:1.45;overflow-wrap:anywhere}
-.label{display:flex;gap:6px;align-items:center;font-size:10px;letter-spacing:.02em;font-weight:650;color:#5b713c;margin-bottom:3px}.dot{width:5px;height:5px;border-radius:50%;background:#72963e}.detail{font-size:11px;opacity:.76;margin-top:4px;max-height:80px;overflow:hidden}.bubble.left{border-radius:15px 15px 4px 15px}
+.label{display:flex;gap:6px;align-items:center;font-size:10px;letter-spacing:.02em;font-weight:650;color:#5b713c;margin-bottom:3px}.dot{width:5px;height:5px;border-radius:50%;background:#72963e}.bubble.left{border-radius:15px 15px 4px 15px}
 @media(prefers-reduced-motion:reduce){.ring.pulse{animation:none;opacity:.55}}
-</style></head><body><div class="ring" id="ring"></div><div class="pointer" id="pointer"><svg viewBox="0 0 28 34" xmlns="http://www.w3.org/2000/svg"><path d="M3 2L24 18l-10 1 5 10-5 3-5-11-6 7Z" fill="#cdeb86" stroke="#24321a" stroke-width="1.6" stroke-linejoin="round"/><path d="M7 9l7 5" stroke="#f6ffe7" stroke-width="1.6" stroke-linecap="round"/></svg></div><div class="bubble" id="bubble"><div class="label"><span class="dot"></span>SchoolWork</div><div id="text"></div><div class="detail" id="detail"></div></div><script>
-const pointer=document.getElementById('pointer'),ring=document.getElementById('ring'),bubble=document.getElementById('bubble'),text=document.getElementById('text'),detail=document.getElementById('detail');
+</style></head><body><div class="ring" id="ring"></div><div class="pointer" id="pointer"><svg viewBox="0 0 28 34" xmlns="http://www.w3.org/2000/svg"><path d="M3 2L24 18l-10 1 5 10-5 3-5-11-6 7Z" fill="#cdeb86" stroke="#24321a" stroke-width="1.6" stroke-linejoin="round"/><path d="M7 9l7 5" stroke="#f6ffe7" stroke-width="1.6" stroke-linecap="round"/></svg></div><div class="bubble" id="bubble" role="status" aria-live="polite"><div class="label"><span class="dot"></span>SchoolWork</div><div id="text"></div></div><script>
+const pointer=document.getElementById('pointer'),ring=document.getElementById('ring'),bubble=document.getElementById('bubble'),text=document.getElementById('text');
 window.schoolworkPointer.subscribe(state=>{
  if(!state||!Number.isFinite(state.x)||!Number.isFinite(state.y))return;
  pointer.style.transform='translate('+(state.x-3)+'px,'+(state.y-2)+'px)';ring.style.left=state.x+'px';ring.style.top=state.y+'px';
- text.textContent=String(state.text||'').slice(0,280);detail.textContent=String(state.explanation||'').slice(0,280);detail.hidden=!detail.textContent;
+ text.textContent=String(state.explanation||'').slice(0,280);bubble.hidden=!text.textContent;
  const width=bubble.offsetWidth,height=bubble.offsetHeight,left=state.x+32+width>innerWidth;
  bubble.classList.toggle('left',left);bubble.style.left=Math.max(4,Math.min(innerWidth-width-4,left?state.x-width-12:state.x+32))+'px';
  bubble.style.top=Math.max(4,Math.min(innerHeight-height-4,state.y+34+height>innerHeight?state.y-height-10:state.y+28))+'px';

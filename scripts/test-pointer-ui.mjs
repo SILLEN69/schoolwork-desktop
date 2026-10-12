@@ -44,35 +44,47 @@ try {
   await page.getByTitle('Toggle sidebar').click();
   await app.evaluate(({screen},modulePath)=>{
     global.__pointerFixture=global.__pointerLoad(modulePath);
-    const origin=screen.getCursorScreenPoint(),target=screen.dipToScreenPoint({x:origin.x+120,y:origin.y+80});
+    const origin=screen.getCursorScreenPoint(),bounds=screen.getPrimaryDisplay().workArea,target=screen.dipToScreenPoint({x:Math.min(bounds.x+bounds.width-40,origin.x+120),y:Math.min(bounds.y+bounds.height-40,origin.y+80)});
     global.__pointerFixture.explain('fixture','Jag klickar på Kalender och kontrollerar resultatet.');
     global.__pointerFixturePromise=global.__pointerFixture.beforeInput('fixture','click',target,new AbortController().signal).then(()=>global.__pointerFixture.finished('fixture','click',true));
   },modulePath);
   await app.evaluate(async()=>await global.__pointerFixturePromise);
   const overlay=(await app.windows()).find(win=>win!==page&&win.url().includes('desktop-pointer.html'));assert(overlay);
-  await overlay.waitForFunction(()=>document.getElementById('text').textContent.includes('Clicked'));
+  await overlay.waitForFunction(()=>document.getElementById('text').textContent.includes('Jag klickar'));
   assert.equal(await overlay.evaluate(()=>Boolean(window.schoolwork)),false,'Pointer has no privileged application API');
   const small=await overlay.locator('#bubble').boundingBox();
-  await app.evaluate(()=>global.__pointerFixture.note('fixture','Jag kontrollerar att rätt kalender är öppen och att sidan verkligen har laddats. Sedan läser jag resultatet och väljer nästa steg.'));
+  await app.evaluate(()=>global.__pointerFixture.explain('fixture','Jag kontrollerar att rätt kalender är öppen och att sidan verkligen har laddats. Sedan läser jag resultatet och väljer nästa steg.'));
   await overlay.waitForFunction(()=>document.getElementById('text').textContent.startsWith('Jag kontrollerar'));
   const large=await overlay.locator('#bubble').boundingBox();assert(large.height>=small.height);
   await overlay.screenshot({path:path.join(out,'schoolwork-pointer-bubble.png'),omitBackground:true});
   await app.evaluate(()=>{
     global.__pointerFixture.explain('fixture','Checking the page content and choosing the next action. '.repeat(8));
-    global.__pointerFixture.note('fixture','Reading the current result before continuing to the next step. '.repeat(8));
+    global.__pointerFixture.explain('fixture','Reading the current result before continuing to the next step. '.repeat(8));
   });
   await overlay.waitForFunction(()=>document.getElementById('text').textContent.length===280);
+  assert.equal(await overlay.locator('#detail').count(),0,'Only public AI explanation is displayed');
+  await page.waitForTimeout(1900);
+  assert.equal(await app.evaluate(({BrowserWindow})=>BrowserWindow.getAllWindows().find(win=>win.getTitle()==='SchoolWork AI pointer').isVisible()),true,'No idle-stage disappearance');
   assert.equal(await overlay.evaluate(()=>{
     const box=document.getElementById('bubble').getBoundingClientRect();
     return box.top>=0&&box.bottom<=innerHeight&&box.left>=0&&box.right<=innerWidth;
   }),true,'Bounded long activity text must not clip outside the transparent window');
   const focusBefore=await main.evaluate(win=>win.isFocused());assert.equal(focusBefore,true,'Overlay must not steal foreground focus');
   await app.evaluate(async({BrowserWindow})=>await global.__pointerFixture.observe(new AbortController().signal,async()=>{
-    global.__pointerFixture.note('fixture','Checking the screenshot');
+    global.__pointerFixture.explain('fixture','Checking the screenshot');
     await new Promise(resolve=>setTimeout(resolve,1700));
     if(BrowserWindow.getAllWindows().find(win=>win.getTitle()==='SchoolWork AI pointer').isVisible())throw new Error('Pointer reappeared during observation');
   }));
-  assert.equal(await app.evaluate(({BrowserWindow})=>BrowserWindow.getAllWindows().find(win=>win.getTitle()==='SchoolWork AI pointer').isVisible()),false);
+  assert.equal(await app.evaluate(({BrowserWindow})=>BrowserWindow.getAllWindows().find(win=>win.getTitle()==='SchoolWork AI pointer').isVisible()),true,'Pointer restores immediately after capture');
+  await app.evaluate(async()=>{
+    await global.__pointerFixture.beforeInput('fixture','key_press',{},new AbortController().signal);
+    global.__pointerFixture.explain('fixture','Jag kontrollerar den nya sidan.');
+  });
+  assert.equal(await app.evaluate(({BrowserWindow})=>BrowserWindow.getAllWindows().find(win=>win.getTitle()==='SchoolWork AI pointer').isVisible()),false,'Public updates cannot expose the pointer during native input/result capture');
+  await app.evaluate(()=>global.__pointerFixture.finished('fixture','key_press',true));
+  assert.equal(await app.evaluate(({BrowserWindow})=>BrowserWindow.getAllWindows().find(win=>win.getTitle()==='SchoolWork AI pointer').isVisible()),true);
+  await app.evaluate(()=>{global.__pointerFixture.explain('fixture','');global.__pointerFixture.explain('fixture','<think>private internal text</think>');});
+  assert.equal(await overlay.locator('#text').textContent(),'Jag kontrollerar den nya sidan.','Empty/private-only deltas must not blank or reveal the public bubble');
   await app.evaluate(()=>global.__pointerFixture.stop());
   assert.equal(await app.evaluate(({BrowserWindow})=>BrowserWindow.getAllWindows().some(win=>win.getTitle()==='SchoolWork AI pointer')),false);
   // Cancellation must close the overlay before a native input could be sent.
@@ -83,5 +95,5 @@ try {
     try{await pending;throw new Error('Expected cancellation');}catch(error){if(!abort.signal.aborted)throw error;}
   });
   assert.equal(await app.evaluate(({BrowserWindow})=>BrowserWindow.getAllWindows().some(win=>win.getTitle()==='SchoolWork AI pointer')),false);
-  console.log('PASS: 45 recent chats scroll without overlap at two window sizes; collapsed lesson control hidden; transparent SchoolWork pointer/bubble resizes, does not steal focus, hides for observation, closes on Stop and cancellation.');
+  console.log('PASS: 45 recent chats fit; public-only bubble resizes, stays through idle, restores after capture, remains hidden throughout native input/capture, does not steal focus and closes on Stop/cancellation.');
 } finally {await app?.close();await fs.rm(modulePath,{force:true});}
