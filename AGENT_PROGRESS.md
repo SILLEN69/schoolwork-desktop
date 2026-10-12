@@ -79,6 +79,16 @@ Investigate stalled SchoolWork and development sessions first, then improve moti
 - Focused verification passed: three notification unit tests; full TypeScript/frontend/backend/native build; real isolated Electron completion and provider-error outcomes, fallback notice visibility, correct conversation navigation, unavailable-native diagnostics and test-button feedback. A separate actual Windows/Electron native request emitted accepted. This proves native acceptance, not banner visibility under every user's Windows settings.
 - Reproduce: `npm test -- electron/taskNotifications.test.ts`; `npm run test:notifications`. After a current build, `node scripts/test-notifications.mjs --native` additionally requests one real Windows toast. Tests use isolated profiles and simulated provider traffic, never the personal profile/key.
 
+## Latest UI cleanup and local-preview credential repair
+
+- Removed notification-test/settings help UI while retaining ordinary completion/error notifications and developer regression access. Removed repeated footer/marketing copy and shortened general, model, desktop, Telegram and MCP settings; permission boundaries and actionable errors remain visible.
+- Windows MinAnimate is disabled on this machine. Automatic startup retains reduced-motion behavior; explicitly selecting Play startup animation now requests actual video playback, including with reduced motion. Real isolated Electron tests verify playing video, skip, failed/stalled media cleanup and still-only automatic startup.
+- The earlier local preview copied encrypted settings without their Chromium Local State encryption context. Inspection confirmed different protected os_crypt keys in the original and cloned profiles. This was a preview-preparation mistake, not an established TeachGPT server defect. After verifying zero active preview tasks, closed only the preview gracefully, backed up its Local State and restored the matching protected os_crypt context from the original. Original installed app/profile remained untouched.
+- Real Electron verification in a separate probe profile used the actual credential service and confirmed the copied configured key decrypts successfully without printing it. Credential failures now offer a Settings recovery instruction; configured status checks readability rather than ciphertext presence. Two focused credential unit tests pass.
+- Full app build passed after closing the idle preview. An earlier native compilation failed because its helper was still running; that failure was repaired by graceful preview shutdown, not ignored. Animation/UI and notification regressions pass after removal of the settings control.
+- Reopened the updated local beta with the same isolated preview history; window responds and settings reports readable credentials. Models:list returned 13 entries, but that handler can return cached defaults, so it is not live-authentication proof. An optional direct provider probe was rejected by execution policy and was not retried through a workaround. No new live inference/authentication claim is made.
+- No push, release, merge, installed-app replacement, new Google permission or execution-policy change. Preview has its own chats/settings; original profile remains authoritative for the installed app.
+
 ## Resume commands
 
 ```powershell

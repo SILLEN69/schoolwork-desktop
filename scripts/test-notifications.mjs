@@ -22,13 +22,13 @@ try{
     assert.equal(await notice.count(),0);
   }
   await page.getByRole('button',{name:/Settings/}).first().click();
-  await page.getByRole('button',{name:'Test Windows notification',exact:true}).click();
-  await page.getByText('The system notification could not be requested. In-app notices still work.',{exact:true}).waitFor();
+  assert.equal(await page.getByRole('button',{name:'Test Windows notification',exact:true}).count(),0);
+  assert.equal((await page.evaluate(()=>window.schoolwork.testNotifications())).requested,false);
   assert.deepEqual(errors,[]);
   const db=new DatabaseSync(path.join(data,'schoolwork.sqlite3'),{readOnly:true});
   const rows=db.prepare("SELECT message,details_json FROM diagnostics WHERE category='notifications'").all();db.close();
   assert.ok(rows.filter(row=>row.message==='unsupported').length>=3);assert.ok(rows.every(row=>row.details_json==='{}'));
-  console.log('PASS: real completion/error events create visible fallback notices; View task opens the matching conversation; unsupported Windows delivery is diagnosed, and the test button reports it honestly.');
+  console.log('PASS: real completion/error notices and matching conversation navigation; native diagnostics remain available without a notification-test settings control.');
 }finally{await app?.close();}
 
 if(process.argv.includes('--native')){

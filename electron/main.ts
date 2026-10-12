@@ -2486,7 +2486,7 @@ function registerIpc() {
       workspace,
       fileAccess: settings.get("fileAccess") || "workspace",
       model: modelId(),
-      configured: Boolean(settings.get("encryptedKey")),
+      configured: (()=>{try{readTeachGPTCredential(settings.get('encryptedKey'));return true;}catch{return false;}})(),
       language: settings.get("language") || "en",
       vaultPath: vault.root,
       migrationWarning: store.migrationWarning,
