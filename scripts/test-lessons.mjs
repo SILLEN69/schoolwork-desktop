@@ -99,6 +99,13 @@ try{
   assert(steered.messages.some(m=>m.role==='tool' && m.content.includes('fixture complete')));assert.equal(steered.task.state,'completed');
   pass('Work dictation fills editable text without sending; guidance arrives during a real tool run without cancelling it');
   await page.screenshot({path:path.join(shots,'work-dictation-steering.png')});
+  // Task completion creates a persistent, dismissible notice above the lesson controls.
+  // Exercise its real dismiss button before continuing the lesson workflow.
+  await page.locator('.task-notice').first().waitFor();
+  while(await page.locator('.task-notice').count()) {
+    await page.locator('.task-notice .notice-dismiss').first().click();
+  }
+  await page.waitForFunction(()=>document.querySelectorAll('.task-notice').length===0);
   await page.getByRole('button',{name:'Follow a lesson'}).click();await page.getByRole('button',{name:'Ny session',exact:true}).click();
   await page.getByRole('button',{name:'Svenska',exact:true}).click();
   await page.waitForFunction(()=>document.querySelector('.lesson-title')?.value==='Ny lektion');
