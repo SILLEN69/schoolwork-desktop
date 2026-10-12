@@ -1,4 +1,6 @@
-import {_electron as electron} from 'playwright';
+// Include the child launch/exit reason when a hosted Electron run cannot start.
+if(process.env.CI)process.env.DEBUG=[process.env.DEBUG,'pw:browser'].filter(Boolean).join(',');
+const {_electron:electron}=await import('playwright');
 import assert from 'node:assert/strict';
 import fs from 'node:fs/promises';
 import os from 'node:os';
