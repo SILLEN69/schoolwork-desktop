@@ -11,6 +11,27 @@
     { "action": "shell", "resource": "npm *", "effect": "allow" },
     { "action": "shell", "resource": "npx *", "effect": "allow" },
     { "action": "shell", "resource": "node *", "effect": "allow" },
-    { "action": "subagent", "resource": "*", "effect": "allow" }
+    { "action": "subagent", "resource": "*", "effect": "allow" },
+    { "action": "question", "resource": "*", "effect": "deny" },
+    { "action": "shell", "resource": "git push*", "effect": "deny" },
+    { "action": "shell", "resource": "git tag *", "effect": "deny" },
+    { "action": "shell", "resource": "git checkout *", "effect": "deny" },
+    { "action": "shell", "resource": "git branch *", "effect": "deny" },
+    { "action": "shell", "resource": "gh *", "effect": "deny" },
+    { "action": "external_directory", "resource": "C:/Users/elias/Documents/Codex/2026-10-12/go-into-my-schoolwork-github-repository/work/alpha-goal/*", "effect": "deny" },
+    { "action": "read", "resource": "C:/Users/elias/Documents/Codex/2026-10-12/go-into-my-schoolwork-github-repository/work/alpha-goal/*", "effect": "deny" },
+    { "action": "edit", "resource": "C:/Users/elias/Documents/Codex/2026-10-12/go-into-my-schoolwork-github-repository/work/alpha-goal/*", "effect": "deny" },
+    { "action": "external_directory", "resource": "C:/Users/elias/Documents/Codex/2026-10-12/go-into-my-schoolwork-github-repository/work/schoolwork-desktop/*", "effect": "deny" },
+    { "action": "read", "resource": "C:/Users/elias/Documents/Codex/2026-10-12/go-into-my-schoolwork-github-repository/work/schoolwork-desktop/*", "effect": "deny" },
+    { "action": "edit", "resource": "C:/Users/elias/Documents/Codex/2026-10-12/go-into-my-schoolwork-github-repository/work/schoolwork-desktop/*", "effect": "deny" },
+    { "action": "external_directory", "resource": "C:/Users/elias/Documents/Codex/2026-10-12/go-into-my-schoolwork-github-repository/work/schoolwork-release-0.10.1/*", "effect": "deny" },
+    { "action": "read", "resource": "C:/Users/elias/Documents/Codex/2026-10-12/go-into-my-schoolwork-github-repository/work/schoolwork-release-0.10.1/*", "effect": "deny" },
+    { "action": "edit", "resource": "C:/Users/elias/Documents/Codex/2026-10-12/go-into-my-schoolwork-github-repository/work/schoolwork-release-0.10.1/*", "effect": "deny" },
+    { "action": "external_directory", "resource": "C:/Users/elias/AppData/Roaming/SchoolWork/*", "effect": "deny" },
+    { "action": "read", "resource": "C:/Users/elias/AppData/Roaming/SchoolWork/*", "effect": "deny" },
+    { "action": "edit", "resource": "C:/Users/elias/AppData/Roaming/SchoolWork/*", "effect": "deny" },
+    { "action": "external_directory", "resource": "C:/Users/elias/AppData/Roaming/schoolwork-desktop/*", "effect": "deny" },
+    { "action": "read", "resource": "C:/Users/elias/AppData/Roaming/schoolwork-desktop/*", "effect": "deny" },
+    { "action": "edit", "resource": "C:/Users/elias/AppData/Roaming/schoolwork-desktop/*", "effect": "deny" }
   ]
 }
