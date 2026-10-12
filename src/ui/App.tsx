@@ -38,6 +38,8 @@ import ImageAttachments, { imageFileData } from "./ImageAttachments";
 import type { Attachment } from "../capabilities";
 import { rankTeachGPTModels } from "../modelRanking";
 import StartupIntro from './StartupIntro';
+import AtomWorking from './AtomWorking';
+import AtomGame from './AtomGame';
 import TaskNotices from './TaskNotices';
 import './motion.css';
 type Msg = {
@@ -91,7 +93,8 @@ export default function App() {
     [keyInput, setKeyInput] = useState(""),
     [showHistory, setShowHistory] = useState(true),
     [rightPanel, setRightPanel] = useState(true),
-    [language, setLanguage] = useState<"en" | "sv">("en");
+    [language, setLanguage] = useState<"en" | "sv">("en"),
+    [atomGame, setAtomGame] = useState<{ origin: { x: number; y: number } | null } | null>(null);
   const [lessonMode, setLessonMode] = useState<"lesson" | "transcription" | null>(null);
   const modelRevision = useRef(0);
   const pendingModel = useRef<string | null>(null);
@@ -523,6 +526,7 @@ export default function App() {
     <>
     {!introReady&&<StartupIntro onComplete={()=>{setIntroReady(true);setIntroPreview(false);}} swedish={isSv} preview={introPreview}/>}
       <TaskNotices swedish={isSv} onOpen={conversationId=>{setLessonMode(null);void chooseChat({id:conversationId});}}/>
+      <AtomGame open={atomGame!==null} swedish={isSv} origin={atomGame?.origin??null} onClose={()=>setAtomGame(null)}/>
     {lessonMode?<LessonWorkspace initialMode={lessonMode} summaryModel={settings.model} configured={settings.configured} onBack={() => setLessonMode(null)} onWork={chatId=>{setLessonMode(null);void chooseChat({id:chatId});}} />:<div className="shell" inert={!introReady}>
       <aside className={"sidebar " + (sidebarCollapsed ? "collapsed" : "")}>
         <div className="brand">
@@ -670,7 +674,7 @@ export default function App() {
           {!messages.length ? (
             <div className="welcome">
               <div className="welcome-orb">
-                <Workflow size={25} />
+                <AtomWorking size={34} />
               </div>
               <h1>
                 {t("What would you like to get done?", "Vad vill du få gjort?")}
@@ -771,8 +775,15 @@ export default function App() {
               <ConversationTimeline conversationId={id} fallback={messages} swedish={isSv} running={loading} onUpdated={() => {if(stickToBottom.current)end.current?.scrollIntoView({behavior:'auto'});}} />
               {status && (
                 <div className="activity">
-                  <span className="activity-icon">
-                    <LoaderCircle size={15} className="spin" />
+                  <span className="activity-icon" title={isSv ? "Spela stjärnfångst" : "Play star catch"}>
+                    <AtomWorking
+                      size={26}
+                      title={isSv ? "Klicka för att spela stjärnfångst" : "Click to play star catch"}
+                      onClick={(e) => {
+                        const r = e.currentTarget.getBoundingClientRect();
+                        setAtomGame({ origin: { x: r.left + r.width / 2, y: r.top + r.height / 2 } });
+                      }}
+                    />
                   </span>
                   <div>
                     <strong>

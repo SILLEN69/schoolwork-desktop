@@ -1,0 +1,30 @@
+/* Star catch — the little game hidden in the working atom. */
+.atom-game-backdrop{position:fixed;inset:0;z-index:300;background:rgba(7,9,8,.93);display:grid;place-items:center}
+.atom-game{position:relative;width:min(660px,94vw);height:min(740px,94vh);background:#14171a;border:1px solid #2b322a;border-radius:20px;box-shadow:0 24px 80px #000a;display:flex;flex-direction:column;align-items:center;padding:20px 24px 22px;overflow:hidden;transform:scale(.04);opacity:.3;transition:transform 430ms cubic-bezier(.2,.85,.3,1.12),opacity 320ms ease}
+.atom-game-open{transform:scale(1);opacity:1}
+.atom-game-head{width:100%;display:flex;align-items:flex-start;gap:12px}
+.atom-game-head h2{margin:0;font:700 19px Manrope,sans-serif;letter-spacing:-.4px;color:#f1f1ec}
+.atom-game-head p{margin:3px 0 0;font-size:11px;line-height:1.5;color:#929592}
+.atom-game-close{margin-left:auto;cursor:pointer;border:0;background:transparent;color:#929492;font-size:22px;line-height:1;padding:2px 8px;border-radius:7px}
+.atom-game-close:hover{background:#252729;color:#f1f1ef}
+.atom-game-score{width:100%;display:flex;justify-content:space-between;font:600 11px 'DM Sans';color:#8fa76f;margin-top:10px}
+.atom-game-score b{color:#d4ef88;font:700 13px 'DM Sans'}
+.atom-game-atom{width:min(52vmin,430px);height:min(52vmin,430px);margin:auto}
+.atom-game-atom .star-g{cursor:pointer}
+.atom-game-timer{width:100%;height:4px;border-radius:2px;background:#232a23;overflow:hidden}
+.atom-game-timer>div{height:100%;width:100%;background:linear-gradient(90deg,#9dc25f,#d4ef88)}
+.atom-game-over{position:absolute;inset:0;z-index:2;display:flex;flex-direction:column;justify-content:center;align-items:center;gap:14px;background:rgba(10,12,10,.85);backdrop-filter:blur(5px);border-radius:20px;text-align:center;padding:20px}
+.atom-game-over h3{margin:0;font:700 26px Manrope,sans-serif;letter-spacing:-.7px;color:#f1f1ec}
+.atom-game-over p{margin:0;font-size:13px;color:#929592}
+.atom-game-over p b{color:#d4ef88;font-size:18px}
+.atom-game-over div{display:flex;gap:10px;margin-top:4px}
+.atom-game-over button{cursor:pointer;padding:9px 16px;border-radius:8px;font:600 12px 'DM Sans';border:1px solid #7b8760;background:transparent;color:#e9e9e7}
+.atom-game-over button:hover{background:#252729}
+.atom-game-over button.primary{background:#d4ef88;border-color:#d4ef88;color:#1c2213}
+.atom-game-over button.primary:hover{background:#dffa8f}
+.atom-star-dot{position:absolute;border-radius:50%;background:#cfe8b0;animation:atom-twinkle 3.5s ease-in-out infinite}
+@keyframes atom-twinkle{0%,100%{opacity:.12}50%{opacity:.55}}
+@media(prefers-reduced-motion:reduce){
+  .atom-game{transition:opacity 200ms ease}
+  .atom-star-dot{animation:none}
+}

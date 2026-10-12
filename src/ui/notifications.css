@@ -1,6 +1,8 @@
 .task-notices{position:fixed;top:24px;right:24px;z-index:110;display:grid;gap:10px;max-width:min(340px,calc(100vw - 48px));pointer-events:none}
 .task-notice{position:relative;background:var(--panel,#1c2221);color:var(--text,#edf2e9);border:1px solid #9dac6a;border-radius:14px;padding:16px 40px 16px 16px;box-shadow:0 8px 24px #0003;pointer-events:auto}
-.task-notice strong{display:block;color:var(--accent,#d4ef88)}
+.task-notice-head{display:flex;align-items:center;gap:10px}
+.notice-badge{flex:none;height:34px;width:34px;border-radius:50%;background:#10140f;border:1px solid #39412e;display:grid;place-items:center}
+.task-notice strong{color:var(--accent,#d4ef88)}
 .task-notice p{margin:8px 0;font-size:14px;line-height:1.4}
 .task-notice button{cursor:pointer;padding:6px 9px;border-radius:6px;background:transparent;color:inherit;border:1px solid #7b8760}
 .task-notice button:focus-visible{outline:2px solid var(--accent,#d4ef88);outline-offset:3px}

@@ -21,6 +21,7 @@
     "test:pointer-ui": "npm run build && node scripts/test-pointer-ui.mjs",
     "animation:studio": "npm --prefix remotion-startup run dev -- --no-open --port=3210",
     "animation:render": "npm --prefix remotion-startup run render:startup",
+    "animation:bumpers": "npm --prefix remotion-startup run render:bumpers",
     "test:motion": "npm run build && node scripts/test-ui-motion.mjs",
     "test:agent-recovery": "npm run build && node scripts/test-agent-recovery.mjs",
     "test:notifications": "npm run build && node scripts/test-notifications.mjs",

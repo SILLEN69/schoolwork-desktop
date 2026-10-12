@@ -25,6 +25,7 @@
     "build": "remotion bundle",
     "upgrade": "remotion upgrade",
     "lint": "eslint src && tsc",
-    "render:startup": "remotion render src/index.ts SchoolWorkStartup ../src/assets/schoolwork-startup.mp4 --codec=h264 --concurrency=2 && remotion still src/index.ts SchoolWorkStartup ../src/assets/schoolwork-startup-poster.jpg --image-format=jpeg --jpeg-quality=80 --frame=70 && node ../scripts/check-startup-assets.mjs --write"
+    "render:startup": "remotion render src/index.ts SchoolWorkStartup ../src/assets/schoolwork-startup.mp4 --codec=h264 --concurrency=2 && remotion still src/index.ts SchoolWorkStartup ../src/assets/schoolwork-startup-poster.jpg --image-format=jpeg --jpeg-quality=80 --frame=70 && node ../scripts/check-startup-assets.mjs --write",
+    "render:bumpers": "remotion render src/index.ts SchoolWorkLoop out/schoolwork-loop.mp4 --codec=h264 && remotion still src/index.ts SchoolWorkStingerLandscape out/schoolwork-stinger-landscape.jpg --image-format=jpeg --jpeg-quality=85 --frame=60 && remotion still src/index.ts SchoolWorkStingerPortrait out/schoolwork-stinger-portrait.jpg --image-format=jpeg --jpeg-quality=85 --frame=60 && remotion still src/index.ts LessonToAction out/lesson-to-action.jpg --image-format=jpeg --jpeg-quality=85 --frame=120"
   }
 }
