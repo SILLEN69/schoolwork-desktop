@@ -132,6 +132,7 @@ contextBridge.exposeInMainWorld("schoolwork", {
   cancel: (id: string) => ipcRenderer.invoke("chat:cancel", id),
   control: (taskId: string, action: "pause" | "resume" | "retry") =>
     ipcRenderer.invoke("chat:control", { taskId, action }),
+  taskRescue: (taskId: string) => ipcRenderer.invoke("task:rescue", taskId),
   memoryList: () => ipcRenderer.invoke("memory:list"),
   memorySearch: (query: string) => ipcRenderer.invoke("memory:search", query),
   memoryGet: (id: string) => ipcRenderer.invoke("memory:get", id),

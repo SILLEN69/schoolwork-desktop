@@ -465,6 +465,12 @@ export class SchoolWorkStore {
     return row ? this.getTask(row.id) : undefined;
   }
 
+  /** All stored events for one task in write order — the offline source of the recovery timeline. */
+  getTaskEvents(taskId: string): Array<{ id: string; sequence: number; type: string; payload: unknown; createdAt: number }> {
+    const rows = this.db.prepare('SELECT id,sequence,type,payload_json,created_at FROM task_events WHERE task_id=? ORDER BY sequence,created_at').all(taskId) as any[];
+    return rows.map(row => ({ id: row.id, sequence: row.sequence, type: row.type, payload: JSON.parse(row.payload_json), createdAt: row.created_at }));
+  }
+
   getActiveTasks(): any[] {
     return (this.db.prepare("SELECT id FROM tasks WHERE state IN ('queued','running','waiting_retry','paused') ORDER BY created_at").all() as any[]).map(row => this.getTask(row.id));
   }

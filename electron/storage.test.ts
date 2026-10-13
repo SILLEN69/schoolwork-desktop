@@ -64,6 +64,23 @@ describe('durable conversation store', () => {
     recovered.close(); fs.rmSync(dir, { recursive: true, force: true });
   });
 
+  it('reads a task event history in write order and keeps other tasks out', () => {
+    const dir = temporary(); const store = new SchoolWorkStore(dir);
+    const conversationId = 'd95fcd92-93fd-46f5-8c47-c399e6ff7b43';
+    const first = { id: '693f8ae3-56f3-48ee-91c6-8ec25db15e74', conversationId, clientRequestId: 'f6da04a0-3fa5-44e8-b2e6-e7a0fd7d49ad', objective: 'first', model: 'Qwen3.8-27B', workspace: dir };
+    const second = { id: 'a3f1c6b2-7d0e-4c5a-9b8d-2f4e6c8a0d12', conversationId: crypto.randomUUID(), clientRequestId: '1b2c3d4e-5f60-4789-a0b1-c2d3e4f5a6b7', objective: 'second', model: 'Qwen3.8-27B', workspace: dir };
+    store.startTask(first); store.startTask(second);
+    store.updateTask(first.id, 'paused'); store.updateTask(second.id, 'paused');
+    store.addEvent({ id: crypto.randomUUID(), taskId: first.id, conversationId: first.conversationId, type: 'tool-start', payload: { callId: 'c1', text: 'step one' } });
+    store.addEvent({ id: crypto.randomUUID(), taskId: second.id, conversationId: second.conversationId, type: 'tool-start', payload: { callId: 'other', text: 'not mine' } });
+    store.addEvent({ id: crypto.randomUUID(), taskId: first.id, conversationId: first.conversationId, type: 'tool-result', payload: { callId: 'c1', ok: true } });
+    store.close();
+    const reopened = new SchoolWorkStore(dir);
+    expect(reopened.getTaskEvents(first.id).map(row => [row.type, (row.payload as any).callId])).toEqual([['tool-start', 'c1'], ['tool-result', 'c1']]);
+    expect(reopened.getTaskEvents(first.id)[0].sequence).toBeLessThan(reopened.getTaskEvents(first.id)[1].sequence);
+    reopened.close(); fs.rmSync(dir, { recursive: true, force: true });
+  });
+
   it('persists tool-call intent before effects and never replaces a completed call on retry', () => {
     const dir = temporary(); const store = new SchoolWorkStore(dir);
     store.startTask({ id: '693f8ae3-56f3-48ee-91c6-8ec25db15e74', conversationId: 'd95fcd92-93fd-46f5-8c47-c399e6ff7b43', clientRequestId: 'f6da04a0-3fa5-44e8-b2e6-e7a0fd7d49ad', objective: 'task', model: 'Qwen3.8-27B', workspace: dir });

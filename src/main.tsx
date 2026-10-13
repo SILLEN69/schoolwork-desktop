@@ -141,6 +141,7 @@ if (!window.schoolwork) {
     },
     cancel: async () => true,
     control: async () => true,
+    taskRescue: async () => null,
     memoryList: async () => [],
     memorySearch: async () => [],
     memoryGet: async () => null,

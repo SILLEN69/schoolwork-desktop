@@ -2552,6 +2552,13 @@ function registerIpc() {
         text: String(JSON.parse(row.payload_json).text || ""),
       }));
   });
+  ipcMain.handle("task:rescue", (event, raw) => {
+    trusted(event);
+    const id = z.string().uuid().parse(raw);
+    const task = store.getTask(id);
+    if (!task) return null;
+    return { task, events: store.getTaskEvents(id) };
+  });
   ipcMain.handle('notifications:test',(event)=>{
     trusted(event);
     const toast=taskNotifications.notify({id:'notification-test',state:'completed',updatedAt:Date.now()},'answer',settings.get('language')==='sv');

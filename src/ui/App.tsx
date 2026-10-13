@@ -29,6 +29,7 @@ import {
 } from "lucide-react";
 import MemoryView from "./MemoryView";
 import ConversationTimeline from "./ConversationTimeline";
+import TaskRescue from "./TaskRescue";
 import WorkPanel from "./WorkPanel";
 import DesktopSettings from "./DesktopSettings";
 import TelegramSettings from "./TelegramSettings";
@@ -99,6 +100,8 @@ export default function App() {
     [showSettings, setShowSettings] = useState(false),
     [showMemory, setShowMemory] = useState(false),
     [currentTaskId, setCurrentTaskId] = useState<string | null>(null),
+    [taskState, setTaskState] = useState<string | null>(null),
+    [rescueOpen, setRescueOpen] = useState(false),
     [keyInput, setKeyInput] = useState(""),
     [showHistory, setShowHistory] = useState(true),
     [rightPanel, setRightPanel] = useState(true),
@@ -192,6 +195,7 @@ export default function App() {
       if (e.type === "queued") {
         taskRef.current = e.taskId;
         setCurrentTaskId(e.taskId);
+        setTaskState("queued");
         setLoading(true);
         if (e.source === "telegram")
           void window.schoolwork
@@ -219,6 +223,7 @@ export default function App() {
         ]);
         setLoading(false);
         setStatus(null);
+        if (typeof e.state === "string") setTaskState(e.state);
         if (e.state === "waiting_retry") setError(e.text);
         void window.schoolwork.listChats(true).then(setChats);
         return;
@@ -236,6 +241,7 @@ export default function App() {
       }
       if (e.type === "error") {
         setError(e.text);
+        setTaskState("waiting_retry");
         setLoading(false);
         setStatus(null);
         return;
@@ -247,16 +253,19 @@ export default function App() {
             ? e.text.replace(/ · \d+s$/, "")
             : e.text,
       });
+      setTaskState("running");
       if (e.type === "answer") {
         setMessages((m) => [
           ...m,
           { role: "assistant", content: e.text, model: e.model },
         ]);
+        setTaskState("completed");
         setLoading(false);
         setStatus(null);
         window.schoolwork.listChats(true).then(setChats);
       }
       if (e.type === "cancelled" || e.type === "paused") {
+        setTaskState(e.type === "paused" ? "paused" : "cancelled");
         setLoading(false);
         setStatus(null);
       }
@@ -277,6 +286,7 @@ export default function App() {
         if (["running", "queued"].includes(full.task.state)) {
           taskRef.current = full.task.id;
           setCurrentTaskId(full.task.id);
+          setTaskState(full.task.state);
           setLoading(true);
           return;
         }
@@ -294,6 +304,7 @@ export default function App() {
           })),
         );
         setCurrentTaskId(full.task.id);
+        setTaskState(full.task.state);
         taskRef.current = full.task.id;
         setLoading(false);
         setStatus(null);
@@ -348,6 +359,8 @@ export default function App() {
     setId(next);
     selectedId.current = next;
     setCurrentTaskId(null);
+    setTaskState(null);
+    setRescueOpen(false);
     taskRef.current = null;
     setLoading(false);
     setMessages([]);
@@ -360,6 +373,8 @@ export default function App() {
     setStatus(null);
     setMessages([]);
     setLoading(false);
+    setRescueOpen(false);
+    setTaskState(null);
     setId(c.id);
     selectedId.current = c.id;
     setError("");
@@ -368,6 +383,7 @@ export default function App() {
       if (selectedId.current !== c.id) return;
       setPendingImages(full.draftAttachments || []);
       setCurrentTaskId(full.task?.id || null);
+      setTaskState(full.task?.state ?? null);
       taskRef.current = full.task?.id || null;
       setLoading(["running", "queued"].includes(full.task?.state));
       if (["running", "queued"].includes(full.task?.state))
@@ -528,6 +544,21 @@ export default function App() {
     setLoading(false);
     setStatus(null);
   };
+  // Performs the single control(taskId,'resume') call; failures propagate to the
+  // caller (the task rescue panel) so the error shows in one clear place.
+  const resumeTask = async (taskId: string) => {
+    if (!taskId) return;
+    await window.schoolwork.control(taskId, "resume");
+    setTaskState("queued");
+    setError("");
+    setLoading(true);
+    setStatus({
+      type: "status",
+      text: t("Resuming saved task…", "Återupptar sparad uppgift…"),
+    });
+  };
+  const taskRescueAuto =
+    taskState !== null && ["paused", "waiting_retry", "failed"].includes(taskState);
   const addCapture = (attachment: Attachment) => {
     if (attachment.conversationId === selectedId.current)
       setPendingImages((images) => [...images, attachment]);
@@ -874,6 +905,15 @@ export default function App() {
           ) : (
             <div className="thread">
               <ConversationTimeline conversationId={id} fallback={messages} swedish={isSv} running={loading} onUpdated={() => {if(stickToBottom.current)end.current?.scrollIntoView({behavior:'auto'});}} />
+              {currentTaskId && (taskRescueAuto || rescueOpen) && (
+                <TaskRescue
+                  taskId={currentTaskId}
+                  swedish={isSv}
+                  canClose={rescueOpen && !taskRescueAuto}
+                  onResume={() => resumeTask(currentTaskId)}
+                  onClose={() => setRescueOpen(false)}
+                />
+              )}
               {status && (
                 <div className="activity">
                   <span className="activity-icon" title={isSv ? "Spela stjärnfångst" : "Play star catch"}>
@@ -925,6 +965,17 @@ export default function App() {
                       </span>
                     </div>
                   </div>
+                  {currentTaskId && (
+                    <button
+                      className="inline-btn"
+                      onClick={() => setRescueOpen(true)}
+                    >
+                      {t(
+                        "What happened to this task?",
+                        "Vad hände med uppgiften?",
+                      )}
+                    </button>
+                  )}
                   {currentTaskId && (
                     <button
                       className="inline-btn"
@@ -982,6 +1033,14 @@ export default function App() {
                         }}
                       >
                         {t("Retry step / resume", "Försök igen / återuppta")}
+                      </button>
+                    )}
+                    {currentTaskId && (
+                      <button
+                        className="inline-btn"
+                        onClick={() => setRescueOpen(true)}
+                      >
+                        {t("See task rescue", "Se upgiftsräddning")}
                       </button>
                     )}
                   </div>

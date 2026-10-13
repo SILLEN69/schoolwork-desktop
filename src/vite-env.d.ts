@@ -161,6 +161,12 @@ interface Window {
       taskId: string,
       action: "pause" | "resume" | "retry",
     ) => Promise<boolean>;
+    taskRescue: (
+      taskId: string,
+    ) => Promise<{
+      task: import("./taskRescue").RescueTask;
+      events: Array<import("./taskRescue").RescueEvent>;
+    } | null>;
     memoryList: () => Promise<any[]>;
     memorySearch: (query: string) => Promise<any[]>;
     memoryGet: (id: string) => Promise<any>;
