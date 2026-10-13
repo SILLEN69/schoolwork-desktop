@@ -13,6 +13,8 @@ if (!window.schoolwork) {
     lessonList: async () => [], lessonCreate: desktopOnly, lessonUpdate: desktopOnly, lessonDelete: desktopOnly,
     lessonAudio: desktopOnly, lessonRetry: desktopOnly, lessonDiscard: desktopOnly, lessonCancel: desktopOnly, lessonAnalyse: desktopOnly,
     lessonLiveSignal: desktopOnly,
+    lessonLivePrepare: desktopOnly,
+    lessonLiveStop: async () => false,
     boardConfigure: desktopOnly,
     boardStatus: async () => ({ configured: false, receiverUrl: '', active: false, connections: false, senders: [], viewUrl: null, windowOpen: false, lastChecked: 0 }),
     boardOpen: desktopOnly,

@@ -33,7 +33,9 @@ try{
   await page.getByRole('heading',{name:'Var med i lektionen.'}).waitFor();assert.equal(await page.getByRole('button',{name:'Svenska',exact:true}).getAttribute('aria-pressed'),'true');
   await page.screenshot({path:path.join(shots,'lesson-empty.png')});
   await page.getByRole('button',{name:'Starta inspelning',exact:true}).click();await page.getByRole('button',{name:'Pausa',exact:true}).waitFor();
-  await page.waitForTimeout(2000);await page.getByRole('button',{name:'Pausa',exact:true}).click();
+  await page.waitForFunction(()=>document.querySelector('.lesson-live-error')?.textContent?.includes('HTTP 503'),{},{timeout:20_000});
+  assert.ok(await app.evaluate(()=>global.__lessonTest.liveBootstrapRequests>0 && global.__lessonTest.liveSignalRequests>0));
+  await page.waitForTimeout(1200);await page.getByRole('button',{name:'Pausa',exact:true}).click();
   await waitIPC(page,async()=> (await window.schoolwork.lessonList())[0]?.segments.length===1);
   await page.getByRole('heading',{name:'Algebra · ekvationer'}).waitFor({timeout:15_000});
   assert.deepEqual(await app.evaluate(()=>global.__lessonTest.audioModels),['kb-whisper-large']);
@@ -42,6 +44,7 @@ try{
   await page.getByRole('button',{name:/^Uppgifter/}).click();
   await page.getByRole('button',{name:'Markera uppgift: Uppgift 3'}).click();await page.waitForFunction(()=>document.querySelector('.lesson-check')?.getAttribute('aria-pressed')==='true');
   pass('real microphone capture produces a complete WAV; Swedish Whisper, persisted transcript, structured summary and task completion work with simulated service responses');
+  pass('live relay failure is visible and does not stop the shared microphone or prevent saved file transcription');
   await page.getByRole('button',{name:'Lägg till i Calendar'}).click();
   assert.equal(await page.locator('input[type="date"]').inputValue(),'2026-10-16');assert.equal(await app.evaluate(()=>global.__lessonTest.calendarWrites),0);
   pass('assignment date is reviewed before any calendar write');

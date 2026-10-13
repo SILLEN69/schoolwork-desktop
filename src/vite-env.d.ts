@@ -20,7 +20,9 @@ interface Window {
     lessonDiscard: (input: {id:string;audioId:string}) => Promise<import('./lesson').LessonSession>;
     lessonCancel: (id:string) => Promise<boolean>;
     lessonAnalyse: (input: {id:string;model:string}) => Promise<import('./lesson').LessonSession>;
-    lessonLiveSignal: (input: {sdp:string;model:string}) => Promise<string>;
+    lessonLivePrepare: (input: {id:string;model:string}) => Promise<{model:string;iceServers:RTCIceServer[]}>;
+    lessonLiveSignal: (input: {id:string;sdp:string}) => Promise<string>;
+    lessonLiveStop: (id:string) => Promise<boolean>;
     boardConfigure: (url:string) => Promise<string>;
     boardStatus: () => Promise<import('./yeetcast').BoardStatus>;
     boardOpen: () => Promise<import('./yeetcast').BoardStatus>;

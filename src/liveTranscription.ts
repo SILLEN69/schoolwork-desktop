@@ -1,7 +1,7 @@
 // Live (real-time) transcription against the school's Speaches server
 // ("OpenAI Realtime API compatible"). The microphone audio flows straight
-// to the speech server over WebRTC; the only HTTP request is the one-shot
-// SDP offer, which the caller relays (through the TeachGPT API key) and
+// to the speech server over WebRTC. The caller first bootstraps the school's
+// token-authenticated live relay, then sends the one-shot SDP offer and
 // hands the SDP answer back through `signal`.
 //
 // Wire protocol (verified against teachgpt.ssis.nu's own client):
@@ -51,13 +51,18 @@ export function feedLiveEnvelope(
 ): string | null {
   if (envelope.type === 'full_message') return envelope.data || null;
   if (envelope.type !== 'partial_message' || !envelope.id) return null;
+  if (!Number.isInteger(envelope.total_fragments) || envelope.total_fragments! < 1 || envelope.total_fragments! > 512) return null;
+  if (!Number.isInteger(envelope.fragment_index) || envelope.fragment_index! < 0 || envelope.fragment_index! >= envelope.total_fragments!) return null;
+  if (typeof envelope.data !== 'string' || envelope.data.length > 256_000) return null;
   let buffer = buffers.get(envelope.id);
   if (!buffer) {
+    if (buffers.size >= 64) buffers.delete(buffers.keys().next().value!);
     buffer = { total: Number(envelope.total_fragments || 0), received: 0, parts: [] };
     buffers.set(envelope.id, buffer);
   }
-  if (typeof envelope.fragment_index === 'number' && envelope.fragment_index >= 0 && envelope.fragment_index < 512) {
-    buffer.parts[envelope.fragment_index] = envelope.data || '';
+  if (buffer.total !== envelope.total_fragments) return null;
+  if (buffer.parts[envelope.fragment_index!] === undefined) {
+    buffer.parts[envelope.fragment_index!] = envelope.data || '';
     buffer.received += 1;
   }
   if (buffer.total > 0 && buffer.received >= buffer.total) {
@@ -74,6 +79,10 @@ export type LiveSessionOptions = {
   signal: (sdpOffer: string) => Promise<string>;
   /** The speech model id, e.g. "kb-whisper-large". */
   model: string;
+  /** Resolve the school's actual ASR model and fresh STUN/TURN configuration. */
+  prepare?: () => Promise<{ model: string; iceServers: RTCIceServer[] }>;
+  /** Cancel any in-flight main-process HTTP relay. */
+  onStop?: () => void | Promise<unknown>;
   iceServers?: RTCIceServer[];
   onDelta?: (text: string) => void;
   onStatus?: (status: 'connecting' | 'live') => void;
@@ -87,11 +96,14 @@ export function startLiveTranscription(options: LiveSessionOptions): LiveSession
   let channel: RTCDataChannel | null = null;
   let closed = false;
   let errorReported = false;
+  const abort = new AbortController();
+  let deadline: ReturnType<typeof setTimeout> | undefined;
   const buffers = new Map<string, LiveFragmentBuffer>();
   const reportError = (code: string, message?: string) => {
     if (errorReported || closed) return;
     errorReported = true;
     options.onError?.(code, message);
+    void stop();
   };
 
   const handleServerEvent = (raw: string) => {
@@ -115,29 +127,21 @@ export function startLiveTranscription(options: LiveSessionOptions): LiveSession
   const stop: LiveSession['stop'] = () => {
     if (closed) return Promise.resolve();
     closed = true;
+    abort.abort();
+    clearTimeout(deadline);
+    buffers.clear();
     try {
       channel?.close();
     } catch {
       // The channel may already be closed.
     }
-    peer?.getSenders().forEach((sender) => sender.track?.stop());
     // Do not stop the shared microphone tracks here; the lesson recorder
     // owns them and may keep recording for the file transcription pipeline.
-    return new Promise((resolve) => {
-      if (!peer || peer.connectionState === 'closed') {
-        peer = null;
-        resolve();
-        return;
-      }
-      peer.onconnectionstatechange = () => {
-        if (peer!.connectionState === 'closed') {
-          peer = null;
-          resolve();
-        }
-      };
-      // Safety net: never hold the caller indefinitely.
-      setTimeout(resolve, 2000);
-    });
+    if (peer) {
+      peer.oniceconnectionstatechange = null; peer.onconnectionstatechange = null;
+      peer.close(); peer = null;
+    }
+    return Promise.resolve().then(() => options.onStop?.()).then(() => {}, () => {});
   };
 
   if (typeof window === 'undefined' || typeof window.RTCPeerConnection === 'undefined') {
@@ -147,33 +151,40 @@ export function startLiveTranscription(options: LiveSessionOptions): LiveSession
 
   void (async () => {
     try {
+      deadline = setTimeout(() => reportError('connection', 'The live connection timed out. Standard transcription continues.'), 90_000);
+      const prepared = options.prepare ? await options.prepare() : { model: options.model, iceServers: options.iceServers || [] };
+      if (closed) return;
       const track = options.stream.getAudioTracks()[0];
       if (!track) throw Object.assign(new Error('No microphone track.'), { name: 'NotFoundError' });
-      peer = new RTCPeerConnection({ iceServers: options.iceServers || [] });
+      peer = new RTCPeerConnection({ iceServers: prepared.iceServers });
       peer.addTrack(track, options.stream);
       channel = peer.createDataChannel(LIVE_DATA_CHANNEL);
       channel.onopen = () => {
+        if (closed) return;
+        clearTimeout(deadline);
         options.onStatus?.('live');
         channel?.send(
           JSON.stringify({
             type: 'session.update',
             session: {
               modalities: ['text'],
-              model: options.model,
+              model: prepared.model,
               // No language: the server detects it.
-              input_audio_transcription: { model: options.model },
+              input_audio_transcription: { model: prepared.model },
               turn_detection: { ...LIVE_TURN_DETECTION },
             },
           }),
         );
       };
       channel.onmessage = (event: MessageEvent) => {
+        if (closed) return;
         let envelope: LiveEnvelope;
         try {
           envelope = JSON.parse(String(event.data));
         } catch {
           return;
         }
+        if (envelope.type !== 'full_message' && envelope.type !== 'partial_message') { handleServerEvent(String(event.data)); return; }
         const payload = feedLiveEnvelope(buffers, envelope);
         if (payload === null) return;
         try {
@@ -182,6 +193,8 @@ export function startLiveTranscription(options: LiveSessionOptions): LiveSession
           // Ignore undecodable payloads.
         }
       };
+      channel.onclose = () => reportError('connection');
+      channel.onerror = () => reportError('connection');
       peer.oniceconnectionstatechange = () => {
         if (peer?.iceConnectionState === 'failed') reportError('connection');
       };
@@ -192,10 +205,21 @@ export function startLiveTranscription(options: LiveSessionOptions): LiveSession
       if (closed) throw new Error('stopped');
       await peer.setLocalDescription(offer);
       if (closed) throw new Error('stopped');
+      // The one-shot relay cannot send later trickle candidates. Include the
+      // gathered host/STUN/TURN candidates in the offer, as far as available.
+      const gatheringPeer = peer;
+      if (gatheringPeer.iceGatheringState !== 'complete') await new Promise<void>(resolve => {
+        const done = () => { clearTimeout(timer); gatheringPeer.removeEventListener('icegatheringstatechange', changed); abort.signal.removeEventListener('abort', done); resolve(); };
+        const changed = () => { if (gatheringPeer.iceGatheringState === 'complete') done(); };
+        const timer = setTimeout(done, 12_000);
+        gatheringPeer.addEventListener('icegatheringstatechange', changed);
+        abort.signal.addEventListener('abort', done, { once: true });
+      });
+      if (closed) return;
       options.onStatus?.('connecting');
       const answer = await options.signal(peer.localDescription!.sdp);
       if (closed) throw new Error('stopped');
-      if (!answer || answer.includes('<')) throw new Error('No SDP answer received.');
+      if (!answer.startsWith('v=0') || !/\nm=audio\s/.test(answer)) throw new Error('No valid SDP answer received.');
       await peer.setRemoteDescription({ type: 'answer', sdp: answer });
     } catch (error) {
       const name = (error as { name?: string })?.name;

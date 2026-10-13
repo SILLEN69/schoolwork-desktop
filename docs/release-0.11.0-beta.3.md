@@ -5,7 +5,7 @@ Beta Windows x64 installer and portable application are published as [v0.11.0-be
 ## Real-time transcription
 
 - While the microphone is recording, the lesson studio can transcribe live over the school's TeachGPT **realtime** (Speaches) speech-to-text service: the microphone audio streams straight to the speech server over WebRTC and the words appear in the transcript card as they are spoken, marked with a pulsing live line.
-- The existing file-based Whisper pipeline stays the final source of truth: recorded segments are still uploaded and transcribed as before, so a live session that cannot connect (for example while the school has not enabled the `realtime` route on the API) falls back silently to standard transcription.
+- The existing file-based Whisper pipeline stays the final source of truth. The original beta.3 live client used the rejected `/api/v1/realtime` proxy path. Investigation on 13 October confirmed that the existing live relay accepts an API token with its normal CSRF session; [beta.4 fixes that connection and shared-microphone cleanup](release-0.11.0-beta.4.md).
 - Realtime signalling is a single one-shot request through the TeachGPT API with your stored key; the audio itself never passes through SchoolWork.
 
 ## The classroom board (YeetCast)

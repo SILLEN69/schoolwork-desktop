@@ -14,6 +14,7 @@ import crypto from "node:crypto";
 import Store from "electron-store";
 import { autoUpdater } from 'electron-updater';
 import { Lessons, audioInputSchema } from "./lessons";
+import { TeachGptLiveTranscription, liveSpeechModel } from './liveTranscription';
 import { Board } from "./yeetcast";
 import { GoogleCalendar } from "./calendar";
 import { publishedGoogleClient } from "./googleClient";
@@ -140,6 +141,7 @@ let desktopLearning: DesktopLearning;
 let telegram: TelegramLink;
 let updates: Updates;
 let lessons: Lessons;
+const liveTranscription = new TeachGptLiveTranscription(key);
 let board: Board;
 let calendar: GoogleCalendar;
 const calendarWrites = new Set<string>();
@@ -2115,35 +2117,19 @@ function registerIpc() {
   ipcMain.handle('lessons:cancel', (event, raw) => { trusted(event); lessons.cancel(z.string().uuid().parse(raw)); return true; });
   ipcMain.handle('lessons:analyse', (event, raw) => { trusted(event); const data=z.object({id:z.string().uuid(),model:z.string().min(1).max(160)}).parse(raw); return lessons.analyse(data.id,data.model); });
   ipcMain.handle('lessons:refine',(event,raw)=>{trusted(event);const p=z.object({id:z.string().uuid(),model:z.string().min(1).max(160)}).parse(raw);return lessons.refine(p.id,p.model);});
-  // One-shot WebRTC signalling for live (real-time) transcription: relay the
-  // SDP offer to the school's Speaches server through the TeachGPT API and
-  // return the SDP answer. The microphone audio itself never touches us.
+  // The existing Sanctum-protected live relay accepts an API token plus its
+  // normal CSRF cookie pair. Resolve real model ids and TURN credentials first.
+  ipcMain.handle('lessons:live-prepare', async (event, raw) => {
+    trusted(event);
+    const p = z.object({id:z.string().uuid(),model:liveSpeechModel}).parse(raw);
+    return liveTranscription.prepare(p.id,p.model);
+  });
   ipcMain.handle('lessons:live-signal',async (event,raw)=>{
     trusted(event);
-    const p=z.object({sdp:z.string().min(100).max(20_000),model:z.string().min(1).max(160)}).parse(raw);
-    const credential=key();
-    if(!credential)throw new Error('Configure your TeachGPT API key in Settings first.');
-    let response:Response;
-    try{
-      response=await fetch(baseURL+'/realtime?model='+encodeURIComponent(p.model),{
-        method:'POST',
-        headers:{Authorization:'Bearer '+credential,'Content-Type':'application/sdp',Accept:'application/json'},
-        body:p.sdp,
-        redirect:'error',
-        signal:AbortSignal.timeout(60_000),
-      });
-    }catch(error){
-      throw new Error('Realtime signalling could not reach TeachGPT. Standard transcription continues.',error instanceof Error?{cause:error}:undefined);
-    }
-    if(!response.ok){
-      if(response.status===403)throw new Error('The school TeachGPT API has not enabled the realtime route yet (HTTP 403). Standard transcription continues.');
-      if(response.status===404||response.status===405)throw new Error('TeachGPT does not expose a realtime endpoint. Standard transcription continues.');
-      throw new Error('Realtime signalling failed (HTTP '+response.status+'). Standard transcription continues.');
-    }
-    const answer=await response.text();
-    if(!answer.trim()||answer.includes('<'))throw new Error('Realtime signalling returned no SDP answer. Standard transcription continues.');
-    return answer;
+    const p=z.object({id:z.string().uuid(),sdp:z.string().min(100).max(100_000)}).parse(raw);
+    return liveTranscription.signal(p.id,p.sdp);
   });
+  ipcMain.handle('lessons:live-stop',(event,raw)=>{trusted(event);liveTranscription.cancel(z.string().uuid().parse(raw));return true;});
   ipcMain.handle('board:configure',(event,raw)=>{trusted(event);return board.configure(z.string().min(8).max(500).parse(raw));});
   ipcMain.handle('board:status',async (event)=>{trusted(event);return board.refresh();});
   ipcMain.handle('board:open',async (event)=>{trusted(event);return board.open();});
@@ -2956,6 +2942,7 @@ else {
     });
   });
   app.on("before-quit", () => {
+    liveTranscription.stop();
     if(updateTimer) clearInterval(updateTimer);
     telegram?.stop();
     calendar?.stop();

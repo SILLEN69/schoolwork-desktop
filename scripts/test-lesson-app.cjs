@@ -26,6 +26,16 @@ app.whenReady().then(()=>{
   fs.writeFileSync(path.join(data,'schoolwork-settings.json'),JSON.stringify({encryptedKey:safeStorage.encryptString('test-only-not-a-real-credential').toString('base64'),model:'Qwen3.8-27B',workspace:data,language:'en',capabilities:{allApps:false,launchApps:false,viewScreen:false,controlScreen:false,allowedApps:[]}}));
   global.fetch=async(url,init)=>{
     const state=global.__lessonTest;
+    if(String(url)==='https://teachgpt.ssis.nu/audio'){
+      state.liveBootstrapRequests=(state.liveBootstrapRequests||0)+1;
+      return new Response('<meta name="csrf-token" content="fixture-csrf-token-0123456789"><div wire:snapshot=\''+JSON.stringify({memo:{name:'live-transcriptions'},data:{enabled:true,speachesModels:[{'kb-whisper-large':'KBLab/kb-whisper-large','faster-whisper-large-v3':'Systran/faster-whisper-large-v3'},{s:'arr'}],iceServers:[[],{s:'arr'}]}})+'\'></div>',{headers:{'Set-Cookie':'fixture_session=test; HttpOnly; Secure; Path=/'}});
+    }
+    if(String(url).startsWith('https://teachgpt.ssis.nu/audio/live/signal?')){
+      state.liveSignalRequests=(state.liveSignalRequests||0)+1;
+      if(!init.headers['X-CSRF-TOKEN']||!init.headers.Cookie)throw new Error('Live relay missing paired CSRF/cookie');
+      // Exercise a real failed live connection; local audio must still record.
+      return new Response('',{status:503});
+    }
     if(String(url).endsWith('/audio/transcriptions')){
       state.audioModels.push(init.body.get('model'));
       if(state.failAudio)return new Response('',{status:503});
