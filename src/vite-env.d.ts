@@ -36,6 +36,15 @@ interface Window {
     followDeckGenerate: (input: { id: string; model: string }) => Promise<import('./reviewDeck').ReviewDeckView>;
     followReviewMark: (input: { id: string; kind: 'card' | 'quiz'; itemIndex: number; result: 'got' | 'still' }) => Promise<{ item: import('./reviewDeck').ReviewItemState; dueCount: number }>;
     followDueQueue: () => Promise<import('./reviewDeck').ReviewQueue>;
+    examList: () => Promise<import('./examPrep').ExamSummary[]>;
+    examGet: (id: string) => Promise<import('./examPrep').ExamDocument>;
+    examLessonSources: () => Promise<Array<{ id: string; title: string; language: 'sv' | 'en'; updatedAt: number }>>;
+    examBuild: (input: { kind: 'lesson'; lessonId: string } | { kind: 'notes'; title?: string; text: string; language: 'sv' | 'en' }, model: string) => Promise<import('./examPrep').ExamDocument>;
+    examStart: (id: string) => Promise<import('./examPrep').ExamDocument>;
+    examAnswer: (input: { id: string; questionId: string; answer: import('./examPrep').ExamAnswer }) => Promise<import('./examPrep').ExamDocument>;
+    examSubmit: (input: { id: string; answers: Record<string, import('./examPrep').ExamAnswer> }) => Promise<import('./examPrep').ExamDocument>;
+    examDelete: (id: string) => Promise<void>;
+    examCancel: (id: string) => Promise<boolean>;
     calendarStatus: () => Promise<import('./lesson').CalendarStatus & {error?:string}>;
     calendarConfigure: (input:{clientId:string;clientSecret:string;calendarId?:string}) => Promise<import('./lesson').CalendarStatus>;
     calendarConnect: () => Promise<import('./lesson').CalendarStatus>;

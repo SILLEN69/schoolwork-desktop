@@ -15,7 +15,9 @@ import Store from "electron-store";
 import { autoUpdater } from 'electron-updater';
 import { Lessons, audioInputSchema } from "./lessons";
 import { LessonFollower } from "./lessonFollower";
+import { ExamPrep, type ExamBuildInput } from "./examPrep";
 import { followImportSchema, detectLanguage } from "../src/lessonFollower";
+import { MAX_NOTES_CHARS, MIN_NOTES_CHARS } from "../src/examPrep";
 import { GoogleCalendar } from "./calendar";
 import { publishedGoogleClient } from "./googleClient";
 import { DesktopPointer } from './desktopPointer';
@@ -148,6 +150,7 @@ let telegram: TelegramLink;
 let updates: Updates;
 let lessons: Lessons;
 let follower: LessonFollower;
+let exams: ExamPrep;
 let calendar: GoogleCalendar;
 let workbenchWatch: (() => void) | null = null;
 const workbenchWorkspace = () => settings.get("workspace") || app.getPath("documents");
@@ -2185,6 +2188,20 @@ function registerIpc() {
   ipcMain.handle('follow:deckGenerate', (event, raw) => { trusted(event); const p = z.object({ id: z.string().uuid(), model: z.string().min(1).max(160) }).parse(raw); return follower.deckGenerate(p.id, p.model); });
   ipcMain.handle('follow:reviewMark', (event, raw) => { trusted(event); const p = z.object({ id: z.string().uuid(), kind: z.enum(['card', 'quiz']), itemIndex: z.number().int().min(0).max(100), result: z.enum(['got', 'still']) }).parse(raw); return follower.reviewMark(p.id, p.kind, p.itemIndex, p.result); });
   ipcMain.handle('follow:dueQueue', event => { trusted(event); return follower.dueQueue(); });
+  const examAnswerSchema = z.object({ optionIndex: z.number().int().min(0).max(3).optional(), text: z.string().max(4000).optional(), flagged: z.boolean().optional() });
+  const examBuildInputSchema: z.ZodType<ExamBuildInput> = z.discriminatedUnion('kind', [
+    z.object({ kind: z.literal('lesson'), lessonId: z.string().uuid() }),
+    z.object({ kind: z.literal('notes'), title: z.string().trim().min(1).max(160).optional(), text: z.string().min(MIN_NOTES_CHARS).max(MAX_NOTES_CHARS), language: z.enum(['sv', 'en']) }),
+  ]);
+  ipcMain.handle('exam:list', event => { trusted(event); return exams.list(); });
+  ipcMain.handle('exam:get', (event, raw) => { trusted(event); return exams.get(z.string().uuid().parse(raw)); });
+  ipcMain.handle('exam:lessonSources', event => { trusted(event); return exams.lessonSources(); });
+  ipcMain.handle('exam:build', (event, raw) => { trusted(event); const p = z.object({ input: examBuildInputSchema, model: z.string().min(1).max(160) }).parse(raw); return exams.build(p.input, p.model); });
+  ipcMain.handle('exam:start', (event, raw) => { trusted(event); return exams.start(z.string().uuid().parse(raw)); });
+  ipcMain.handle('exam:answer', (event, raw) => { trusted(event); const p = z.object({ id: z.string().uuid(), questionId: z.string().min(1).max(80), answer: examAnswerSchema }).parse(raw); return exams.answer(p.id, p.questionId, p.answer); });
+  ipcMain.handle('exam:submit', (event, raw) => { trusted(event); const p = z.object({ id: z.string().uuid(), answers: z.record(z.string().min(1).max(80), examAnswerSchema) }).parse(raw); return exams.submit(p.id, p.answers); });
+  ipcMain.handle('exam:delete', (event, raw) => { trusted(event); return exams.remove(z.string().uuid().parse(raw)); });
+  ipcMain.handle('exam:cancel', (event, raw) => { trusted(event); exams.cancel(z.string().uuid().parse(raw)); return true; });
   ipcMain.handle('calendar:status', event => { trusted(event); return calendar.status(); });
   ipcMain.handle('calendar:check',event=>{trusted(event);return calendar.check();});
   ipcMain.handle('calendar:drive',(event,raw)=>{trusted(event);return calendar.enableDrive(z.boolean().parse(raw));});
@@ -3027,6 +3044,7 @@ else {
     }
     lessons = new Lessons(store, path.join(app.getPath('userData'), 'lesson-audio'), key);
     follower = new LessonFollower(store, key);
+    exams = new ExamPrep(store, key);
     calendar = new GoogleCalendar(store, encryptTeachGPTCredential, readTeachGPTCredential, shell.openExternal, fetch, publishedGoogleClient);
     connections=new Connections(store,encryptTeachGPTCredential,readTeachGPTCredential);
     session.defaultSession.setPermissionCheckHandler((contents, permission, _origin, details) => contents === win?.webContents && details.isMainFrame && (permission === 'clipboard-sanitized-write' || permission === 'media' && details.mediaType === 'audio'));
@@ -3047,6 +3065,7 @@ else {
     stopWorkbenchRuns();
     for (const lesson of lessons?.list() || []) lessons.cancel(lesson.id);
     for (const lesson of follower?.list() || []) follower.cancel(lesson.id);
+    exams?.cancelAll();
     for (const controller of active.values()) controller.abort();
     stopDesktop();
     globalShortcut.unregisterAll();

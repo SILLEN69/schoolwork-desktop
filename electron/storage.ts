@@ -118,6 +118,14 @@ export class SchoolWorkStore {
         UNIQUE(lesson_id, kind, item_index)
       );
       CREATE INDEX IF NOT EXISTS review_items_due ON review_items(due_at);
+      CREATE TABLE IF NOT EXISTS practice_exams (
+        id TEXT PRIMARY KEY, title TEXT NOT NULL, language TEXT NOT NULL,
+        source_kind TEXT NOT NULL, source_lesson_id TEXT REFERENCES follow_lessons(id) ON DELETE SET NULL,
+        source_title TEXT NOT NULL, source_text TEXT NOT NULL, questions_json TEXT NOT NULL,
+        duration_min INTEGER NOT NULL, built_with TEXT NOT NULL, state_json TEXT NOT NULL,
+        created_at INTEGER NOT NULL, updated_at INTEGER NOT NULL
+      );
+      CREATE INDEX IF NOT EXISTS practice_exams_updated ON practice_exams(updated_at DESC);
     `);
     this.migrateLegacyJson(userDataPath);
     this.recoverInterruptedTasks();
@@ -383,6 +391,47 @@ export class SchoolWorkStore {
     this.db.prepare('UPDATE review_items SET due_at=?,last_reviewed_at=?,interval_index=?,attempts=?,correct=?,status=? WHERE id=? AND lesson_id=?').run(
       item.dueAt, item.lastReviewedAt, item.intervalIndex, item.attempts, item.correct, item.status, item.id, item.lessonId,
     );
+  }
+
+  listFinishedFollowLessons(): Array<{ id: string; title: string; language: 'sv' | 'en'; updatedAt: number }> {
+    const rows = this.db.prepare('SELECT id,title,language,state_json,updated_at FROM follow_lessons ORDER BY updated_at DESC').all() as any[];
+    return rows
+      .filter(row => { try { return Boolean(JSON.parse(row.state_json).finishedAt); } catch { return false; } })
+      .map(row => ({ id: row.id, title: row.title, language: row.language, updatedAt: row.updated_at }));
+  }
+
+  listExams(): Array<{ id: string; title: string; sourceKind: 'lesson' | 'notes'; sourceTitle: string; questionCount: number; durationMin: number; status: 'ready' | 'in_progress' | 'submitted'; builtWith: 'model' | 'offline'; createdAt: number; updatedAt: number }> {
+    const rows = this.db.prepare('SELECT id,title,source_kind,source_title,questions_json,duration_min,built_with,state_json,created_at,updated_at FROM practice_exams ORDER BY updated_at DESC').all() as any[];
+    return rows.map(row => ({
+      id: row.id, title: row.title, sourceKind: row.source_kind, sourceTitle: row.source_title,
+      questionCount: (JSON.parse(row.questions_json) as unknown[]).length, durationMin: row.duration_min,
+      status: (JSON.parse(row.state_json) as any).status, builtWith: row.built_with,
+      createdAt: row.created_at, updatedAt: row.updated_at,
+    }));
+  }
+
+  getExam(id: string): import('../src/examPrep').ExamDocument | undefined {
+    const row = this.db.prepare('SELECT id,title,language,source_kind,source_lesson_id,source_title,source_text,questions_json,duration_min,built_with,state_json,created_at,updated_at FROM practice_exams WHERE id=?').get(id) as any;
+    if (!row) return undefined;
+    return {
+      id: row.id, title: row.title, language: row.language,
+      sourceKind: row.source_kind, sourceLessonId: row.source_lesson_id ?? undefined,
+      sourceTitle: row.source_title, sourceText: row.source_text,
+      questions: JSON.parse(row.questions_json), durationMin: row.duration_min,
+      builtWith: row.built_with, createdAt: row.created_at, updatedAt: row.updated_at,
+      state: JSON.parse(row.state_json),
+    };
+  }
+
+  saveExam(doc: import('../src/examPrep').ExamDocument): void {
+    this.db.prepare('INSERT INTO practice_exams(id,title,language,source_kind,source_lesson_id,source_title,source_text,questions_json,duration_min,built_with,state_json,created_at,updated_at) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?) ON CONFLICT(id) DO UPDATE SET title=excluded.title,language=excluded.language,source_kind=excluded.source_kind,source_lesson_id=excluded.source_lesson_id,source_title=excluded.source_title,source_text=excluded.source_text,questions_json=excluded.questions_json,duration_min=excluded.duration_min,built_with=excluded.built_with,state_json=excluded.state_json,updated_at=excluded.updated_at').run(
+      doc.id, doc.title, doc.language, doc.sourceKind, doc.sourceLessonId ?? null, doc.sourceTitle, doc.sourceText,
+      JSON.stringify(doc.questions), doc.durationMin, doc.builtWith, JSON.stringify(doc.state), doc.createdAt, doc.updatedAt,
+    );
+  }
+
+  removeExam(id: string): void {
+    this.db.prepare('DELETE FROM practice_exams WHERE id=?').run(id);
   }
 
   /** Lessons that have due review items, for the sidebar badge and the review queue. */

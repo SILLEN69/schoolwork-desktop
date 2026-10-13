@@ -16,6 +16,8 @@ if (!window.schoolwork) {
     followAdvance: desktopOnly, followExplain: desktopOnly, followFile: async () => null, followCancel: async () => false,
     followQuestions: desktopOnly, followAnswer: desktopOnly, followSkip: desktopOnly, followFinish: desktopOnly,
     followDeck: async () => null, followDeckGenerate: desktopOnly, followReviewMark: desktopOnly, followDueQueue: async () => ({ count: 0, lessons: [] }),
+    examList: async () => [], examGet: desktopOnly, examLessonSources: async () => [], examBuild: desktopOnly,
+    examStart: desktopOnly, examAnswer: desktopOnly, examSubmit: desktopOnly, examDelete: desktopOnly, examCancel: async () => false,
     calendarStatus: async () => ({configured:false,connected:false,connecting:false,calendarId:'primary'}),
     calendarConfigure: desktopOnly, calendarConnect: desktopOnly, calendarCancelConnect: desktopOnly, calendarDisconnect: desktopOnly, calendarAdd: desktopOnly,
     updateStatus: async () => ({phase:'unsupported',currentVersion:'preview',message:'Updates are available in the installed app.'}),

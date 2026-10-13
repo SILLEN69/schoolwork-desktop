@@ -1,15 +1,16 @@
 import { useEffect, useRef, useState } from 'react';
-import { ArrowLeft, ArrowUpRight, BookOpenCheck, Check, ChevronLeft, ChevronRight, Eye, FileText, Flag, Layers, LoaderCircle, Plus, RefreshCw, Repeat, RotateCcw, SkipForward, Sparkles, Trash2, X } from 'lucide-react';
+import { ArrowLeft, ArrowUpRight, BookOpenCheck, Check, ChevronLeft, ChevronRight, ClipboardList, Eye, FileText, Flag, Layers, LoaderCircle, Plus, RefreshCw, Repeat, RotateCcw, SkipForward, Sparkles, Trash2, X } from 'lucide-react';
 import MessageMarkdown from './MessageMarkdown';
 import type { FollowLesson, FollowSegment } from '../lessonFollower';
 import type { ReviewDeckView, ReviewMark } from '../reviewDeck';
 import './lessons.css';
 type Props = {
   configured: boolean; model: string; swedish: boolean; onBack: () => void; onWork: (chatId: string) => void;
+  onExam?: (lessonId: string) => void;
   target?: { lessonId: string; review: boolean } | null;
 };
 const errorText = (e: unknown) => (e instanceof Error ? e.message : String(e));
-export default function LessonFollower({ configured, model, swedish, onBack, onWork, target }: Props) {
+export default function LessonFollower({ configured, model, swedish, onBack, onWork, onExam, target }: Props) {
   const t = (en: string, sv: string) => (swedish ? sv : en);
   const [lessons, setLessons] = useState<FollowLesson[]>([]);
   const [current, setCurrent] = useState<FollowLesson | null>(null);
@@ -382,6 +383,7 @@ export default function LessonFollower({ configured, model, swedish, onBack, onW
             {firstFlagged >= 0 ? <button className={deck ? 'lesson-primary' : 'lesson-outline'} onClick={() => void reviewFirst()}><Flag size={15}/> {t('Review weak segments', 'Repetera svaga delar')}</button> : <span>{t('Nothing to review', 'Inget att repetera')}</span>}
             {deck ? <button className="lesson-outline" onClick={() => void openDeck()}><Layers size={15}/> {t('Open review deck', 'Öppna repeteringsdeck')}</button>
               : <button className="lesson-primary" disabled={building} onClick={() => void buildDeck()}>{building ? <LoaderCircle className="spin" size={15}/> : <Layers size={15}/>}{building ? t('Building your review deck…', 'Bygger din repeteringsdeck…') : t('Build review deck', 'Bygg repeteringsdeck')}</button>}
+            {onExam && <button className="lesson-outline" onClick={() => onExam(lesson.id)}><ClipboardList size={15}/> {t('Practice exam', 'Övningsprov')}</button>}
           </div>
         </div>
       </>}
