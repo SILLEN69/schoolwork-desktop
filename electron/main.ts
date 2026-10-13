@@ -14,6 +14,7 @@ import crypto from "node:crypto";
 import Store from "electron-store";
 import { autoUpdater } from 'electron-updater';
 import { Lessons, audioInputSchema } from "./lessons";
+import { Board } from "./yeetcast";
 import { GoogleCalendar } from "./calendar";
 import { publishedGoogleClient } from "./googleClient";
 import { DesktopPointer } from './desktopPointer';
@@ -139,6 +140,7 @@ let desktopLearning: DesktopLearning;
 let telegram: TelegramLink;
 let updates: Updates;
 let lessons: Lessons;
+let board: Board;
 let calendar: GoogleCalendar;
 const calendarWrites = new Set<string>();
 let updateTimer: ReturnType<typeof setInterval>|undefined;
@@ -2113,14 +2115,62 @@ function registerIpc() {
   ipcMain.handle('lessons:cancel', (event, raw) => { trusted(event); lessons.cancel(z.string().uuid().parse(raw)); return true; });
   ipcMain.handle('lessons:analyse', (event, raw) => { trusted(event); const data=z.object({id:z.string().uuid(),model:z.string().min(1).max(160)}).parse(raw); return lessons.analyse(data.id,data.model); });
   ipcMain.handle('lessons:refine',(event,raw)=>{trusted(event);const p=z.object({id:z.string().uuid(),model:z.string().min(1).max(160)}).parse(raw);return lessons.refine(p.id,p.model);});
-  ipcMain.handle('lessons:chat',(event,raw)=>{
+  // One-shot WebRTC signalling for live (real-time) transcription: relay the
+  // SDP offer to the school's Speaches server through the TeachGPT API and
+  // return the SDP answer. The microphone audio itself never touches us.
+  ipcMain.handle('lessons:live-signal',async (event,raw)=>{
+    trusted(event);
+    const p=z.object({sdp:z.string().min(100).max(20_000),model:z.string().min(1).max(160)}).parse(raw);
+    const credential=key();
+    if(!credential)throw new Error('Configure your TeachGPT API key in Settings first.');
+    let response:Response;
+    try{
+      response=await fetch(baseURL+'/realtime?model='+encodeURIComponent(p.model),{
+        method:'POST',
+        headers:{Authorization:'Bearer '+credential,'Content-Type':'application/sdp',Accept:'application/json'},
+        body:p.sdp,
+        redirect:'error',
+        signal:AbortSignal.timeout(60_000),
+      });
+    }catch(error){
+      throw new Error('Realtime signalling could not reach TeachGPT. Standard transcription continues.',error instanceof Error?{cause:error}:undefined);
+    }
+    if(!response.ok){
+      if(response.status===403)throw new Error('The school TeachGPT API has not enabled the realtime route yet (HTTP 403). Standard transcription continues.');
+      if(response.status===404||response.status===405)throw new Error('TeachGPT does not expose a realtime endpoint. Standard transcription continues.');
+      throw new Error('Realtime signalling failed (HTTP '+response.status+'). Standard transcription continues.');
+    }
+    const answer=await response.text();
+    if(!answer.trim()||answer.includes('<'))throw new Error('Realtime signalling returned no SDP answer. Standard transcription continues.');
+    return answer;
+  });
+  ipcMain.handle('board:configure',(event,raw)=>{trusted(event);return board.configure(z.string().min(8).max(500).parse(raw));});
+  ipcMain.handle('board:status',async (event)=>{trusted(event);return board.refresh();});
+  ipcMain.handle('board:open',async (event)=>{trusted(event);return board.open();});
+  ipcMain.handle('board:hide',(event)=>{trusted(event);return board.hide();});
+  ipcMain.handle('board:close',(event)=>{trusted(event);board.close();return true;});
+  ipcMain.handle('board:capture',async (event,raw)=>{
+    trusted(event);
+    const sessionId=z.string().uuid().parse(raw);
+    const file=await board.capture();
+    if(!file)throw new Error('Open the board window first, then capture it.');
+    return lessons.attachBoardSnapshot(sessionId,file);
+  });
+  ipcMain.handle('lessons:chat',async (event,raw)=>{
     trusted(event);const p=z.object({id:z.string().uuid(),model:z.string().min(1).max(160),question:z.string().trim().min(1).max(10000)}).parse(raw);
     const s=lessons.get(p.id),chatId=s.linkedChatId || crypto.randomUUID();
+    // Latest captured board image as context: a fresh import per question, bound to that question by the pipeline.
+    let boardAttachmentIds:string[]=[];
+    const snapshot=(s.boardSnapshots||[]).at(-1);
+    if(snapshot){
+      try{boardAttachmentIds=[(await attachments.import(chatId,'board-'+snapshot.id+'.jpg',await fs.readFile(snapshot.path))).id];}
+      catch{ /* Board context is best effort; the question continues text-only. */ }
+    }
     const existing=store.getActiveTasks().find(t=>t.conversationId===chatId && ['running','queued'].includes(t.state));
     const reference=JSON.stringify({title:s.title,subject:s.subject,notes:s.analysis,transcript:transcriptText(s).slice(-35000)});
     let taskId:string;
-    if(existing){store.steerTask({taskId:existing.id,conversationId:chatId,clientRequestId:crypto.randomUUID(),text:p.question,attachmentIds:[]});emit(existing,'steering-queued',{text:'Your follow-up is saved for the next step.'});taskId=existing.id;}
-    else taskId=submitTask({chatId,userText:p.question,model:p.model},undefined,reference);
+    if(existing){store.steerTask({taskId:existing.id,conversationId:chatId,clientRequestId:crypto.randomUUID(),text:p.question,attachmentIds:boardAttachmentIds});emit(existing,'steering-queued',{text:'Your follow-up is saved for the next step.'});taskId=existing.id;}
+    else taskId=submitTask({chatId,userText:p.question,model:p.model,attachmentIds:boardAttachmentIds},undefined,reference);
     lessons.update(p.id,{linkedChatId:chatId});return {chatId,taskId};
   });
   ipcMain.handle('calendar:status', event => { trusted(event); return calendar.status(); });
@@ -2890,7 +2940,10 @@ else {
       setTimeout(()=>void updates.check(false),15000).unref();
       updateTimer=setInterval(()=>void updates.check(false),6*60*60*1000);updateTimer.unref();
     }
-    lessons = new Lessons(store, path.join(app.getPath('userData'), 'lesson-audio'), key);
+    board = new Board(store, path.join(app.getPath('userData'), 'board'));
+    lessons = new Lessons(store, path.join(app.getPath('userData'), 'lesson-audio'), key, fetch,
+      (model) => visionProfiles()[model]?.status !== 'unsupported',
+      (model) => saveVision(model, 'unsupported', 'Lesson board image was rejected by the provider.'));
     calendar = new GoogleCalendar(store, encryptTeachGPTCredential, readTeachGPTCredential, shell.openExternal, fetch, publishedGoogleClient);
     connections=new Connections(store,encryptTeachGPTCredential,readTeachGPTCredential);
     session.defaultSession.setPermissionCheckHandler((contents, permission, _origin, details) => contents === win?.webContents && details.isMainFrame && (permission === 'clipboard-sanitized-write' || permission === 'media' && details.mediaType === 'audio'));
@@ -2907,6 +2960,7 @@ else {
     telegram?.stop();
     calendar?.stop();
     connections?.stop();
+    board?.close();
     for (const lesson of lessons?.list() || []) lessons.cancel(lesson.id);
     for (const controller of active.values()) controller.abort();
     stopDesktop();

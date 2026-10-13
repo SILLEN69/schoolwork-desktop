@@ -1,7 +1,9 @@
 import { useEffect, useRef, useState } from 'react';
-import { ArrowLeft, ArrowUpRight, CalendarDays, Check, CheckCircle2, ChevronRight, Download, FileAudio, FileText, GraduationCap, Headphones, LoaderCircle, Mic, Pause, Plus, RefreshCw, Settings2, Sparkles, Trash2, X } from 'lucide-react';
+import { ArrowLeft, ArrowUpRight, CalendarDays, Camera, Check, CheckCircle2, ChevronRight, Download, FileAudio, FileText, GraduationCap, Headphones, LoaderCircle, Mic, Pause, Plus, RefreshCw, Settings2, Sparkles, Trash2, Tv, X } from 'lucide-react';
 import { LessonRecorder, audioBase64 } from '../audioRecorder';
+import { startLiveTranscription, type LiveSession } from '../liveTranscription';
 import { audioEnd, formatAudioTime, transcriptText, lessonSubjects, type AudioInput, type AudioLanguage, type CalendarStatus, type LessonSession, type LessonTask } from '../lesson';
+import type { BoardStatus } from '../yeetcast';
 import MessageMarkdown from './MessageMarkdown';
 import { speechModels } from '../speechModels';
 import './lessons.css';
@@ -21,7 +23,10 @@ export default function LessonWorkspace({ initialMode, summaryModel, configured,
   const [showCalendar, setShowCalendar] = useState(false), [calendarTask, setCalendarTask] = useState<LessonTask | null>(null);
   const [calendarTitle, setCalendarTitle] = useState(''), [calendarDate, setCalendarDate] = useState(''), [calendarBusy, setCalendarBusy] = useState(false);
   const [deleteId, setDeleteId] = useState<string | null>(null);
-  const recorder = useRef<LessonRecorder | null>(null), queue = useRef<Promise<void>>(Promise.resolve()), queued = useRef(0);
+  const [liveStatus, setLiveStatus] = useState<'idle' | 'connecting' | 'live' | 'failed'>('idle'), [liveText, setLiveText] = useState('');
+  const [board, setBoard] = useState<BoardStatus | null>(null), [boardConfig, setBoardConfig] = useState(false);
+  const [boardUrlInput, setBoardUrlInput] = useState(''), [boardBusy, setBoardBusy] = useState(false), [boardNote, setBoardNote] = useState('');
+  const recorder = useRef<LessonRecorder | null>(null), queue = useRef<Promise<void>>(Promise.resolve()), queued = useRef(0), liveSession = useRef<LiveSession | null>(null);
   const creating=useRef<Promise<LessonSession>|null>(null);
   const selected = useRef<LessonSession | null>(null), mounted = useRef(true), lastAnalysis = useRef(0), analysisBusy = useRef(false);
   const startedAt = useRef(0), uploadInput = useRef<HTMLInputElement>(null), summaryModelRef = useRef(summaryModel);
@@ -37,7 +42,7 @@ export default function LessonWorkspace({ initialMode, summaryModel, configured,
   useEffect(() => {
     mounted.current = true;
     window.schoolwork.lessonList().then(s => { if(mounted.current) setSessions(s); }).catch(e => setError(errorText(e)));
-    return () => { mounted.current = false; recorder.current?.stop(); recorder.current = null; };
+    return () => { mounted.current = false; stopLive(); recorder.current?.stop(); recorder.current = null; };
   }, []);
   useEffect(() => {
     let active = true;
@@ -85,7 +90,25 @@ export default function LessonWorkspace({ initialMode, summaryModel, configured,
     selected.current = session; accept(session); setTitle(session.title); setError(''); setElapsed(0); lastAnalysis.current = 0; return session;})();
     try{return await creating.current;}finally{creating.current=null;}
   };
-  const stop = () => { recorder.current?.stop(); recorder.current = null; setRecording(false); setStarting(false); };
+  const stopLive = () => { const session = liveSession.current; liveSession.current = null; if (session) void session.stop(); setLiveStatus('idle'); setLiveText(''); };
+  const stop = () => { stopLive(); recorder.current?.stop(); recorder.current = null; setRecording(false); setStarting(false); };
+  const boardLoad = () => window.schoolwork.boardStatus().then(s => { if (mounted.current) setBoard(s); }).catch(() => {});
+  useEffect(() => { void boardLoad(); const timer = setInterval(() => void boardLoad(), 10_000); return () => clearInterval(timer); }, []);
+  const boardConfigureSubmit = async () => {
+    if (!boardUrlInput.trim() || boardBusy) return; setBoardBusy(true); setBoardNote('');
+    try { await window.schoolwork.boardConfigure(boardUrlInput.trim()); setBoardConfig(false); await boardLoad(); }
+    catch (e) { setBoardNote(errorText(e)); } finally { if (mounted.current) setBoardBusy(false); }
+  };
+  const boardToggle = async () => {
+    if (boardBusy) return; setBoardBusy(true); setBoardNote('');
+    try { await (board?.windowOpen ? window.schoolwork.boardHide() : window.schoolwork.boardOpen()); await boardLoad(); }
+    catch (e) { setBoardNote(errorText(e)); } finally { if (mounted.current) setBoardBusy(false); }
+  };
+  const boardCapture = async () => {
+    const session = current; if (!session || boardBusy) return; setBoardBusy(true); setBoardNote('');
+    try { const updated = await window.schoolwork.boardCapture(session.id); accept(updated); setBoardNote(t('Tavlan sparas som AI-kontext.', 'Board saved as AI context.')); setTimeout(() => { if (mounted.current) setBoardNote(''); }, 5_000); }
+    catch (e) { setBoardNote(errorText(e)); } finally { if (mounted.current) setBoardBusy(false); }
+  };
   const enqueue = (input: AudioInput) => {
     queued.current++; setUploads(queued.current);
     if (queued.current >= 4) { stop(); setError(t('Inspelningen pausades för att hinna transkribera ljudet. Vänta och fortsätt sedan.', 'Recording paused to catch up with transcription. Wait, then continue.')); }
@@ -110,10 +133,24 @@ export default function LessonWorkspace({ initialMode, summaryModel, configured,
       const captureLanguage = session.language;
       const next = new LessonRecorder(({buffer,start,duration}) => enqueue({ sessionId: session.id, id: crypto.randomUUID(),
         base64: audioBase64(buffer), mime: 'audio/wav', name: `recording-${Math.floor(start)}.wav`, start, duration, language: captureLanguage }),
-        value => { if(mounted.current) setLevel(value); }, () => { setRecording(false); setError(t('Mikrofonen kopplades från. Inspelningen har pausats.', 'Microphone disconnected. Recording paused.')); }, audioEnd(session));
+        value => { if(mounted.current) setLevel(value); }, () => { setRecording(false); stopLive(); setError(t('Mikrofonen kopplades från. Inspelningen har pausats.', 'Microphone disconnected. Recording paused.')); }, audioEnd(session));
       recorder.current = next; await next.start();
       if (!mounted.current || recorder.current !== next) { next.stop(); return; }
       startedAt.current = Date.now(); setElapsed(0); setRecording(true);
+      // Live (real-time) transcription runs alongside the recording and shares its
+      // microphone track; the file pipeline below stays the final source of truth.
+      const stream = next.mediaStream;
+      if (stream && configured) {
+        stopLive(); setLiveStatus('connecting');
+        liveSession.current = startLiveTranscription({
+          stream,
+          model: speechModels[captureLanguage],
+          signal: sdp => window.schoolwork.lessonLiveSignal({ sdp, model: speechModels[captureLanguage] }),
+          onDelta: text => setLiveText(previous => (previous ? previous.slice(-220) + ' ' : '') + text),
+          onStatus: status => { if (mounted.current) setLiveStatus(status); },
+          onError: () => { if (mounted.current) { setLiveStatus('failed'); setLiveText(''); } },
+        });
+      }
     } catch (e) { stop(); setError(errorText(e)); }
     finally { if(mounted.current) setStarting(false); }
   };
@@ -177,11 +214,32 @@ export default function LessonWorkspace({ initialMode, summaryModel, configured,
       <section className="lesson-intro"><div><div className="lesson-eyebrow"><Sparkles size={13}/>{t('MER NÄRVARO. MINDRE ANTECKNANDE.', 'MORE PRESENCE. LESS NOTE-TAKING.')}</div>{current ? <input className="lesson-title" value={title} maxLength={160} aria-label={t('Sessionens namn', 'Session title')} onChange={e => setTitle(e.target.value)} onBlur={() => { if(title.trim() && title !== current.title) void perform(() => window.schoolwork.lessonUpdate({id:current.id,title:title.trim()})); else setTitle(current.title); }}/> : <h1>{t(mode === 'lesson' ? 'Var med i lektionen.' : 'Från tal till text.', mode === 'lesson' ? 'Be present in the lesson.' : 'From speech to text.')}</h1>}<p>{t(mode === 'lesson' ? 'Vi fångar orden, samlar det viktiga och hjälper dig vidare.' : 'Spela in eller ladda upp ljud. Läs, kopiera och spara ditt transkript.', mode === 'lesson' ? 'Capture the words, connect the ideas, and know what comes next.' : 'Record or upload audio. Read, copy, and save your transcript.')}</p></div><button className="lesson-outline" disabled={!current || locked} onClick={exportNotes}><Download size={15}/>{t('Exportera', 'Export')}</button></section>
       {!configured && <div className="lesson-notice">{t('Lägg till din TeachGPT-nyckel i SchoolWorks inställningar för att transkribera och sammanfatta.', 'Add your TeachGPT key in SchoolWork settings to transcribe and summarise.')}</div>}
       {error && <div className="lesson-error" role="alert"><span>{error}</span><button aria-label={t('Stäng meddelande', 'Dismiss message')} onClick={() => setError('')}><X size={15}/></button></div>}
-      <div className="lesson-capture"><div className={'lesson-record-status ' + (recording ? 'live' : '')}><div className="lesson-mic-orb"><Mic size={21}/></div><div><strong>{recording ? t('Lyssnar på lektionen', 'Listening to the lesson') : starting ? t('Öppnar mikrofon…', 'Opening microphone…') : uploads ? t('Transkriberar ljud…', 'Transcribing audio…') : t('Redo när du är', 'Ready when you are')}</strong><small>{recording ? `${formatAudioTime(elapsed)} · ${t('Nya delar ungefär var 20:e sekund', 'New segments about every 20 seconds')}` : `${sv ? 'KB Whisper · Svenska' : 'Whisper · English'} · ${speechModels[language]}`}</small></div></div><div className="lesson-wave" aria-hidden="true">{Array.from({length:25},(_,i) => <i key={i} style={{height:`${recording ? 5 + level * (10 + Math.sin(i * 1.9) * 8 + i % 5 * 3) : 4 + Math.sin(i*.8)**2*9}px`}}/>)}</div><div className="lesson-capture-actions"><input ref={uploadInput} type="file" hidden accept=".wav,.mp3,.m4a,.mp4,.ogg,.webm,.flac" onChange={e => void importAudio(e.target.files?.[0])}/><button className="lesson-outline" disabled={locked || !configured} onClick={() => uploadInput.current?.click()}><FileAudio size={16}/>{t('Ljudfil', 'Audio file')}</button><button className={'lesson-primary ' + (recording ? 'pause' : '')} disabled={starting || (!recording && (uploads > 0 || !configured || Boolean(current?.pending.length)))} onClick={recording ? stop : () => void start()}>{starting ? <LoaderCircle className="spin" size={16}/> : recording ? <Pause size={16}/> : <Mic size={16}/>} {recording ? t('Pausa', 'Pause') : t(current?.segments.length ? 'Fortsätt' : 'Starta inspelning', current?.segments.length ? 'Continue' : 'Start recording')}</button></div></div>
+      <div className="lesson-capture"><div className={'lesson-record-status ' + (recording ? 'live' : '')}><div className="lesson-mic-orb"><Mic size={21}/></div><div><strong>{recording ? t('Lyssnar på lektionen', 'Listening to the lesson') : starting ? t('Öppnar mikrofon…', 'Opening microphone…') : uploads ? t('Transkriberar ljud…', 'Transcribing audio…') : t('Redo när du är', 'Ready when you are')}</strong><small>{recording ? `${formatAudioTime(elapsed)} · ${t('Nya delar ungefär var 20:e sekund', 'New segments about every 20 seconds')}${liveStatus === 'live' ? ' · ' + t('Realtid', 'Live') : liveStatus === 'connecting' ? ' · ' + t('Kopplar realtid…', 'Connecting live…') : liveStatus === 'failed' ? ' · ' + t('Realtid avstängd', 'Live off') : ''}` : `${sv ? 'KB Whisper · Svenska' : 'Whisper · English'} · ${speechModels[language]}`}</small></div></div><div className="lesson-wave" aria-hidden="true">{Array.from({length:25},(_,i) => <i key={i} style={{height:`${recording ? 5 + level * (10 + Math.sin(i * 1.9) * 8 + i % 5 * 3) : 4 + Math.sin(i*.8)**2*9}px`}}/>)}</div><div className="lesson-capture-actions"><input ref={uploadInput} type="file" hidden accept=".wav,.mp3,.m4a,.mp4,.ogg,.webm,.flac" onChange={e => void importAudio(e.target.files?.[0])}/><button className="lesson-outline" disabled={locked || !configured} onClick={() => uploadInput.current?.click()}><FileAudio size={16}/>{t('Ljudfil', 'Audio file')}</button><button className={'lesson-primary ' + (recording ? 'pause' : '')} disabled={starting || (!recording && (uploads > 0 || !configured || Boolean(current?.pending.length)))} onClick={recording ? stop : () => void start()}>{starting ? <LoaderCircle className="spin" size={16}/> : recording ? <Pause size={16}/> : <Mic size={16}/>} {recording ? t('Pausa', 'Pause') : t(current?.segments.length ? 'Fortsätt' : 'Starta inspelning', current?.segments.length ? 'Continue' : 'Start recording')}</button></div></div>
       <div className="lesson-consent">{t('Spela in med lärarens och deltagarnas tillåtelse. Ljud skickas till skolans TeachGPT. Lyckade ljuddelar raderas efter transkribering; misslyckade delar sparas för nytt försök.', 'Record with the teacher’s and participants’ permission. Audio is sent to school TeachGPT. Successful audio segments are deleted after transcription; failed segments are retained for retry.')}</div>
+      <section className="lesson-board" aria-label={t('Tavlan (YeetCast)', 'Board (YeetCast)')}>
+        <span className="lesson-board-icon"><Tv size={16}/></span>
+        <div className="lesson-board-status">
+          <strong>{board?.active ? t('Kast pågår', 'Cast in progress') : t('Tavlan', 'Board')}</strong>
+          <small>{!board?.configured ? t('Ange projektorns sida för att följa kasts. SchoolWork tittar bara – inget kast startas.', 'Set the projector page to follow casts. SchoolWork only views – no cast is started.') : board.error ? board.error : board.active ? (board.senders.filter(s => s.sending).map(s => s.name).join(', ') || t('Någon kastar', 'Someone is casting')) : t('Inget pågående kast just nu.', 'No active cast right now.')}</small>
+        </div>
+        <div className="lesson-board-actions">
+          {boardNote && <span role="status">{boardNote}</span>}
+          {boardConfig ? <form className="lesson-board-config" onSubmit={e => { e.preventDefault(); void boardConfigureSubmit(); }}>
+            <input value={boardUrlInput} onChange={e => setBoardUrlInput(e.target.value)} placeholder="https://yeet.ssis.nu/receiver/…" aria-label={t('Projektorns sida', 'Projector page')} disabled={boardBusy}/>
+            <button type="submit" className="lesson-primary" disabled={boardBusy || !boardUrlInput.trim()}>{t('Spara', 'Save')}</button>
+            <button type="button" className="lesson-outline" disabled={boardBusy} onClick={() => setBoardConfig(false)}>{t('Avbryt', 'Cancel')}</button>
+          </form> : <>
+            <button className="lesson-outline" disabled={boardBusy} onClick={() => { setBoardUrlInput(board?.receiverUrl || ''); setBoardConfig(true); }}><Settings2 size={14}/>{t('Projektorns sida', 'Projector page')}</button>
+            <button className="lesson-outline" disabled={boardBusy} onClick={() => void boardLoad()}><RefreshCw size={14}/>{t('Uppdatera', 'Refresh')}</button>
+            <button className="lesson-outline" disabled={!board?.viewUrl || boardBusy} onClick={() => void boardToggle()}><Tv size={14}/>{board?.windowOpen ? t('Dölj fönstret', 'Hide window') : t('Visa tavlan', 'Show board')}</button>
+            <button className="lesson-primary" disabled={!board?.windowOpen || !current || boardBusy} onClick={() => void boardCapture()}><Camera size={14}/>{t('Fotografera tavlan', 'Capture board')}</button>
+          </>}
+        </div>
+      </section>
       <nav className="lesson-tabs" aria-label={t('Lektionens innehåll','Lesson content')}>{([['notes',t('Anteckningar','Notes')],['tasks',t('Uppgifter','Tasks')],['transcript',t('Transkript','Transcript')]] as const).map(([tab,label])=><button key={tab} aria-pressed={view===tab} onClick={()=>setView(tab)}>{label}{tab==='tasks' && <span>{lessonTasks.length+assignments.length}</span>}</button>)}{current && <select aria-label={t('Ämne','Subject')} value={current.subject || 'Övrigt'} onChange={e=>void perform(()=>window.schoolwork.lessonUpdate({id:current.id,subject:e.target.value}))}>{lessonSubjects.map(s=><option key={s}>{s}</option>)}</select>}</nav>
       <div className={'lesson-columns ' + (mode === 'transcription' ? 'transcription-only' : '')} data-view={view}>
         <section className="lesson-card lesson-transcript"><div className="lesson-card-head"><div><FileText size={16}/><h2>{t('Transkript', 'Transcript')}</h2>{recording && <span className="lesson-live-pill">LIVE</span>}</div><span>{current?.segments.length || 0} {t('delar', 'segments')}</span></div><div className="lesson-scroll">
+          {liveText && <div className="lesson-live-line" role="status"><span className="lesson-live-dot"/>{liveText}</div>}
           {!transcript && <div className="lesson-empty"><div className="lesson-empty-icon"><Mic size={25}/></div><h3>{t('Orden landar här.', 'The words land here.')}</h3><p>{t('Starta mikrofonen eller välj en ljudfil. Ditt transkript växer medan du lyssnar.', 'Start the microphone or choose an audio file. Your transcript grows as you listen.')}</p></div>}
           {transcript && <article className="lesson-continuous"><p>{transcript}</p><details><summary>{t('Original med tidsstämplar','Original with timestamps')}</summary>{current?.segments.filter(s=>s.text).map(s=><p key={s.id}><time>{formatAudioTime(s.start)}</time> {s.text}</p>)}</details></article>}
           {current?.pending.map(p => <div className="lesson-pending" key={p.id}><strong>{formatAudioTime(p.start)} · {p.name}</strong><p>{p.error || t('Väntar på transkribering', 'Waiting for transcription')}</p><div><button disabled={uploads > 0} onClick={() => void retry(p.id)}><RefreshCw size={13}/>{t('Försök igen', 'Retry')}</button><button disabled={uploads > 0} onClick={() => void perform(() => window.schoolwork.lessonDiscard({id:current.id,audioId:p.id}))}><Trash2 size={13}/>{t('Ta bort ljud', 'Discard audio')}</button></div></div>)}

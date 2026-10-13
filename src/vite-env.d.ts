@@ -20,6 +20,13 @@ interface Window {
     lessonDiscard: (input: {id:string;audioId:string}) => Promise<import('./lesson').LessonSession>;
     lessonCancel: (id:string) => Promise<boolean>;
     lessonAnalyse: (input: {id:string;model:string}) => Promise<import('./lesson').LessonSession>;
+    lessonLiveSignal: (input: {sdp:string;model:string}) => Promise<string>;
+    boardConfigure: (url:string) => Promise<string>;
+    boardStatus: () => Promise<import('./yeetcast').BoardStatus>;
+    boardOpen: () => Promise<import('./yeetcast').BoardStatus>;
+    boardHide: () => Promise<boolean>;
+    boardClose: () => Promise<boolean>;
+    boardCapture: (sessionId:string) => Promise<import('./lesson').LessonSession>;
     calendarStatus: () => Promise<import('./lesson').CalendarStatus & {error?:string}>;
     calendarConfigure: (input:{clientId:string;clientSecret:string;calendarId?:string}) => Promise<import('./lesson').CalendarStatus>;
     calendarConnect: () => Promise<import('./lesson').CalendarStatus>;

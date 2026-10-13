@@ -17,10 +17,12 @@ export type AudioLanguage = 'sv' | 'en';
 export type AudioInput = { sessionId: string; id: string; base64: string; mime: string; name: string; start: number; duration: number; language: AudioLanguage };
 export type TranscriptSegment = { id: string; start: number; duration: number; text: string; language: AudioLanguage; model: string };
 export type PendingAudio = Omit<AudioInput, 'base64' | 'sessionId'> & { error?: string };
+export type BoardSnapshot = { id: string; path: string; at: number };
 export type LessonSession = {
   id: string; title: string; mode: 'lesson' | 'transcription'; language: AudioLanguage;
   subject?: string; subjectLocked?: boolean;
   refinedTranscript?: { text: string; revision: number }; linkedChatId?: string;
+  boardSnapshots?: BoardSnapshot[];
   createdAt: number; updatedAt: number; revision: number;
   segments: TranscriptSegment[]; pending: PendingAudio[];
   analysis: Omit<LessonAnalysis, 'tasks'> & { tasks: LessonTask[] };

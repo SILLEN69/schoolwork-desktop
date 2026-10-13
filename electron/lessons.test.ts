@@ -67,3 +67,34 @@ it('keeps a new transcript segment when a summary of an older snapshot finishes'
   const request=lessons.analyse(s.id,'Qwen3.8-27B');await requested;const second=audio(s.id);second.start=20;await lessons.upload(second);finish(summary(JSON.stringify({...notes,tasks:[notes.tasks[0]]})));
   const result=await request;expect(result.segments).toHaveLength(2);expect(result.revision).toBe(2);expect(result.analysedRevision).toBe(1);
 });
+it('uses the captured board image as summary context when the model has vision',async()=>{
+  const file=path.join(root,'board-1.jpg');await fs.writeFile(file,Buffer.from([0xff,0xd8,0xff,0xe0,1,2,3,4,5,6,7,8]));
+  const bodies:any[]=[];
+  const fetcher=vi.fn(async(url:unknown,init?:RequestInit)=>{if(String(url).endsWith('/audio/transcriptions'))return Response.json({text:'Gör uppgift 3 nu. Lämna in rapporten den 16 oktober.'});bodies.push(JSON.parse(String(init!.body)));return summary(JSON.stringify(notes));}) as typeof fetch;
+  const lessons=new Lessons(db,root,()=> 'test',fetcher,()=>true),s=lessons.create('lesson','sv','Test');
+  await lessons.upload(audio(s.id));lessons.attachBoardSnapshot(s.id,file);
+  expect(lessons.get(s.id).boardSnapshots).toHaveLength(1);
+  const result=await lessons.analyse(s.id,'Qwen3.8-27B');
+  const body=bodies[bodies.length-1];
+  expect(body.messages[0].content).toContain('classroom board');
+  const user=body.messages[1].content;
+  expect(Array.isArray(user)).toBe(true);
+  expect(user.some((part:any)=>part.type==='image_url'&&part.image_url.url.startsWith('data:image/jpeg;base64,'))).toBe(true);
+  expect(result.analysis.tasks).toHaveLength(2);
+});
+it('retries the summary without the board image when the provider rejects images',async()=>{
+  const file=path.join(root,'board-2.jpg');await fs.writeFile(file,Buffer.from([0xff,0xd8,0xff,0xe0,1,2,3,4,5,6,7,8]));
+  let completions=0;const rejected:string[]=[];
+  const fetcher=vi.fn(async(url:unknown)=>{
+    if(String(url).endsWith('/audio/transcriptions'))return Response.json({text:'Gör uppgift 3 nu. Lämna in rapporten den 16 oktober.'});
+    completions++;
+    if(completions===1)return new Response(JSON.stringify({error:{message:'This model does not support image input.'}}),{status:400,headers:{'Content-Type':'application/json'}});
+    return summary(JSON.stringify(notes));
+  }) as typeof fetch;
+  const lessons=new Lessons(db,root,()=> 'test',fetcher,()=>true,model=>rejected.push(model)),s=lessons.create('lesson','sv','Test');
+  await lessons.upload(audio(s.id));lessons.attachBoardSnapshot(s.id,file);
+  const result=await lessons.analyse(s.id,'Qwen3.8-27B');
+  expect(completions).toBe(2);
+  expect(rejected).toEqual(['Qwen3.8-27B']);
+  expect(result.analysis.tasks).toHaveLength(2);
+});

@@ -50,6 +50,8 @@ export class LessonRecorder {
   private segments?:PcmSegments; private stopping = false;
   constructor(private emit: (data: { buffer: ArrayBuffer; start: number; duration: number }) => void, private level: (value: number) => void,
     private ended: () => void, private offset = 0) {}
+  /** The live microphone stream; the real-time WebRTC session shares its track. */
+  get mediaStream(): MediaStream | undefined { return this.stopping ? undefined : this.stream; }
   async start() {
     try {
       this.stream = await navigator.mediaDevices.getUserMedia({ audio: { channelCount: 1, echoCancellation: true, noiseSuppression: true }, video: false });
