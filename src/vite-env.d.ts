@@ -110,6 +110,21 @@ interface Window {
     }>;
     projectWatchStart: () => Promise<boolean>;
     projectWatchStop: () => Promise<boolean>;
+    projectRun: (input: {
+      path: string;
+      timeoutMs?: number;
+    }) => Promise<{ runId: string; command: string; interpreter: string }>;
+    projectRunStop: (runId: string) => Promise<boolean>;
+    onProjectRunOutput: (
+      cb: (data: { runId: string; stream: "stdout" | "stderr"; data: string }) => void,
+    ) => () => void;
+    onProjectRunResult: (
+      cb: (data: {
+        runId: string;
+        result: import("./workbench").WorkbenchRunResult | null;
+        error?: string;
+      }) => void,
+    ) => () => void;
     onProjectChanged: (cb: (workspace: string) => void) => () => void;
     openUrl: (url: string) => Promise<void>;
     getActivity: (id: string) => Promise<any[]>;

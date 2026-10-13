@@ -51,6 +51,7 @@ import {
   readWorkbenchFile,
   watchWorkspace,
 } from "./projectView";
+import { runWorkspaceFile } from "./projectRun";
 import {
   processInputs,
   processToolSchemas,
@@ -150,6 +151,11 @@ let follower: LessonFollower;
 let calendar: GoogleCalendar;
 let workbenchWatch: (() => void) | null = null;
 const workbenchWorkspace = () => settings.get("workspace") || app.getPath("documents");
+const activeWorkbenchRuns = new Map<string, { stop: () => void }>();
+const stopWorkbenchRuns = () => {
+  for (const run of activeWorkbenchRuns.values()) run.stop();
+  activeWorkbenchRuns.clear();
+};
 const calendarWrites = new Set<string>();
 let updateTimer: ReturnType<typeof setInterval>|undefined;
 const capabilities = () =>
@@ -651,6 +657,7 @@ function makeWindow() {
   else void win.loadFile(path.join(__dirname, "../dist/index.html"));
   win.on("closed", () => {
     desktopPointer?.stop();
+    stopWorkbenchRuns();
     win = undefined;
   });
 }
@@ -2625,6 +2632,50 @@ function registerIpc() {
     }
     return true;
   });
+  // Run one opened file with its sensible interpreter. The file stays inside
+  // the workspace, the child runs there under a hard timeout with bounded
+  // output, and only "run this file" is exposed — no arbitrary command.
+  ipcMain.handle('project:run', async (event, raw) => {
+    trusted(event);
+    const input = z
+      .object({
+        path: z.string().min(1).max(4096),
+        timeoutMs: z.number().int().min(100).max(600_000).optional(),
+      })
+      .parse(raw);
+    if (activeWorkbenchRuns.size > 0) throw new Error('A file is already running. Stop it first.');
+    const run = await runWorkspaceFile(workbenchWorkspace(), input.path, {
+      timeoutMs: input.timeoutMs,
+      onOutput: (stream, data) => {
+        if (win && !win.isDestroyed()) win.webContents.send('project:run:output', { runId: run.runId, stream, data });
+      },
+    });
+    activeWorkbenchRuns.set(run.runId, { stop: run.stop });
+    void run.promise
+      .then((result) => {
+        if (win && !win.isDestroyed()) win.webContents.send('project:run:result', { runId: run.runId, result });
+      })
+      .catch((error: any) => {
+        if (win && !win.isDestroyed())
+          win.webContents.send('project:run:result', {
+            runId: run.runId,
+            result: null,
+            error: error instanceof Error ? error.message : String(error),
+          });
+      })
+      .finally(() => {
+        activeWorkbenchRuns.delete(run.runId);
+      });
+    return { runId: run.runId, command: run.command, interpreter: run.interpreter };
+  });
+  ipcMain.handle('project:run:stop', (event, raw) => {
+    trusted(event);
+    const input = z.object({ runId: z.string().uuid() }).parse(raw);
+    const run = activeWorkbenchRuns.get(input.runId);
+    if (!run) return false;
+    run.stop();
+    return true;
+  });
   ipcMain.handle("settings:set-key", (event, raw) => {
     trusted(event);
     const input = z.string().trim().min(12).max(512).parse(raw);
@@ -2993,6 +3044,7 @@ else {
     calendar?.stop();
     connections?.stop();
     if(workbenchWatch){workbenchWatch();workbenchWatch=null;}
+    stopWorkbenchRuns();
     for (const lesson of lessons?.list() || []) lessons.cancel(lesson.id);
     for (const lesson of follower?.list() || []) follower.cancel(lesson.id);
     for (const controller of active.values()) controller.abort();

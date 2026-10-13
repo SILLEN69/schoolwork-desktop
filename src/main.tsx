@@ -80,6 +80,12 @@ if (!window.schoolwork) {
     },
     projectWatchStart: async () => false,
     projectWatchStop: async () => false,
+    projectRun: async () => {
+      throw new Error("The project workbench requires the desktop application.");
+    },
+    projectRunStop: async () => false,
+    onProjectRunOutput: () => () => {},
+    onProjectRunResult: () => () => {},
     onProjectChanged: () => () => {},
     openUrl: async (url: string) => {
       window.open(url, "_blank", "noopener,noreferrer");

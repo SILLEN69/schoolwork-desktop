@@ -9,7 +9,11 @@ import {
   Folder,
   FolderOpen,
   LoaderCircle,
+  Play,
   Search,
+  Sparkles,
+  Square,
+  Terminal,
   X,
 } from 'lucide-react';
 import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
@@ -40,12 +44,16 @@ import xml from 'highlight.js/lib/languages/xml';
 import yaml from 'highlight.js/lib/languages/yaml';
 import MessageMarkdown from './MessageMarkdown';
 import {
+  buildExplainFileRequest,
   filterWorkbenchTree,
   formatBytes,
   isMarkdownName,
+  isRunnableName,
   languageForPath,
+  runCommandLabel,
   type RecentFile,
   type WorkbenchEntry,
+  type WorkbenchRunResult,
 } from '../workbench';
 import './workbench.css';
 type FileView = {
@@ -56,7 +64,17 @@ type FileView = {
   binary?: boolean;
   tooLarge?: boolean;
 };
-type Props = { workspace: string; swedish: boolean; onBack: () => void };
+type RunState =
+  | { status: 'running'; runId: string; command: string; stdout: string; stderr: string }
+  | { status: 'done'; result: WorkbenchRunResult }
+  | { status: 'error'; command: string; error: string };
+type Props = {
+  workspace: string;
+  swedish: boolean;
+  onBack: () => void;
+  /** Sends the composed explain message through the app's existing send path; false when guarded or refused. */
+  onExplain: (text: string) => Promise<boolean> | boolean;
+};
 
 // Only the grammars the extension map can request are registered, keeping the
 // preview lightweight while reusing the highlighter the markdown stack already ships.
@@ -67,6 +85,7 @@ const grammars: Record<string, LanguageFn> = {
 for (const [name, grammar] of Object.entries(grammars)) hljs.registerLanguage(name, grammar);
 
 const errorText = (e: unknown) => (e instanceof Error ? e.message : String(e));
+const formatRunTime = (ms: number) => (ms < 1000 ? `${ms} ms` : `${(ms / 1000).toFixed(1)} s`);
 
 // Files opened this app session, newest first (in memory, not persisted).
 const recentFiles: RecentFile[] = [];
@@ -90,7 +109,7 @@ const highlightCode = (text: string, name: string): { html: string; language: st
   return { html: escapeHtml(text), language: language || null };
 };
 
-export default function ProjectWorkbench({ workspace, swedish, onBack }: Props) {
+export default function ProjectWorkbench({ workspace, swedish, onBack, onExplain }: Props) {
   const t = (en: string, sv: string) => (swedish ? sv : en);
   const [tree, setTree] = useState<{ entries: WorkbenchEntry[]; truncated: boolean } | null>(null);
   const [expanded, setExpanded] = useState<Record<string, boolean>>({});
@@ -100,8 +119,14 @@ export default function ProjectWorkbench({ workspace, swedish, onBack }: Props) 
   const [openError, setOpenError] = useState('');
   const [error, setError] = useState('');
   const [recents, setRecents] = useState<RecentFile[]>(() => [...recentFiles]);
+  const [run, setRun] = useState<RunState | null>(null);
+  const [explaining, setExplaining] = useState(false);
+  const [selectionText, setSelectionText] = useState('');
   const mounted = useRef(true);
   const firstTree = useRef(true);
+  const runIdRef = useRef<string | null>(null);
+  const previewRef = useRef<HTMLDivElement | null>(null);
+  const runBodyRef = useRef<HTMLPreElement | null>(null);
 
   const load = async () => {
     try {
@@ -132,6 +157,9 @@ export default function ProjectWorkbench({ workspace, swedish, onBack }: Props) 
     setOpen(null);
     setOpenError('');
     setError('');
+    setRun(null);
+    setExplaining(false);
+    setSelectionText('');
     const off = window.schoolwork.onProjectChanged(ws => {
       if (mounted.current && ws === workspace) void load();
     });
@@ -141,12 +169,67 @@ export default function ProjectWorkbench({ workspace, swedish, onBack }: Props) 
       mounted.current = false;
       off();
       void window.schoolwork.projectWatchStop().catch(() => {});
+      // A run belongs to its file: never keep a child process alive after the view goes.
+      if (runIdRef.current) void window.schoolwork.projectRunStop(runIdRef.current).catch(() => {});
+      runIdRef.current = null;
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [workspace]);
 
+  // Live output and the final result for the run started from this view.
+  useEffect(() => {
+    const offOutput = window.schoolwork.onProjectRunOutput(data => {
+      if (!mounted.current || data.runId !== runIdRef.current) return;
+      setRun(prev => {
+        if (!prev || prev.status !== 'running' || prev.runId !== data.runId) return prev;
+        return data.stream === 'stdout'
+          ? { ...prev, stdout: prev.stdout + data.data }
+          : { ...prev, stderr: prev.stderr + data.data };
+      });
+    });
+    const offResult = window.schoolwork.onProjectRunResult(data => {
+      if (!mounted.current || data.runId !== runIdRef.current) return;
+      runIdRef.current = null;
+      setRun(data.error ? { status: 'error', command: '', error: data.error } : { status: 'done', result: data.result! });
+    });
+    return () => {
+      offOutput();
+      offResult();
+    };
+  }, []);
+
+  // Track a text selection inside the preview so "Explain this" can explain the selection.
+  useEffect(() => {
+    const update = () => {
+      const root = previewRef.current;
+      const sel = window.getSelection();
+      if (!root || !sel || sel.isCollapsed) return;
+      const node = sel.anchorNode;
+      if (!node || node === root || !root.contains(node)) {
+        setSelectionText('');
+        return;
+      }
+      const text = sel.toString();
+      setSelectionText(prev => (text === prev ? prev : text));
+    };
+    document.addEventListener('selectionchange', update);
+    return () => document.removeEventListener('selectionchange', update);
+  }, []);
+
+  // Keep the output area pinned to the newest bytes.
+  useEffect(() => {
+    const el = runBodyRef.current;
+    if (el) el.scrollTop = el.scrollHeight;
+  }, [run]);
+
+  const abortRun = () => {
+    if (runIdRef.current) void window.schoolwork.projectRunStop(runIdRef.current).catch(() => {});
+    runIdRef.current = null;
+  };
+
   const openFile = async (relPath: string) => {
     if (opening) return;
+    abortRun();
     setOpening(true);
     setOpenError('');
     try {
@@ -155,6 +238,7 @@ export default function ProjectWorkbench({ workspace, swedish, onBack }: Props) 
       rememberRecent(file);
       setRecents([...recentFiles]);
       setOpen(file);
+      setSelectionText('');
     } catch (e) {
       if (mounted.current) {
         setOpen(null);
@@ -163,6 +247,48 @@ export default function ProjectWorkbench({ workspace, swedish, onBack }: Props) 
     } finally {
       if (mounted.current) setOpening(false);
     }
+  };
+
+  const explain = async () => {
+    if (!open || open.text == null || explaining) return;
+    const selection = selectionText.trim() || undefined;
+    const text = buildExplainFileRequest({
+      path: open.path,
+      name: open.name,
+      language: swedish ? 'sv' : 'en',
+      selection,
+      content: open.text,
+    });
+    setExplaining(true);
+    try {
+      const sent = await onExplain(text);
+      if (!sent && mounted.current)
+        setError(t('The explanation could not be sent.', 'Förklaringen kunde inte skickas.'));
+    } finally {
+      if (mounted.current) setExplaining(false);
+    }
+  };
+
+  const startRun = async () => {
+    if (!open || !isRunnableName(open.name) || runIdRef.current) return;
+    const file = open;
+    try {
+      const started = await window.schoolwork.projectRun({ path: file.path });
+      if (!mounted.current) {
+        void window.schoolwork.projectRunStop(started.runId).catch(() => {});
+        return;
+      }
+      runIdRef.current = started.runId;
+      setSelectionText('');
+      setRun({ status: 'running', runId: started.runId, command: started.command, stdout: '', stderr: '' });
+    } catch (e) {
+      if (mounted.current)
+        setRun({ status: 'error', command: runCommandLabel(file.name, file.path), error: errorText(e) });
+    }
+  };
+
+  const stopRun = () => {
+    if (runIdRef.current) void window.schoolwork.projectRunStop(runIdRef.current).catch(() => {});
   };
 
   const filtering = filter.trim().length > 0;
@@ -317,8 +443,43 @@ export default function ProjectWorkbench({ workspace, swedish, onBack }: Props) 
               {opening && <LoaderCircle size={14} className="spin" />}
               <button
                 type="button"
+                className="wb-action"
+                disabled={open.text == null || explaining}
+                title={
+                  open.tooLarge
+                    ? t('File too large to explain: it is above the 1 MB preview limit.', 'Filen är för stor att förklara: över gränsen på 1 MB för förhandsvisning.')
+                    : open.binary
+                      ? t('Binary files can not be explained here.', 'Binärfiler kan inte förklaras här.')
+                      : t('Ask the current conversation to explain this file', 'Bea den aktuella konversationen att förklara denna fil')
+                }
+                onClick={() => void explain()}
+              >
+                <Sparkles size={13} />
+                <span>
+                  {explaining
+                    ? t('Sending…', 'Skickar…')
+                    : selectionText.trim()
+                      ? t('Explain selection', 'Förklara markeringen')
+                      : t('Explain this', 'Förklara det här')}
+                </span>
+              </button>
+              {isRunnableName(open.name) && (
+                <button
+                  type="button"
+                  className="wb-action"
+                  disabled={run?.status === 'running'}
+                  title={t('Run this file in the workspace and show its output', 'Kör filen i arbetsytan och visa utdatan')}
+                  onClick={() => void startRun()}
+                >
+                  <Play size={13} />
+                  <span>{t('Run this file', 'Kör filen')}</span>
+                </button>
+              )}
+              <button
+                type="button"
                 className="wb-close"
                 onClick={() => {
+                  abortRun();
                   setOpen(null);
                   setOpenError('');
                 }}
@@ -327,7 +488,7 @@ export default function ProjectWorkbench({ workspace, swedish, onBack }: Props) 
                 <X size={15} />
               </button>
             </header>
-            <div className="wb-preview-body">
+            <div className="wb-preview-body" ref={previewRef}>
               {open.tooLarge && (
                 <div className="wb-state">
                   <FileQuestion size={30} />
@@ -365,6 +526,87 @@ export default function ProjectWorkbench({ workspace, swedish, onBack }: Props) 
                 </pre>
               )}
             </div>
+            {run && (
+              <section className="wb-run" aria-live="polite">
+                <header className="wb-run-bar">
+                  <Terminal size={13} />
+                  <code className="wb-run-cmd" title={run.status === 'done' ? run.result.command : run.command}>
+                    {(run.status === 'done' ? run.result.command : run.command) || '—'}
+                  </code>
+                  <span
+                    className={
+                      'wb-run-state ' +
+                      (run.status === 'running'
+                        ? 'running'
+                        : run.status === 'error'
+                          ? 'error'
+                          : run.result.exitCode === 0
+                            ? 'ok'
+                            : 'warn')
+                    }
+                  >
+                    {run.status === 'running' && (
+                      <>
+                        <LoaderCircle size={12} className="spin" />
+                        {t('Running…', 'Körs…')}
+                      </>
+                    )}
+                    {run.status === 'done' &&
+                      (run.result.timedOut
+                        ? t('Timed out', 'Tidsgräns nåddes')
+                        : run.result.stopped
+                          ? t('Stopped', 'Stoppad')
+                          : run.result.exitCode === 0
+                            ? t('Exit code 0', 'Avslutningskod 0')
+                            : t('Exit code ' + (run.result.exitCode ?? 'signal'), 'Avslutningskod ' + (run.result.exitCode ?? 'signal')))}
+                    {run.status === 'error' && t('Failed to start', 'Kunde inte starta')}
+                  </span>
+                  {run.status === 'done' && (
+                    <span className="wb-run-time">{formatRunTime(run.result.durationMs)}</span>
+                  )}
+                  {run.status === 'running' && (
+                    <button type="button" className="wb-run-stop" onClick={stopRun}>
+                      <Square size={11} />
+                      <span>{t('Stop', 'Stoppa')}</span>
+                    </button>
+                  )}
+                  <button
+                    type="button"
+                    className="wb-run-clear"
+                    onClick={() => {
+                      abortRun();
+                      setRun(null);
+                    }}
+                    aria-label={t('Clear output', 'Rensa utdata')}
+                  >
+                    <X size={13} />
+                  </button>
+                </header>
+                {run.status === 'error' ? (
+                  <p className="wb-run-error">{run.error}</p>
+                ) : (
+                  <pre className="wb-run-body" ref={runBodyRef}>
+                    {run.status === 'running' ? (
+                      <>
+                        {run.stdout && <span className="wb-run-out">{run.stdout}</span>}
+                        {run.stderr && <span className="wb-run-err">{run.stderr}</span>}
+                        {!run.stdout && !run.stderr && (
+                          <span className="wb-run-wait">{t('Waiting for output…', 'Väntar på utdata…')}</span>
+                        )}
+                      </>
+                    ) : (
+                      <>
+                        {run.result.stdout && <span className="wb-run-out">{run.result.stdout}</span>}
+                        {run.result.stderr && <span className="wb-run-err">{run.result.stderr}</span>}
+                        {!run.result.stdout && !run.result.stderr && (
+                          <span className="wb-run-wait">{t('The run produced no output.', 'Körningen gav ingen utdata.')}</span>
+                        )}
+                      </>
+                    )}
+                  </pre>
+                )}
+              </section>
+            )}
           </>
         ) : (
           <div className="wb-state wb-idle">

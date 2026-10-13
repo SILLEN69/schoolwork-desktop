@@ -79,6 +79,19 @@ contextBridge.exposeInMainWorld("schoolwork", {
     ipcRenderer.invoke("project:read", input),
   projectWatchStart: () => ipcRenderer.invoke("project:watch:start"),
   projectWatchStop: () => ipcRenderer.invoke("project:watch:stop"),
+  projectRun: (input: { path: string; timeoutMs?: number }) =>
+    ipcRenderer.invoke("project:run", input),
+  projectRunStop: (runId: string) => ipcRenderer.invoke("project:run:stop", { runId }),
+  onProjectRunOutput: (callback: (data: { runId: string; stream: "stdout" | "stderr"; data: string }) => void) => {
+    const listener = (_event: Electron.IpcRendererEvent, data: any) => callback(data);
+    ipcRenderer.on("project:run:output", listener);
+    return () => ipcRenderer.removeListener("project:run:output", listener);
+  },
+  onProjectRunResult: (callback: (data: { runId: string; result: any; error?: string }) => void) => {
+    const listener = (_event: Electron.IpcRendererEvent, data: any) => callback(data);
+    ipcRenderer.on("project:run:result", listener);
+    return () => ipcRenderer.removeListener("project:run:result", listener);
+  },
   onProjectChanged: (callback: (workspace: string) => void) => {
     const listener = (_event: Electron.IpcRendererEvent, data: any) =>
       callback(data && data.workspace ? data.workspace : "");

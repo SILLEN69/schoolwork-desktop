@@ -114,6 +114,49 @@ try {
   await fs.writeFile(path.join(data, 'workspace', 'fresh.ts'), 'export const fresh = true;\n');
   await page.locator('.wb-tree button[data-file="fresh.ts"]').waitFor({ timeout: 10_000 });
   pass('the tree auto-refreshes when a new file appears in the workspace (fs.watch, debounced)');
+  // Phase 2 — run guards: outside-workspace paths, directories and unsupported types are refused.
+  for (const [attempt, pattern] of [
+    ['../outside-run.js', /outside the selected workspace/],
+    ['src', /Not a file/],
+    ['README.md', /can not be run/],
+  ]) {
+    const err = await page.evaluate(async p => {
+      try { await window.schoolwork.projectRun({ path: p }); return null; }
+      catch (e) { return e instanceof Error ? e.message : String(e); }
+    }, attempt);
+    assert(err && pattern.test(err), 'run guard for ' + attempt + ' -> ' + err);
+  }
+  pass('run guards: outside-workspace paths, directories and unsupported types are refused');
+  // Run the small node script: output streams into the console and the exit code is reported.
+  await page.locator('.wb-tree button[data-file="hello.mjs"]').waitFor();
+  await page.locator('.wb-tree button[data-file="hello.mjs"]').click();
+  await page.locator('.wb-preview-bar .wb-preview-path', { hasText: 'hello.mjs' }).waitFor();
+  const runBtn = page.getByRole('button', { name: 'Run this file' });
+  await runBtn.waitFor();
+  await runBtn.click();
+  await page.locator('.wb-run').waitFor();
+  await page.locator('.wb-run-state', { hasText: 'Exit code 3' }).waitFor({ timeout: 30_000 });
+  const runOutput = await page.locator('.wb-run-body').innerText();
+  assert(runOutput.includes('hello from hello.mjs'), 'stdout must be shown: ' + runOutput);
+  assert(runOutput.includes('a warning on stderr'), 'stderr must be shown: ' + runOutput);
+  await page.screenshot({ path: path.join(shots, 'workbench-run.png') });
+  pass('running a .mjs file shows streamed stdout/stderr and the exit code in the output console');
+  // A second run must be refused while one is active, and Stop cancels the run.
+  await page.locator('.wb-tree button[data-file="slow.mjs"]').click();
+  await page.locator('.wb-preview-bar .wb-preview-path', { hasText: 'slow.mjs' }).waitFor();
+  await page.getByRole('button', { name: 'Run this file' }).click();
+  await page.locator('.wb-run-state', { hasText: 'Running…' }).waitFor({ timeout: 10_000 });
+  const busyErr = await page.evaluate(async () => {
+    try { await window.schoolwork.projectRun({ path: 'hello.mjs' }); return null; }
+    catch (e) { return e instanceof Error ? e.message : String(e); }
+  });
+  assert(busyErr && /already running/i.test(busyErr), 'double run must be refused: ' + busyErr);
+  await page.getByRole('button', { name: 'Stop' }).click();
+  await page.locator('.wb-run-state', { hasText: 'Stopped' }).waitFor({ timeout: 15_000 });
+  const slowOutput = await page.locator('.wb-run-body').innerText();
+  assert(slowOutput.includes('starting slow work'), 'the slow script must have printed before the stop: ' + slowOutput);
+  await page.screenshot({ path: path.join(shots, 'workbench-run-stopped.png') });
+  pass('stop cancels a running file, and a second run is refused while one is active');
   // Back returns to the normal app shell.
   await page.locator('.wb-back').click();
   await page.locator('.shell').waitFor();

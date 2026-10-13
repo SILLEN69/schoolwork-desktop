@@ -452,6 +452,71 @@ export default function App() {
       submitting.current = false;
     }
   };
+  /**
+   * Workbench "Explain this": sends the composed file-context message through
+   * the same path as a normal submit — steering the running task when the
+   * current conversation is busy, guarded against double sends.
+   */
+  const explainFromWorkbench = async (text: string): Promise<boolean> => {
+    if (submitting.current || importing) return false;
+    const submittedId = id;
+    submitting.current = true;
+    stickToBottom.current = true;
+    setShowProject(false);
+    setError("");
+    setMessages((m) => [...m, { role: "user", content: text, attachments: [] }]);
+    taskStartedAt.current = Date.now();
+    stageStartedAt.current = Date.now();
+    stageKey.current = "planning";
+    setClockNow(Date.now());
+    setLoading(true);
+    setStatus({
+      type: "status",
+      text: t("Planning your task…", "Planerar uppgiften…"),
+    });
+    let viaSteer = false;
+    try {
+      if (loading && taskRef.current && selectedId.current === submittedId) {
+        viaSteer = true;
+        await window.schoolwork.steer({
+          taskId: taskRef.current,
+          chatId: submittedId,
+          userText: text,
+          clientRequestId: crypto.randomUUID(),
+          attachmentIds: [],
+        });
+      } else {
+        const taskId = await window.schoolwork.send({
+          chatId: submittedId,
+          userText: text,
+          model: settings.model,
+          clientRequestId: crypto.randomUUID(),
+          attachmentIds: [],
+        });
+        if (selectedId.current === submittedId) {
+          setCurrentTaskId(taskId);
+          taskRef.current = taskId;
+        }
+      }
+      return true;
+    } catch (e: any) {
+      if (!viaSteer && selectedId.current === submittedId) {
+        setMessages((m) => m.slice(0, -1));
+        setLoading(false);
+        setStatus(null);
+      }
+      if (selectedId.current === submittedId)
+        setError(
+          String(e.message || e).replace(
+            /^Error invoking remote method 'chat:send': Error: /,
+            "",
+          ),
+        );
+      return false;
+    } finally {
+      submitting.current = false;
+    }
+  };
   const cancel = async () => {
     await window.schoolwork.cancel(id);
     setLoading(false);
@@ -543,7 +608,7 @@ export default function App() {
     {!introReady&&<StartupIntro onComplete={()=>{setIntroReady(true);setIntroPreview(false);}} swedish={isSv} preview={introPreview}/>}
       <TaskNotices swedish={isSv} onOpen={conversationId=>{setLessonMode(null);void chooseChat({id:conversationId});}}/>
       <AtomGame open={atomGame!==null} swedish={isSv} origin={atomGame?.origin??null} onClose={()=>setAtomGame(null)}/>
-    {showProject?<ProjectWorkbench workspace={settings.workspace} swedish={isSv} onBack={() => setShowProject(false)} />:showReviewQueue?<ReviewQueueView swedish={isSv} queue={dueQueue} onBack={() => {setShowReviewQueue(false);loadDueQueue();}} onReview={lessonId=>{setFollowerTarget({lessonId,review:true});setShowReviewQueue(false);setShowFollower(true);}} />:showFollower?<LessonFollower configured={settings.configured} model={settings.model} swedish={isSv} target={followerTarget} onBack={() => {setFollowerTarget(null);setShowFollower(false);loadDueQueue();}} onWork={chatId=>{setFollowerTarget(null);setShowFollower(false);void chooseChat({id:chatId});}} />:lessonMode?<LessonWorkspace initialMode={lessonMode} summaryModel={settings.model} configured={settings.configured} onBack={() => setLessonMode(null)} onWork={chatId=>{setLessonMode(null);void chooseChat({id:chatId});}} />:<div className="shell" inert={!introReady}>
+    {showProject?<ProjectWorkbench workspace={settings.workspace} swedish={isSv} onBack={() => setShowProject(false)} onExplain={explainFromWorkbench} />:showReviewQueue?<ReviewQueueView swedish={isSv} queue={dueQueue} onBack={() => {setShowReviewQueue(false);loadDueQueue();}} onReview={lessonId=>{setFollowerTarget({lessonId,review:true});setShowReviewQueue(false);setShowFollower(true);}} />:showFollower?<LessonFollower configured={settings.configured} model={settings.model} swedish={isSv} target={followerTarget} onBack={() => {setFollowerTarget(null);setShowFollower(false);loadDueQueue();}} onWork={chatId=>{setFollowerTarget(null);setShowFollower(false);void chooseChat({id:chatId});}} />:lessonMode?<LessonWorkspace initialMode={lessonMode} summaryModel={settings.model} configured={settings.configured} onBack={() => setLessonMode(null)} onWork={chatId=>{setLessonMode(null);void chooseChat({id:chatId});}} />:<div className="shell" inert={!introReady}>
       <aside className={"sidebar " + (sidebarCollapsed ? "collapsed" : "")}>
         <div className="brand">
           <div className="brand-mark">

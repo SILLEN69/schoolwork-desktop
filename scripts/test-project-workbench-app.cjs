@@ -21,6 +21,10 @@ app.whenReady().then(() => {
   fs.writeFileSync(path.join(workspace, 'src', 'app.ts'),
     "import { greet } from './lib';\n\nexport const answer: number = 42;\n\nfunction greet(name: string): string {\n  return `Hello ${name}!`;\n}\n\ngreet('world');\n");
   fs.writeFileSync(path.join(workspace, 'src', 'lib.ts'), 'export const add = (a: number, b: number): number => a + b;\n');
+  fs.writeFileSync(path.join(workspace, 'hello.mjs'),
+    'console.log("hello from hello.mjs");\nconsole.error("a warning on stderr");\nprocess.exitCode = 3;\n');
+  fs.writeFileSync(path.join(workspace, 'slow.mjs'),
+    'console.log("starting slow work");\nsetInterval(() => console.log("still running"), 250);\n');
   fs.writeFileSync(path.join(workspace, 'package.json'), JSON.stringify({ name: 'sample', version: '1.0.0', scripts: { test: 'echo ok' } }, null, 2));
   fs.writeFileSync(path.join(workspace, 'README.md'), '# Sample project\n\nThis is **bold** text with a [link](https://example.com).\n\n```ts\nconst x = 1;\n```\n\n## Notes\n\n- one\n- two\n');
   fs.writeFileSync(path.join(workspace, 'docs', 'guide.md'), '# Guide\n\nStep **one**.\n');
@@ -31,6 +35,7 @@ app.whenReady().then(() => {
   fs.writeFileSync(path.join(workspace, 'dist', 'bundle.js'), '/* built */\n');
   fs.writeFileSync(path.join(workspace, 'release', 'app.exe'), 'x');
   fs.writeFileSync(path.join(data, 'outside-secret.txt'), 'must never be readable');
+  fs.writeFileSync(path.join(data, 'outside-run.js'), 'console.log("must never be run");\n');
   fs.writeFileSync(path.join(data, 'schoolwork-settings.json'), JSON.stringify({
     model: 'Qwen3.8-27B',
     workspace,
