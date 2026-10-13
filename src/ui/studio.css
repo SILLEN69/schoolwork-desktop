@@ -6,7 +6,7 @@
 .lesson-main{padding:0 clamp(22px,5vw,72px) 32px;overflow-y:auto;display:block}
 .lesson-main>*{max-width:1050px;margin-left:auto;margin-right:auto}
 .lesson-topbar{min-height:58px}.lesson-topbar>div:first-child{font-size:11px;letter-spacing:.7px}
-.lesson-intro{padding:24px 0 20px}.lesson-eyebrow{display:none}.lesson-title{font-size:29px;letter-spacing:-.7px}.lesson-intro p{font-size:13px}
+.lesson-intro{padding:24px 0 20px}.studio-shell .lesson-eyebrow{display:none}.lesson-title{font-size:29px;letter-spacing:-.7px}.lesson-intro p{font-size:13px}
 .lesson-capture{padding:14px 18px;gap:16px;background:#20291f;border-color:#3d4b35}
 .lesson-record-status{min-width:0}.lesson-record-status strong{font-size:13px}.lesson-record-status small{font-size:11px}
 .lesson-consent{font-size:11px;line-height:1.65;margin-top:10px;margin-bottom:16px;color:#99a995}

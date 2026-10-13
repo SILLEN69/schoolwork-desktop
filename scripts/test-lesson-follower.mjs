@@ -1,5 +1,7 @@
 // Real Electron app, isolated profile, no TeachGPT key: the Lesson Follower must
-// import, structure offline, follow, persist, import from file and explain-safe hint.
+// import, structure offline, follow, persist, import from file and explain-safe hint,
+// and (phase 2) run self-checks, record answers/skips, produce and persist a gap
+// report whose "Review weak segments" jumps to the first flagged part.
 import { _electron as electron } from 'playwright';
 import assert from 'node:assert/strict';
 import fs from 'node:fs/promises';
@@ -112,9 +114,79 @@ try {
   assert.equal(remaining.length, 1);
   assert.equal(remaining[0].title, 'Photosynthesis');
   pass('delete removes the lesson and its persisted state');
+  // --- Phase 2: comprehension checkpoints and the personal gap report (fully offline) ---
+  // Select the remaining Photosynthesis lesson; its reading position is still segment 2.
+  await page.locator('.lesson-history-row', { hasText: 'Photosynthesis' }).locator('button').first().click();
+  await seg(page, 2, 3).waitFor();
+  const photoId = remaining[0].id;
+  await page.getByRole('button', { name: 'Previous' }).click();
+  await seg(page, 1, 3).waitFor();
+  // 1) Self-check on segment 1: offline recall questions appear, plain-text answers are
+  // recorded, and the length heuristic grades them without any model call.
+  await page.getByRole('button', { name: 'Check myself' }).click();
+  assert.equal(await page.locator('.follow-checkpoint .follow-answer').count(), 2, 'offline checkpoint must offer two recall questions');
+  assert.ok((await page.locator('.follow-checkpoint .follow-answer-top span').first().textContent()).includes('List two key concepts'), 'first offline question is the key-concepts recall prompt');
+  await page.locator('.follow-checkpoint .follow-answer textarea').nth(0).fill('Chlorophyll captures light and chloroplasts store the energy as sugar.');
+  await page.getByRole('button', { name: 'Save my answers' }).click();
+  await page.locator('.follow-checkpoint .follow-verdict.pass').first().waitFor({ timeout: 15_000 });
+  let photo = await page.evaluate(id => window.schoolwork.followGet(id), photoId);
+  assert.equal(photo.follow.segments[0].status, 'answered');
+  assert.equal(photo.follow.segments[0].source, 'offline');
+  assert.deepEqual(photo.follow.segments[0].questions.map(q => q.verdict), ['pass', 'review']);
+  pass('the offline self-check offers recall questions, records plain-text answers and grades them with the length heuristic');
+  // 2) Segment 2 is skipped.
+  await page.getByRole('button', { name: 'Next' }).click();
+  await seg(page, 2, 3).waitFor();
+  await page.getByRole('button', { name: 'Skip this part' }).click();
+  await page.locator('.lesson-card-head .follow-verdict.skip', { hasText: 'Skipped' }).waitFor({ timeout: 15_000 });
+  photo = await page.evaluate(id => window.schoolwork.followGet(id), photoId);
+  assert.equal(photo.follow.segments[1].status, 'skipped');
+  pass('a part can be skipped and the skip is persisted');
+  // 3) Segment 3 is answered solidly: every question passes.
+  await page.getByRole('button', { name: 'Next' }).click();
+  await seg(page, 3, 3).waitFor();
+  await page.getByRole('button', { name: 'Check myself' }).click();
+  const segment3Textareas = page.locator('.follow-checkpoint .follow-answer textarea');
+  assert.equal(await segment3Textareas.count(), 2);
+  await segment3Textareas.nth(0).fill('Carbon dioxide enters through stomata and the Calvin cycle fixes it into sugar.');
+  await segment3Textareas.nth(1).fill('The Calvin cycle uses ATP and NADPH from the light reactions to build sugar.');
+  await page.getByRole('button', { name: 'Save my answers' }).click();
+  photo = await page.evaluate(id => window.schoolwork.followGet(id), photoId);
+  assert.deepEqual(photo.follow.segments[2].questions.map(q => q.verdict), ['pass', 'pass']);
+  pass('a fully answered part grades every question passing');
+  // 4) Finish: the gap report is computed, shown and persisted with the lesson.
+  await page.getByRole('button', { name: 'Finish & get my gap report' }).click();
+  await page.locator('.lesson-intro .lesson-eyebrow', { hasText: 'GAP REPORT' }).waitFor();
+  const statText = (await page.locator('.follow-stat').allTextContents()).join(' | ');
+  assert.ok(statText.includes('SEGMENTS3') && statText.includes('ANSWERED2') && statText.includes('SKIPPED1') && statText.includes('SELF-CHECK ANSWERED3'), 'report stats: ' + statText);
+  const reviewRows = (await page.locator('.follow-review-row').allTextContents()).join(' | ');
+  assert.ok(reviewRows.includes('Photosynthesis') && reviewRows.includes('The light reactions') && reviewRows.includes('Skipped'), 'to-review rows: ' + reviewRows);
+  assert.equal(await page.locator('.follow-report details .follow-verdict.review').count(), 1, 'the weak segment shows its review verdict');
+  assert.equal(await page.locator('.follow-report details .follow-verdict.pass').count(), 1, 'the clean segment shows its pass verdict');
+  photo = await page.evaluate(id => window.schoolwork.followGet(id), photoId);
+  assert.deepEqual(photo.follow.report, { totalSegments: 3, completedSegments: 2, skippedSegments: 1, askedQuestions: 4, answeredQuestions: 3, skippedQuestions: 1, reviewSegmentIds: [photo.follow.segments[0].id, photo.follow.segments[1].id] });
+  assert.equal(await app.evaluate(() => global.__followerTest.explainRequests.length), 0, 'no model request may leave the app without a key');
+  await page.screenshot({ path: path.join(shots, 'follower-gap-report.png') });
+  pass('finishing shows the gap report: stats, to-review list and per-question self-check results, persisted with the lesson');
+  // 5) Restart: the report is shown again for the finished lesson, and "Review weak
+  // segments" jumps the follow view to the first flagged part.
+  await app.close();
+  app = await launch();
+  page = await app.firstWindow();
+  await page.waitForFunction(() => Boolean(window.schoolwork));
+  page.on('pageerror', e => errors.push(e.message));
+  await page.getByRole('button', { name: 'Lesson Follower' }).click();
+  await page.locator('.lesson-intro .lesson-eyebrow', { hasText: 'GAP REPORT' }).waitFor({ timeout: 20_000 });
+  photo = await page.evaluate(id => window.schoolwork.followGet(id), photoId);
+  assert.ok(photo.follow.report, 'the report must survive the restart');
+  await page.getByRole('button', { name: 'Review weak segments' }).click();
+  await seg(page, 1, 3).waitFor();
+  assert.equal(await page.locator('.follower-jump button.flagged').count(), 2, 'flagged parts stay marked in the jump nav');
+  await page.screenshot({ path: path.join(shots, 'follower-review-jump.png') });
+  pass('the gap report is shown again when the finished lesson is reopened, and Review weak segments jumps to the first flagged part');
   assert.deepEqual(errors, []);
   await page.screenshot({ path: path.join(shots, 'follower-final.png') });
-  console.log(`PASS: ${results.length} lesson-follower UI checks; real Electron IPC, offline structuring and persistence exercised with no external traffic.`);
+  console.log(`PASS: ${results.length} lesson-follower UI checks; real Electron IPC, offline structuring, self-checks, the persisted gap report and persistence exercised with no external traffic.`);
 } catch (error) {
   console.error('FOLLOWER_TEST_FAILURE', error);
   if (app) {

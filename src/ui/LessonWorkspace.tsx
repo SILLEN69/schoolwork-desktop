@@ -162,7 +162,7 @@ export default function LessonWorkspace({ initialMode, summaryModel, configured,
     {task.kind === 'assignment' && <><span className="lesson-due">{task.dueDate ? `${t('Datum', 'Date')}: ${task.dueDate}` : t('Datum behöver bekräftas', 'Date needs confirmation')}</span>
       {task.calendarEventId ? <button className="lesson-text-button" onClick={() => task.calendarUrl && void window.schoolwork.openUrl(task.calendarUrl)}><CheckCircle2 size={14}/>{t('Sparad i Calendar', 'Saved in Calendar')}</button> : <button className="lesson-text-button" onClick={() => openCalendarTask(task)}><CalendarDays size={14}/>{t('Lägg till i Calendar', 'Add to Calendar')}<ArrowUpRight size={13}/></button>}</>}
   </article>;
-  return <div className="lesson-shell">
+  return <div className="lesson-shell studio-shell">
     <aside className="lesson-rail">
       <button className="lesson-back" disabled={locked} onClick={onBack}><ArrowLeft size={17}/><span>SchoolWork</span></button>
       <div className="lesson-brand"><span><Headphones size={24}/></span><div><strong>{t('Ditt lärande.', 'Your learning.')}<br/>{t('Samlat.', 'Together.')}</strong><small>{t('LYSSNA · FÖRSTÅ · GÖR', 'LISTEN · UNDERSTAND · DO')}</small></div></div>

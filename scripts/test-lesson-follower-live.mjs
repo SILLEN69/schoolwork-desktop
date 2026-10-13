@@ -1,6 +1,8 @@
 // Live end-to-end verification: the real built app on the isolated dev profile,
 // with the real TeachGPT key entered through the Settings UI (never written by
 // this script). The key file path arrives only via SCHOOLWORK_FOLLOWER_KEY_FILE.
+// Phase 2: also verifies live model self-check questions, live verdicts, the
+// persisted gap report and the "Review weak segments" jump after a restart.
 import { _electron as electron } from 'playwright';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
@@ -86,9 +88,81 @@ try {
   await page.locator('.follower-jump button[aria-current="true"]', { hasText: '3' }).waitFor({ timeout: 30_000 });
   const final = await page.evaluate(id => window.schoolwork.followGet(id), imported.id);
   assert.equal(final.follow.current, 2, 'position must be left at segment 3');
-  assert.deepEqual(errors, []);
   await page.screenshot({ path: path.join(shots, 'live-segment-3.png') });
-  console.log(`LIVE-FOLLOWER-VERIFY PASS — ${imported.follow.segments.length} live-structured segments, live explain completed, position left at segment 3 of ${imported.follow.segments.length}.`);
+
+  // 5) Phase 2, live: the model must generate 1-3 self-check questions for this segment.
+  await page.getByRole('button', { name: 'Check myself' }).click();
+  await page.locator('.follow-checkpoint .follow-answer textarea').first().waitFor({ timeout: 180_000 });
+  let live = await page.evaluate(id => window.schoolwork.followGet(id), imported.id);
+  const liveSeg = live.follow.segments[2];
+  assert.equal(liveSeg.source, 'model', 'a live key must produce model-generated self-check questions');
+  const liveQuestions = liveSeg.questions.map(q => q.text);
+  assert.ok(liveQuestions.length >= 1 && liveQuestions.length <= 3, '1-3 questions: ' + JSON.stringify(liveQuestions));
+  assert.ok(liveQuestions.every(q => q.length >= 6 && q.length <= 240), 'question lengths within contract');
+  const OFFLINE_BANK = [
+    'List two key concepts from this part from memory and give each a one-sentence explanation.',
+    'Explain the main idea of this part in your own words.',
+    'Which example, number, or formula in this part matters most? Why?',
+    'Summarise this part in two or three sentences, as if explaining it to a classmate.',
+    'Notera två viktiga begrepp ur det här avsnittet ur minnet och ge varje en kort förklaring.',
+    'Förklara det huvudsakliga innehållet i det här avsnittet med egna ord.',
+    'Vilket exempel, tal eller formel i avsnittet är viktigast? Varför?',
+    'Sammanfatta avsnittet på två till tre meningar, som om du förklarade det för en klasskamrat.',
+  ];
+  assert.ok(liveQuestions.some(q => !OFFLINE_BANK.includes(q)), 'at least one question must come from the model, not the offline bank');
+  console.log('live self-check questions:', liveQuestions.length);
+  await page.screenshot({ path: path.join(shots, 'live-questions.png') });
+
+  // 6) Plain-text answers are graded live: every question gets a verdict and feedback.
+  for (let i = 0; i < liveSeg.questions.length; i++) {
+    const concept = liveSeg.concepts[i % liveSeg.concepts.length] || 'the process';
+    await page.locator('.follow-checkpoint .follow-answer textarea').nth(i).fill(`The part explains how ${concept} works in the process, with the concrete steps that make it happen.`);
+  }
+  await page.getByRole('button', { name: 'Save my answers' }).click();
+  await page.locator('.follow-checkpoint .follow-verdict').first().waitFor({ timeout: 180_000 });
+  live = await page.evaluate(id => window.schoolwork.followGet(id), imported.id);
+  const graded = live.follow.segments[2];
+  assert.equal(graded.status, 'answered');
+  assert.ok(graded.questions.every(q => (q.verdict === 'pass' || q.verdict === 'review') && typeof q.feedback === 'string'), 'live verdicts: ' + JSON.stringify(graded.questions.map(q => q.verdict)));
+  console.log('live verdicts:', graded.questions.map(q => q.verdict).join(', '));
+  await page.screenshot({ path: path.join(shots, 'live-answers.png') });
+
+  // 7) Skip segment 2, then finish from the last segment: the gap report must flag it.
+  await page.getByRole('button', { name: 'Previous' }).click();
+  await page.locator('.follower-jump button[aria-current="true"]', { hasText: '2' }).waitFor({ timeout: 30_000 });
+  await page.getByRole('button', { name: 'Skip this part' }).click();
+  const total = (await page.evaluate(id => window.schoolwork.followGet(id), imported.id)).follow.segments.length;
+  await page.locator('.follower-jump button').nth(total - 1).click();
+  await page.getByRole('button', { name: 'Finish & get my gap report' }).click();
+  await page.locator('.lesson-intro .lesson-eyebrow', { hasText: 'GAP REPORT' }).waitFor({ timeout: 30_000 });
+  live = await page.evaluate(id => window.schoolwork.followGet(id), imported.id);
+  assert.ok(live.follow.report, 'the report must be persisted at finish');
+  assert.ok(live.follow.report.reviewSegmentIds.includes(live.follow.segments[1].id), 'the skipped segment must be flagged for review');
+  console.log('live gap report:', JSON.stringify(live.follow.report));
+  await page.screenshot({ path: path.join(shots, 'live-gap-report.png') });
+
+  // 8) Restart: the report is shown again and "Review weak segments" jumps to the first flagged part.
+  await app.close();
+  app = await electron.launch({
+    executablePath: process.platform === 'win32' ? path.resolve('node_modules/electron/dist/electron.exe') : path.resolve('node_modules/electron/dist/electron'),
+    args: ['.', '--user-data-dir=' + profile, ...(process.platform === 'linux' ? ['--no-sandbox'] : [])],
+    timeout: 60_000,
+  });
+  const page2 = await app.firstWindow();
+  page2.setDefaultTimeout(60_000);
+  page2.on('pageerror', e => errors.push(e.message));
+  await page2.waitForFunction(() => Boolean(window.schoolwork), null, { timeout: 45_000 });
+  await page2.waitForFunction(() => { const el = document.querySelector('.shell'); return el && !el.hasAttribute('inert'); }, null, { timeout: 30_000 });
+  await page2.getByRole('button', { name: 'Lesson Follower' }).click();
+  await page2.locator('.lesson-intro .lesson-eyebrow', { hasText: 'GAP REPORT' }).waitFor({ timeout: 30_000 });
+  const reopened = (await page2.evaluate(() => window.schoolwork.followList())).find(l => l.id === imported.id);
+  assert.ok(reopened.follow.report, 'the report must survive the restart');
+  const firstFlagged = reopened.follow.segments.findIndex(s => s.id === reopened.follow.report.reviewSegmentIds[0]);
+  await page2.getByRole('button', { name: 'Review weak segments' }).click();
+  await page2.locator('.follower-jump button[aria-current="true"]', { hasText: String(firstFlagged + 1) }).waitFor({ timeout: 30_000 });
+  assert.deepEqual(errors, []);
+  await page2.screenshot({ path: path.join(shots, 'live-review-jump.png') });
+  console.log(`LIVE-FOLLOWER-VERIFY PASS — ${total} live-structured segments, live explain, live self-check questions and verdicts, gap report persisted and reopened with the review jump to segment ${firstFlagged + 1}.`);
 } catch (error) {
   console.error('LIVE_FOLLOWER_FAILURE', error);
   if (app) {
