@@ -1,5 +1,6 @@
 import path from 'node:path';
 import { DatabaseSync } from 'node:sqlite';
+import type { FollowLesson } from '../src/lessonFollower';
 
 export type StoredMessage = {
   id: string;
@@ -95,6 +96,12 @@ export class SchoolWorkStore {
         id TEXT PRIMARY KEY, task_id TEXT, category TEXT NOT NULL, message TEXT NOT NULL,
         details_json TEXT NOT NULL, created_at INTEGER NOT NULL
       );
+      CREATE TABLE IF NOT EXISTS follow_lessons (
+        id TEXT PRIMARY KEY, title TEXT NOT NULL, language TEXT NOT NULL, source_name TEXT,
+        document TEXT NOT NULL, state_json TEXT NOT NULL,
+        created_at INTEGER NOT NULL, updated_at INTEGER NOT NULL
+      );
+      CREATE INDEX IF NOT EXISTS follow_lessons_updated ON follow_lessons(updated_at DESC);
     `);
     this.migrateLegacyJson(userDataPath);
     this.recoverInterruptedTasks();
@@ -301,6 +308,27 @@ export class SchoolWorkStore {
 
   setMetadata(key: string, value: string): void {
     this.db.prepare('INSERT INTO metadata(key,value) VALUES(?,?) ON CONFLICT(key) DO UPDATE SET value=excluded.value').run(key, value);
+  }
+
+  listFollowLessons(): Array<{ id: string; title: string; language: 'sv' | 'en'; sourceName?: string; updatedAt: number }> {
+    const rows = this.db.prepare('SELECT id,title,language,source_name,updated_at FROM follow_lessons ORDER BY updated_at DESC').all() as any[];
+    return rows.map(row => ({ id: row.id, title: row.title, language: row.language, sourceName: row.source_name ?? undefined, updatedAt: row.updated_at }));
+  }
+
+  getFollowLesson(id: string): FollowLesson | undefined {
+    const row = this.db.prepare('SELECT id,title,language,source_name,document,state_json,created_at,updated_at FROM follow_lessons WHERE id=?').get(id) as any;
+    if (!row) return undefined;
+    return { id: row.id, title: row.title, language: row.language, text: row.document, createdAt: row.created_at, updatedAt: row.updated_at, follow: JSON.parse(row.state_json) };
+  }
+
+  upsertFollowLesson(lesson: FollowLesson): void {
+    this.db.prepare('INSERT INTO follow_lessons(id,title,language,source_name,document,state_json,created_at,updated_at) VALUES(?,?,?,?,?,?,?,?) ON CONFLICT(id) DO UPDATE SET title=excluded.title,language=excluded.language,source_name=excluded.source_name,document=excluded.document,state_json=excluded.state_json,updated_at=excluded.updated_at').run(
+      lesson.id, lesson.title, lesson.language, lesson.follow.sourceName ?? null, lesson.text, JSON.stringify(lesson.follow), lesson.createdAt, lesson.updatedAt,
+    );
+  }
+
+  removeFollowLesson(id: string): void {
+    this.db.prepare('DELETE FROM follow_lessons WHERE id=?').run(id);
   }
 
   getTask(id: string): any {

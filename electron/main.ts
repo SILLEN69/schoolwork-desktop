@@ -14,6 +14,8 @@ import crypto from "node:crypto";
 import Store from "electron-store";
 import { autoUpdater } from 'electron-updater';
 import { Lessons, audioInputSchema } from "./lessons";
+import { LessonFollower } from "./lessonFollower";
+import { followImportSchema, detectLanguage } from "../src/lessonFollower";
 import { GoogleCalendar } from "./calendar";
 import { publishedGoogleClient } from "./googleClient";
 import { DesktopPointer } from './desktopPointer';
@@ -139,6 +141,7 @@ let desktopLearning: DesktopLearning;
 let telegram: TelegramLink;
 let updates: Updates;
 let lessons: Lessons;
+let follower: LessonFollower;
 let calendar: GoogleCalendar;
 const calendarWrites = new Set<string>();
 let updateTimer: ReturnType<typeof setInterval>|undefined;
@@ -2123,6 +2126,47 @@ function registerIpc() {
     else taskId=submitTask({chatId,userText:p.question,model:p.model},undefined,reference);
     lessons.update(p.id,{linkedChatId:chatId});return {chatId,taskId};
   });
+  ipcMain.handle('follow:list', event => { trusted(event); return follower.list(); });
+  ipcMain.handle('follow:import', (event, raw) => { trusted(event); const data = followImportSchema.parse(raw); return follower.import(data, settings.get('model') || ''); });
+  ipcMain.handle('follow:file', async (event) => {
+    trusted(event);
+    const r = await dialog.showOpenDialog(win!, {
+      title: 'Import a lesson file',
+      defaultPath: settings.get('workspace') || app.getPath('documents'),
+      filters: [{ name: 'Text or Markdown', extensions: ['txt', 'md', 'markdown'] }],
+      properties: ['openFile'],
+    });
+    if (r.canceled || !r.filePaths[0]) return null;
+    const file = r.filePaths[0];
+    const info = await fs.stat(file);
+    if (info.size > 1_000_000) throw new Error('The lesson file is larger than 1 MB.');
+    const text = await fs.readFile(file, 'utf8');
+    return follower.import({ title: path.basename(file, path.extname(file)), text, language: detectLanguage(text), sourceName: path.basename(file) }, settings.get('model') || '');
+  });
+  ipcMain.handle('follow:explain', (event, raw) => {
+    trusted(event);
+    const p = z.object({ id: z.string().uuid(), segmentId: z.string().min(1).max(80) }).parse(raw);
+    const lesson = follower.get(p.id);
+    const request = follower.explainContext(p.id, p.segmentId);
+    const chatId = lesson.follow.explainChatId || crypto.randomUUID();
+    const existing = store.getActiveTasks().find(t => t.conversationId === chatId && ['running', 'queued'].includes(t.state));
+    let taskId: string;
+    if (existing) {
+      store.steerTask({ taskId: existing.id, conversationId: chatId, clientRequestId: crypto.randomUUID(), text: request.userText, attachmentIds: [] });
+      emit(existing, 'steering-queued', { text: 'Your follow-up is saved for the next step.' });
+      taskId = existing.id;
+    } else taskId = submitTask({ chatId, userText: request.userText, model: settings.get('model') }, undefined, request.reference);
+    follower.setExplainChat(p.id, chatId);
+    return { chatId, taskId };
+  });
+  ipcMain.handle('follow:get', (event, raw) => { trusted(event); return follower.get(z.string().uuid().parse(raw)); });
+  ipcMain.handle('follow:delete', (event, raw) => { trusted(event); return follower.remove(z.string().uuid().parse(raw)); });
+  ipcMain.handle('follow:cancel', (event, raw) => { trusted(event); follower.cancel(z.string().uuid().parse(raw)); return true; });
+  ipcMain.handle('follow:questions', (event, raw) => { trusted(event); const p = z.object({ id: z.string().uuid(), segmentId: z.string().min(1).max(80), model: z.string().min(1).max(160) }).parse(raw); return follower.questions(p.id, p.segmentId, p.model); });
+  ipcMain.handle('follow:answer', (event, raw) => { trusted(event); const p = z.object({ id: z.string().uuid(), segmentId: z.string().min(1).max(80), answers: z.array(z.string().max(2000)).min(1).max(3), model: z.string().min(1).max(160) }).parse(raw); return follower.answer(p.id, p.segmentId, p.answers, p.model); });
+  ipcMain.handle('follow:skip', (event, raw) => { trusted(event); const p = z.object({ id: z.string().uuid(), segmentId: z.string().min(1).max(80) }).parse(raw); return follower.skip(p.id, p.segmentId); });
+  ipcMain.handle('follow:advance', (event, raw) => { trusted(event); const p = z.object({ id: z.string().uuid(), index: z.number().int().min(0).max(1000) }).parse(raw); return follower.advance(p.id, p.index); });
+  ipcMain.handle('follow:finish', (event, raw) => { trusted(event); return follower.finish(z.string().uuid().parse(raw)); });
   ipcMain.handle('calendar:status', event => { trusted(event); return calendar.status(); });
   ipcMain.handle('calendar:check',event=>{trusted(event);return calendar.check();});
   ipcMain.handle('calendar:drive',(event,raw)=>{trusted(event);return calendar.enableDrive(z.boolean().parse(raw));});
@@ -2891,6 +2935,7 @@ else {
       updateTimer=setInterval(()=>void updates.check(false),6*60*60*1000);updateTimer.unref();
     }
     lessons = new Lessons(store, path.join(app.getPath('userData'), 'lesson-audio'), key);
+    follower = new LessonFollower(store, key);
     calendar = new GoogleCalendar(store, encryptTeachGPTCredential, readTeachGPTCredential, shell.openExternal, fetch, publishedGoogleClient);
     connections=new Connections(store,encryptTeachGPTCredential,readTeachGPTCredential);
     session.defaultSession.setPermissionCheckHandler((contents, permission, _origin, details) => contents === win?.webContents && details.isMainFrame && (permission === 'clipboard-sanitized-write' || permission === 'media' && details.mediaType === 'audio'));
@@ -2908,6 +2953,7 @@ else {
     calendar?.stop();
     connections?.stop();
     for (const lesson of lessons?.list() || []) lessons.cancel(lesson.id);
+    for (const lesson of follower?.list() || []) follower.cancel(lesson.id);
     for (const controller of active.values()) controller.abort();
     stopDesktop();
     globalShortcut.unregisterAll();

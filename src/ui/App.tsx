@@ -1,6 +1,8 @@
 import { useEffect, useRef, useState } from "react";
 import {
   ArrowUp,
+  BookOpen,
+  BookOpenCheck,
   Brain,
   ChevronDown,
   ChevronRight,
@@ -29,6 +31,7 @@ import WorkPanel from "./WorkPanel";
 import DesktopSettings from "./DesktopSettings";
 import TelegramSettings from "./TelegramSettings";
 import LessonWorkspace from "./LessonWorkspace";
+import LessonFollower from "./LessonFollower";
 import VoiceInput from './VoiceInput';
 import ConnectionsSettings from './ConnectionsSettings';
 import './studio.css';
@@ -96,6 +99,7 @@ export default function App() {
     [language, setLanguage] = useState<"en" | "sv">("en"),
     [atomGame, setAtomGame] = useState<{ origin: { x: number; y: number } | null } | null>(null);
   const [lessonMode, setLessonMode] = useState<"lesson" | "transcription" | null>(null);
+  const [showFollower, setShowFollower] = useState(false);
   const modelRevision = useRef(0);
   const pendingModel = useRef<string | null>(null);
   const confirmedModel = useRef(defaults[0]);
@@ -527,7 +531,7 @@ export default function App() {
     {!introReady&&<StartupIntro onComplete={()=>{setIntroReady(true);setIntroPreview(false);}} swedish={isSv} preview={introPreview}/>}
       <TaskNotices swedish={isSv} onOpen={conversationId=>{setLessonMode(null);void chooseChat({id:conversationId});}}/>
       <AtomGame open={atomGame!==null} swedish={isSv} origin={atomGame?.origin??null} onClose={()=>setAtomGame(null)}/>
-    {lessonMode?<LessonWorkspace initialMode={lessonMode} summaryModel={settings.model} configured={settings.configured} onBack={() => setLessonMode(null)} onWork={chatId=>{setLessonMode(null);void chooseChat({id:chatId});}} />:<div className="shell" inert={!introReady}>
+    {showFollower?<LessonFollower configured={settings.configured} model={settings.model} swedish={isSv} onBack={() => setShowFollower(false)} onWork={chatId=>{setShowFollower(false);void chooseChat({id:chatId});}} />:lessonMode?<LessonWorkspace initialMode={lessonMode} summaryModel={settings.model} configured={settings.configured} onBack={() => setLessonMode(null)} onWork={chatId=>{setLessonMode(null);void chooseChat({id:chatId});}} />:<div className="shell" inert={!introReady}>
       <aside className={"sidebar " + (sidebarCollapsed ? "collapsed" : "")}>
         <div className="brand">
           <div className="brand-mark">
@@ -566,6 +570,8 @@ export default function App() {
           </button>
         </div>
         <button className="nav-item lesson-nav" onClick={() => setLessonMode("lesson")}><GraduationCap size={16}/><span>{t("Follow a lesson", "Följ en lektion")}</span></button>
+        <button className="nav-item follower-nav" onClick={() => setShowFollower(true)}><BookOpenCheck size={16}/><span>{t("Lesson Follower", "Lektionsföljare")}</span></button>
+        <button className="nav-item lesson-nav" onClick={() => setShowFollower(true)}><BookOpen size={16}/><span>{t("Study a lesson", "Studera en lektion")}</span></button>
         <button
           className="nav-item memory-nav"
           onClick={() => setShowMemory(true)}
