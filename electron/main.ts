@@ -2127,7 +2127,7 @@ function registerIpc() {
     lessons.update(p.id,{linkedChatId:chatId});return {chatId,taskId};
   });
   ipcMain.handle('follow:list', event => { trusted(event); return follower.list(); });
-  ipcMain.handle('follow:import', (event, raw) => { trusted(event); const data = followImportSchema.parse(raw); return follower.import(data, settings.get('model') || ''); });
+  ipcMain.handle('follow:import', (event, raw) => { trusted(event); const data = followImportSchema.parse(raw); return follower.import(data, modelId()); });
   ipcMain.handle('follow:file', async (event) => {
     trusted(event);
     const r = await dialog.showOpenDialog(win!, {
@@ -2141,7 +2141,7 @@ function registerIpc() {
     const info = await fs.stat(file);
     if (info.size > 1_000_000) throw new Error('The lesson file is larger than 1 MB.');
     const text = await fs.readFile(file, 'utf8');
-    return follower.import({ title: path.basename(file, path.extname(file)), text, language: detectLanguage(text), sourceName: path.basename(file) }, settings.get('model') || '');
+    return follower.import({ title: path.basename(file, path.extname(file)), text, language: detectLanguage(text), sourceName: path.basename(file) }, modelId());
   });
   ipcMain.handle('follow:explain', (event, raw) => {
     trusted(event);
@@ -2155,7 +2155,7 @@ function registerIpc() {
       store.steerTask({ taskId: existing.id, conversationId: chatId, clientRequestId: crypto.randomUUID(), text: request.userText, attachmentIds: [] });
       emit(existing, 'steering-queued', { text: 'Your follow-up is saved for the next step.' });
       taskId = existing.id;
-    } else taskId = submitTask({ chatId, userText: request.userText, model: settings.get('model') }, undefined, request.reference);
+    } else taskId = submitTask({ chatId, userText: request.userText, model: modelId() }, undefined, request.reference);
     follower.setExplainChat(p.id, chatId);
     return { chatId, taskId };
   });

@@ -28,6 +28,7 @@ try {
     timeout: 60_000,
   });
   const page = await app.firstWindow();
+  app.process().stderr.on('data', chunk => fs.appendFileSync(path.join(shots, 'live-electron-stderr.log'), chunk));
   page.setDefaultTimeout(60_000);
   const errors = [];
   page.on('pageerror', e => errors.push(e.message));
@@ -51,6 +52,8 @@ try {
   // 2) Import the sample lesson; the live model must structure it (4-10 titled segments, 2-5 concepts each).
   await page.getByRole('button', { name: 'Lesson Follower' }).click();
   await page.locator('.lesson-shell').waitFor();
+  // A previous lesson in the profile is auto-selected; force the import view.
+  await page.getByRole('button', { name: /Import a lesson|Importera en lektion/ }).click();
   await page.locator('.follow-textarea').fill(lesson);
   await page.getByRole('button', { name: 'Import and start following' }).click();
   console.log('live model structuring in flight...');

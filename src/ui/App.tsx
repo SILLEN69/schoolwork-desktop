@@ -1,7 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import {
   ArrowUp,
-  BookOpen,
   BookOpenCheck,
   Brain,
   ChevronDown,
@@ -571,7 +570,6 @@ export default function App() {
         </div>
         <button className="nav-item lesson-nav" onClick={() => setLessonMode("lesson")}><GraduationCap size={16}/><span>{t("Follow a lesson", "Följ en lektion")}</span></button>
         <button className="nav-item follower-nav" onClick={() => setShowFollower(true)}><BookOpenCheck size={16}/><span>{t("Lesson Follower", "Lektionsföljare")}</span></button>
-        <button className="nav-item lesson-nav" onClick={() => setShowFollower(true)}><BookOpen size={16}/><span>{t("Study a lesson", "Studera en lektion")}</span></button>
         <button
           className="nav-item memory-nav"
           onClick={() => setShowMemory(true)}
