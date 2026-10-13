@@ -56,7 +56,7 @@ export type RescueReport = {
   taskId: string;
   objective: string;
   state: string;
-  /** True when the task was interrupted by an app close (recovery_required event). */
+  /** True when the newest recovery_required event is newer than the latest queued/resume event. */
   interrupted: boolean;
   resumable: boolean;
   resumeNoteKey: ResumeNoteKey | null;
@@ -109,6 +109,10 @@ export function buildRescueReport(task: RescueTask, events: RescueEvent[]): Resc
   );
   const steps: RescueStep[] = [];
   const openTools = new Map<string, RescueStep>();
+  // Events arrive in chronological order, so this flag simply tracks whether the
+  // newest recovery_required event predates the latest queued (resume) event.
+  // A recovery from a previous app close does not stay "interrupted" once the
+  // task has been resumed — that stale notice only matters as timeline history.
   let interrupted = false;
   let lastPlan: { id: string; at: number; steps: any[] } | null = null;
 
@@ -124,6 +128,9 @@ export function buildRescueReport(task: RescueTask, events: RescueEvent[]): Resc
     const payload = event.payload || {};
     switch (event.type) {
       case 'queued':
+        // A (re)start after an earlier recovery means the task is no longer
+        // stuck at that recovery point — clear any stale interrupted flag.
+        interrupted = false;
         steps.push({ key: event.id, state: 'info', kind: 'queued', label: firstLine(payload.text), detail: payload.text, at: event.createdAt });
         break;
       case 'plan':

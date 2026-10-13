@@ -70,6 +70,44 @@ describe('task rescue report', () => {
     expect(report.resumeNoteKey).toBe('interrupted');
   });
 
+  it('treats a recovery newer than any resume as the current interrupted point', () => {
+    // queued -> tool -> recovery_required, with no queued after the recovery.
+    event('queued', { text: 'Task queued.' });
+    tick();
+    const start = event('tool-start', { callId: 'c10', text: 'Writing file index.html' });
+    tick();
+    const recovery = event('recovery_required', { message: 'Inspect any interrupted tool operation before retrying.' });
+    tick();
+    const report = buildRescueReport(
+      task('paused', { error: 'Application closed before task completion. Review the last tool operation before resuming.' }),
+      [start, recovery],
+    );
+    expect(report.interrupted).toBe(true);
+    expect(report.resumeNoteKey).toBe('interrupted');
+  });
+
+  it('clears the interrupted flag once the task is resumed after a stale recovery', () => {
+    // queued -> recovery_required (old close) -> queued (resume) -> paused (by you).
+    event('queued', { text: 'Task queued.' });
+    tick();
+    const start = event('tool-start', { callId: 'c11', text: 'Writing file index.html' });
+    tick();
+    const recovery = event('recovery_required', { message: 'Inspect any interrupted tool operation before retrying.' });
+    tick();
+    const resume = event('queued', { text: 'Resuming from saved evidence.' });
+    tick();
+    const paused = event('paused', { text: 'Paused by you.' });
+    const report = buildRescueReport(
+      task('paused', { error: null }),
+      [start, recovery, resume, paused],
+    );
+    // The recovery is stale now that a resume happened after it.
+    expect(report.interrupted).toBe(false);
+    expect(report.resumeNoteKey).toBe('paused');
+    // The recovery notice is still visible as history in the timeline.
+    expect(report.steps.some((step) => step.kind === 'recovery' && step.state === 'paused' && step.key !== report.resumePointKey)).toBe(true);
+  });
+
   it('keeps tools running while the task is live and does not mark them interrupted', () => {
     const start = event('tool-start', { callId: 'c3', text: 'Checking preview' });
     const report = buildRescueReport(task('running'), [event('queued', { text: 'Task queued.' }), start]);
