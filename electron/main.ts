@@ -2130,7 +2130,9 @@ function registerIpc() {
     return liveTranscription.signal(p.id,p.sdp);
   });
   ipcMain.handle('lessons:live-stop',(event,raw)=>{trusted(event);liveTranscription.cancel(z.string().uuid().parse(raw));return true;});
-  ipcMain.handle('board:configure',(event,raw)=>{trusted(event);return board.configure(z.string().min(8).max(500).parse(raw));});
+  ipcMain.handle('board:configure',(event,raw)=>{trusted(event);return board.configure(z.string().trim().max(500).parse(raw));});
+  ipcMain.handle('board:cancel-connect',(event)=>{trusted(event);return board.cancelConnect();});
+  ipcMain.handle('board:disconnect',(event)=>{trusted(event);return board.disconnect();});
   ipcMain.handle('board:status',async (event)=>{trusted(event);return board.refresh();});
   ipcMain.handle('board:open',async (event)=>{trusted(event);return board.open();});
   ipcMain.handle('board:hide',(event)=>{trusted(event);return board.hide();});

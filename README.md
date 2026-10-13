@@ -16,6 +16,8 @@ SchoolWork is a Windows assistant for students and teachers with access to **Tea
 
 **Current release: v0.10.1 for Windows x64.** It adds a button-free branded startup, public pointer explanations, task notifications, command/recovery fixes and publisher-configured Google sign-in to the existing lessons and Work flows. See [release notes](docs/release-0.10.1.md) and [workflow design, verification and limitations](docs/workflow-0.10.md). Every installation needs its own eligible TeachGPT account and API key. SchoolWork is an independent open-source project, not an official school application.
 
+The **beta** source is now **0.11.0-beta.5**, with working TeachGPT Realtime and six-digit YeetCast projector setup. See [beta release notes](docs/release-0.11.0-beta.5.md) and [projector setup](docs/projector-setup.md). The `alpha-cool` branch is an experimental feature workbench; it has no published alpha installer. Stable downloads remain v0.10.1.
+
 The 0.7 release adds bounded observation loops, one-call memory saves, chronological chat and actual task-specific Telegram replies. Its one-time upgrade migration enables application launching, screen viewing and input; later user revocations stay saved. See [0.7 implementation and verification](docs/agent-efficiency-0.7.md).
 
 Version 0.8.1 fixes desktop action handoff through file dialogs and provides [in-app update prompts](docs/release-0.8.md), with distinct release/network errors. **Install the latest release manually if upgrading from 0.7 or earlier**; 0.8.0 installations can use the complete GitHub update feed. Portable builds continue to use GitHub downloads. For sharing with a teacher, read the [pilot guide and deployment limits](docs/teacher-pilot.md).
@@ -246,7 +248,7 @@ For a bug report, use [GitHub Issues](https://github.com/SILLEN69/schoolwork-des
 
 ## Run the latest source
 
-The development source is **0.10.1**, adding a button-free branded startup, public pointer explanations, task notifications, command/recovery fixes and publisher-configured Google sign-in to the existing lessons and Work flows. See [0.10.1 source notes](docs/release-0.10.1.md). The matching Windows installer and portable application are published as v0.10.1. Google is in Production but branding and scope verification are still required; see the [live status](docs/google-verification-status.md).
+Choose the branch for your purpose: `main` is stable 0.10.1, `beta` is 0.11.0-beta.5 for Realtime and projector integration, and `alpha-cool` holds experimental study and project features. Alpha is source-only and still inherits a beta package version; it is not the published beta installer. Google Calendar verification status is documented separately in [Google setup](docs/google-verification-status.md).
 
 For developers or school IT building and checking the application from source:
 

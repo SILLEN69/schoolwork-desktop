@@ -1,0 +1,42 @@
+import {_electron as electron} from 'playwright';
+import assert from 'node:assert/strict';
+import fs from 'node:fs/promises';import os from 'node:os';import path from 'node:path';
+const data=await fs.mkdtemp(path.join(os.tmpdir(),'schoolwork-projector-test-'));
+const shots=path.resolve('work/projector-verification');await fs.mkdir(shots,{recursive:true});
+const results=[];const pass=text=>{results.push(text);console.log('PASS:',text);};
+let app;
+try{
+ app=await electron.launch({executablePath:path.resolve('node_modules/electron/dist',process.platform==='win32'?'electron.exe':'electron'),args:[path.resolve('scripts/test-projector-app.cjs'),'--user-data-dir='+data,...(process.platform==='linux'?['--no-sandbox']:[])],env:{...process.env,SCHOOLWORK_PROJECTOR_TEST_DATA:data},timeout:30000});
+ const page=await app.firstWindow();const errors=[];page.on('pageerror',e=>errors.push(e.message));
+ await page.getByRole('button',{name:'Follow a lesson'}).click();
+ const board=page.getByRole('region',{name:'Tavlan (YeetCast)'});const input=board.getByRole('textbox',{name:'Projektorkod'});await input.waitFor();
+ await input.fill('123');await board.getByRole('button',{name:'Anslut',exact:true}).click();await board.getByRole('status').filter({hasText:/six-digit/}).waitFor();
+ assert.equal(await app.evaluate(()=>global.__projectorTest.lookups),0);pass('invalid input has a clear error and makes no join request');
+ await input.fill('001 234');const connecting=board.getByRole('button',{name:'Ansluter…'});await board.getByRole('button',{name:'Anslut',exact:true}).click();await connecting.waitFor();
+ let login;for(let i=0;i<80;i++){login=app.windows().find(w=>w.url()==='https://yeet.ssis.nu/');if(login)break;await page.waitForTimeout(100);}
+ assert.ok(login,'first connection opens the school sign-in window');await login.getByRole('button',{name:'Sign in to school'}).click();
+ await board.getByText('Teacher',{exact:true}).waitFor({timeout:20000});
+ assert.equal(await page.evaluate(()=>window.schoolwork.boardStatus().then(s=>s.receiverUrl)),'https://yeet.ssis.nu/receiver/42');
+ assert.deepEqual(await app.evaluate(()=>({lookups:global.__projectorTest.lookups,deletes:global.__projectorTest.deletes,joined:global.__projectorTest.joined,pushLoads:global.__projectorTest.pushLoads})),{lookups:1,deletes:1,joined:0,pushLoads:0});
+ pass('a spaced six-digit code resolves through normal sign-in, stores the receiver, deletes its temporary sender and never loads a push stream');
+ await app.evaluate(()=>{global.__projectorTest.code='654321';});
+ await board.getByRole('button',{name:'Visa tavlan'}).click();await board.getByRole('button',{name:'Dölj fönstret'}).waitFor();
+ await board.getByRole('button',{name:'Dölj fönstret'}).click();await board.getByRole('button',{name:'Visa tavlan'}).waitFor();
+ await board.getByRole('button',{name:'Visa tavlan'}).click();await board.getByRole('button',{name:'Dölj fönstret'}).waitFor();
+ assert.equal(await app.evaluate(()=>global.__projectorTest.lookups),1);pass('rotating the code does not disconnect the remembered projector; hide and show both work');
+ const lesson=await page.evaluate(()=>window.schoolwork.lessonCreate({title:'Classroom board test',language:'sv',mode:'lesson'}));
+ await page.reload();await page.getByRole('button',{name:'Follow a lesson'}).click();await page.getByRole('button',{name:/^Classroom board test/}).click();
+ await board.getByRole('button',{name:'Fotografera tavlan'}).click();await board.getByRole('status').filter({hasText:'Tavlan sparas som AI-kontext.'}).waitFor();
+ const saved=await page.evaluate(id=>window.schoolwork.lessonList().then(items=>items.find(item=>item.id===id)),lesson.id);
+ assert.equal(saved.boardSnapshots.length,1);assert.ok(saved.boardSnapshots[0].path.startsWith(data));
+ pass('Capture board stores an actual window image on the selected lesson in the isolated profile');
+ await page.screenshot({path:path.join(shots,'code-connected.png')});
+ await board.getByRole('button',{name:'Byt projektor'}).click();await input.fill('111111');await board.getByRole('button',{name:'Anslut',exact:true}).click();await board.getByRole('status').filter({hasText:/invalid or expired/}).waitFor({timeout:20000});
+ assert.equal((await page.evaluate(()=>window.schoolwork.boardStatus())).receiverUrl,'https://yeet.ssis.nu/receiver/42');pass('an expired code reports the problem and preserves the previous projector');
+ await board.getByRole('button',{name:'Avbryt',exact:true}).click();await board.getByRole('button',{name:'Koppla från'}).click();await input.waitFor();
+ await app.evaluate(()=>{global.__projectorTest.signedIn=false;});await input.fill('654321');await board.getByRole('button',{name:'Anslut',exact:true}).click();await connecting.waitFor();
+ await board.getByRole('button',{name:'Avbryt',exact:true}).click();await board.getByRole('button',{name:'Anslut',exact:true}).waitFor();
+ assert.equal((await page.evaluate(()=>window.schoolwork.boardStatus())).configured,false);pass('cancel closes pending sign-in and disconnect removes the saved projector');
+ assert.equal(errors.length,0,errors.join(' | '));pass('no renderer errors');
+ await fs.writeFile(path.join(shots,'results.json'),JSON.stringify({results,services:'simulated',profileIsolated:true},null,2));
+}finally{await app?.close().catch(()=>{});}

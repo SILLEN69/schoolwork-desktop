@@ -16,6 +16,8 @@ if (!window.schoolwork) {
     lessonLivePrepare: desktopOnly,
     lessonLiveStop: async () => false,
     boardConfigure: desktopOnly,
+    boardCancelConnect: async () => true,
+    boardDisconnect: async () => true,
     boardStatus: async () => ({ configured: false, receiverUrl: '', active: false, connections: false, senders: [], viewUrl: null, windowOpen: false, lastChecked: 0 }),
     boardOpen: desktopOnly,
     boardHide: async () => false,

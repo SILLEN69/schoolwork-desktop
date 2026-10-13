@@ -1,6 +1,6 @@
 {
   "name": "schoolwork-desktop",
-  "version": "0.11.0-beta.4",
+  "version": "0.11.0-beta.5",
   "private": true,
   "description": "A local-first AI work assistant powered by TeachGPT",
   "main": "dist-electron/main.js",
@@ -18,6 +18,7 @@
     "test": "vitest run",
     "test:desktop": "npm run build && node scripts/test-desktop.mjs",
     "test:lessons": "npm run build && node scripts/test-lessons.mjs",
+    "test:projector": "npm run build && node scripts/test-projector.mjs",
     "test:pointer-ui": "npm run build && node scripts/test-pointer-ui.mjs",
     "animation:studio": "npm --prefix remotion-startup run dev -- --no-open --port=3210",
     "animation:render": "npm --prefix remotion-startup run render:startup",

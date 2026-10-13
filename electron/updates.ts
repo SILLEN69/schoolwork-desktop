@@ -5,6 +5,7 @@ export interface UpdateDriver {
   autoInstallOnAppQuit: boolean;
   allowPrerelease: boolean;
   allowDowngrade: boolean;
+  channel?: string | null;
   on(name:string,listener:(value:any)=>void):unknown;
   checkForUpdates():Promise<{cancellationToken?:{cancel():void}}|null>;
   downloadUpdate(token?:any):Promise<unknown>;
@@ -34,7 +35,9 @@ export class Updates {
   private checking=false;
   constructor(private driver:UpdateDriver,version:string,private publish:(state:UpdateState)=>void,private busy:()=>boolean,unsupported?:string,private report:(failure:ReturnType<typeof updateFailure>)=>void=()=>{}) {
     this.state={phase:unsupported?'unsupported':'idle',currentVersion:version,message:unsupported};
-    driver.autoDownload=false; driver.autoInstallOnAppQuit=false; driver.allowPrerelease=false; driver.allowDowngrade=false;
+    const beta=/-beta(?:\.|$)/.test(version);
+    driver.autoDownload=false; driver.autoInstallOnAppQuit=false;
+    driver.channel=beta?'beta':'latest'; driver.allowPrerelease=beta; driver.allowDowngrade=false;
     driver.on('update-available',info=>{if(this.state.phase==='checking') this.set({phase:'available',version:info.version,message:undefined});});
     driver.on('update-not-available',()=>{if(this.state.phase==='checking') this.set({phase:'idle',message:'You’re up to date.'});});
     driver.on('download-progress',p=>{if(this.state.phase==='downloading') this.set({percent:Math.max(0,Math.min(100,Math.round(p.percent)))});});

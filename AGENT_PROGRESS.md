@@ -45,6 +45,18 @@ Updated: 2026-10-12. Work stays on `beta`; no release, deployment, main merge or
 
 ## Mission and working rules
 
+## Latest beta checkpoint — 13 October 2026
+
+Beta source is 0.11.0-beta.5. Projector setup accepts the rotating six-digit YeetCast code with leading zeroes/spaces, uses normal authorized school sign-in and `Cast::checkCode`, deletes its own temporary sender, and saves the resolved receiver URL instead of the PIN. Sender iframes and media/display capture are blocked in the connection window. Livewire collection/HTML parsing, idle/error states, hide/show and stale board capture are repaired. Beta update checks now follow beta.yml; stable checks stay on latest.yml.
+
+Verified: 209 unit tests, six release/asset/native checks, Windows build, 13 lesson/model UI workflows, and seven projector-window/IPC checks including actual image capture with simulated school services. The real anonymous YeetCast component and Google account-entry page were reached without entering credentials. No live classroom code was available; real signed-in lookup and teacher video remain unverified. Setup details: `docs/projector-setup.md`.
+
+Alpha remains a separate experimental branch with no published alpha installer. Snapshot `559544b` passed 300 unit tests, a Windows build, 19 offline lesson-follower UI checks and 16 project-workbench UI checks. Its package still says beta.2; do not confuse it with the published beta.2 installer.
+
+GitHub cleanup removed only `codex/agent-efficiency-07` at `cf655664f584748741622b70a5f934690109ada4` and `codex/desktop-ui-images` at `79ab1bbac75b180e3b44ae03dc1fa689a60ad37f`: exact heads of merged PRs #2/#1, already ancestors of main, with no open PRs. Main, beta, alpha, design work and release history are preserved. Historical notes below are not current capability/status claims.
+
+## Historical work
+
 Investigate stalled SchoolWork and development sessions first, then improve motion, reproducible development and the most useful product defects. Preserve chats, credentials, current user edits and live processes. Commit validated milestones locally. Keep evidence and limits explicit.
 
 ## Phase 1: findings verified before edits

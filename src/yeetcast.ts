@@ -1,96 +1,75 @@
-/** Pure helpers for the YeetCast (yeet.ssis.nu) board viewer.
- *  The projector page is public: it embeds a read-only vdo.ninja
- *  "view" URL in the ReceiverScreen Livewire component state. We only
- *  ever read that page and open the view URL — no casting, no
- *  connections are created on the YeetCast server. */
-
+/** YeetCast codes identify a receiver through its official signed-in join flow.
+ * Receiver pages and VDO view streams are read-only. Never treat a PIN as an ID. */
+export const yeetCastOrigin = 'https://yeet.ssis.nu';
 export type YeetCastSenders = { name: string; sending: boolean }[];
-export type YeetCastState = {
-  receiverUri: string;
-  active: boolean;
-  connections: boolean;
-  senders: YeetCastSenders;
-};
-
-/** What the board viewer reports to the UI. */
+export type YeetCastState = { receiverUri: string; active: boolean; connections: boolean; senders: YeetCastSenders };
 export type BoardStatus = {
-  configured: boolean;
-  receiverUrl: string;
-  active: boolean;
-  connections: boolean;
-  senders: YeetCastSenders;
-  viewUrl: string | null;
-  windowOpen: boolean;
-  lastChecked: number;
-  error?: string;
+  configured: boolean; receiverUrl: string; active: boolean; connections: boolean;
+  senders: YeetCastSenders; viewUrl: string | null; windowOpen: boolean; lastChecked: number; error?: string;
 };
-
-/** Accepts a full projector URL or bare text and returns a normalized http(s) URL. */
-export function normalizeReceiverUrl(raw: string): string {
-  const value = raw.trim();
-  if (!value) throw new Error('Enter the projector page URL, for example https://yeet.ssis.nu/receiver/abc123.');
-  let url: URL;
-  try {
-    url = new URL(value);
-  } catch {
-    throw new Error('That does not look like a URL. Use the projector page address, for example https://yeet.ssis.nu/receiver/abc123.');
-  }
-  if (url.protocol !== 'http:' && url.protocol !== 'https:')
-    throw new Error('Use an http or https projector page URL.');
-  return url.toString().replace(/\/$/, '');
+export function projectorCode(raw: string): string | null {
+  const value = raw.trim().replace(/[\s-]/g, '');
+  return /^\d{6}$/.test(value) ? value : null;
 }
-
-/** Extracts the live-cast state from a YeetCast receiver page.
- *  Livewire v3 stores the component state in a
- *  `<script type="text/json" data-wire:snapshot>` tag; v2 used a
- *  URL-encoded `wire:snapshot` attribute. Returns null when the page
- *  does not look like a YeetCast receiver page. */
+/** Retain existing saved links; new users enter a code instead. */
+export function normalizeReceiverUrl(raw: string): string {
+  let url: URL;
+  try { url = new URL(raw.trim()); } catch { throw new Error('Enter the six-digit code shown on the projector.'); }
+  if (url.origin !== yeetCastOrigin || url.username || url.password || !/^\/receiver\/[1-9]\d*\/?$/.test(url.pathname))
+    throw new Error('Use the six-digit projector code or a YeetCast receiver link.');
+  return yeetCastOrigin + url.pathname.replace(/\/$/, '');
+}
+function decodeHtml(value: string) {
+  return value.replace(/&(?:quot|apos|amp|lt|gt|#\d+|#x[\da-f]+);/gi, entity => {
+    const named: Record<string, string> = { '&quot;': '"', '&apos;': "'", '&amp;': '&', '&lt;': '<', '&gt;': '>' };
+    if (named[entity]) return named[entity];
+    const number = entity.toLowerCase().startsWith('&#x') ? parseInt(entity.slice(3, -1), 16) : Number(entity.slice(2, -1));
+    return number > 0 && number <= 0x10ffff ? String.fromCodePoint(number) : '';
+  });
+}
+function unwrap(value: any, depth = 0): any {
+  if (depth > 12) throw new Error('Invalid projector state.');
+  if (Array.isArray(value) && value.length === 2 && typeof value[1]?.s === 'string') return unwrap(value[0], depth + 1);
+  if (Array.isArray(value)) return value.map(item => unwrap(item, depth + 1));
+  if (value && typeof value === 'object') return Object.fromEntries(Object.entries(value).map(([key, item]) => [key, unwrap(item, depth + 1)]));
+  return value;
+}
+/** Permit view streams only, never a sender/push URL or executable protocol. */
+export function readOnlyViewUrl(raw: unknown): string {
+  if (typeof raw !== 'string' || !raw) return '';
+  try {
+    const url = new URL(decodeHtml(raw));
+    if (url.protocol !== 'https:' || url.username || url.password || url.searchParams.has('push') || url.searchParams.has('room') || url.searchParams.has('director')) return '';
+    if (!/^[a-z\d_-]+(?:,[a-z\d_-]+)*$/i.test(url.searchParams.get('view') || '')) return '';
+    return url.toString();
+  } catch { return ''; }
+}
+/** Parse actual Livewire attributes, JSON scripts and nested collection tuples. */
 export function parseReceiverPage(html: string): YeetCastState | null {
-  const candidates: string[] = [];
-  const scriptRe = /<script[^>]*data-wire:snapshot[^>]*>([\s\S]*?)<\/script>/gi;
-  let match: RegExpExecArray | null;
-  while ((match = scriptRe.exec(html))) candidates.push(match[1]);
-  if (!candidates.length) {
-    const attrRe = /wire:snapshot="([^"]+)"/i;
-    match = attrRe.exec(html);
-    if (match) {
-      try {
-        candidates.push(decodeURIComponent(match[1]));
-      } catch {
-        candidates.push(match[1]);
-      }
-    }
+  if (html.length > 2_000_000) return null;
+  const candidates = [...html.matchAll(/<script\b[^>]*data-wire:snapshot[^>]*>([\s\S]*?)<\/script>/gi)].map(match => match[1]);
+  for (const match of html.matchAll(/\bwire:snapshot\s*=\s*(["'])([\s\S]*?)\1/g)) {
+    const decoded = decodeHtml(match[2]);
+    candidates.push(decoded);
+    try { candidates.push(decodeURIComponent(decoded)); } catch { /* Plain JSON. */ }
   }
   for (const candidate of candidates) {
     try {
-      const json = JSON.parse(candidate);
-      const data = json?.snapshot?.data ?? json?.data;
-      if (!data || typeof data !== 'object') continue;
-      if (typeof data.receiverUri !== 'string' || !data.receiverUri) continue;
-      const senders: YeetCastSenders = Array.isArray(data.senders)
-        ? data.senders.map((s: any) => ({ name: String(s?.name || 'Sender'), sending: s?.sending === true }))
-        : [];
-      return {
-        receiverUri: data.receiverUri,
-        active: data.active === true,
-        connections: data.connections === true || senders.some((s) => s.sending),
-        senders,
-      };
-    } catch {
-      // Not JSON or the wrong component: keep looking.
-    }
+      const parsed = JSON.parse(candidate); const snapshot = parsed.snapshot ?? parsed;
+      const data = unwrap(snapshot.data);
+      if (!data || (snapshot.memo?.name !== 'receiver-screen' && typeof data.receiverUri !== 'string')) continue;
+      const senders: YeetCastSenders = Array.isArray(data.senders) ? data.senders
+        .filter((s: any) => s && typeof s.name === 'string')
+        .map((s: any) => ({ name: s.name.slice(0, 200), sending: s.sending === true })) : [];
+      const receiverUri = readOnlyViewUrl(data.receiverUri);
+      if (data.active === true && !receiverUri) return null;
+      return { receiverUri, active: data.active === true, connections: data.connections === true || senders.some(s => s.sending), senders };
+    } catch { /* Another component or malformed snapshot. */ }
   }
-  // Last resort: a vdo.ninja view URL rendered somewhere in the markup.
-  const direct =
-    html.match(/https?:\/\/[^"'\\\s]+vdo\.ninja[^"'\\\s]*?view=[0-9a-fA-F,]+[^"'\\\s]*/) ||
-    html.match(/https?:\/\/[^"'\\\s]+\/\?cleanoutput[^"'\\\s]*/);
-  if (direct)
-    return { receiverUri: direct[0].replace(/&amp;/g, '&'), active: true, connections: true, senders: [] };
-  return null;
+  const iframe = /<iframe\b[^>]*\bsrc\s*=\s*(["'])([\s\S]*?)\1/i.exec(html);
+  const receiverUri = iframe ? readOnlyViewUrl(iframe[2]) : '';
+  return receiverUri ? { receiverUri, active: true, connections: true, senders: [] } : null;
 }
-
-/** The part of a vdo.ninja view URL that identifies the viewed senders. */
-export function viewId(url: string): string {
-  const match = /view=([^&]+)/.exec(url);
-  return match ? match[1] : '';
+export function viewId(raw: string): string {
+  try { return new URL(raw).searchParams.get('view') || ''; } catch { return ''; }
 }

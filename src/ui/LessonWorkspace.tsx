@@ -44,7 +44,7 @@ export default function LessonWorkspace({ initialMode, summaryModel, configured,
   useEffect(() => {
     mounted.current = true;
     window.schoolwork.lessonList().then(s => { if(mounted.current) setSessions(s); }).catch(e => setError(errorText(e)));
-    return () => { mounted.current = false; stopLive(); recorder.current?.stop(); recorder.current = null; };
+    return () => { mounted.current = false; void window.schoolwork.boardCancelConnect().catch(()=>{}); stopLive(); recorder.current?.stop(); recorder.current = null; };
   }, []);
   useEffect(() => {
     let active = true;
@@ -98,7 +98,7 @@ export default function LessonWorkspace({ initialMode, summaryModel, configured,
   useEffect(() => { void boardLoad(); const timer = setInterval(() => void boardLoad(), 10_000); return () => clearInterval(timer); }, []);
   const boardConfigureSubmit = async () => {
     if (!boardUrlInput.trim() || boardBusy) return; setBoardBusy(true); setBoardNote('');
-    try { await window.schoolwork.boardConfigure(boardUrlInput.trim()); setBoardConfig(false); await boardLoad(); }
+    try { await window.schoolwork.boardConfigure(boardUrlInput.trim()); if(mounted.current){setBoardConfig(false);setBoardUrlInput('');} await boardLoad(); }
     catch (e) { setBoardNote(errorText(e)); } finally { if (mounted.current) setBoardBusy(false); }
   };
   const boardToggle = async () => {
@@ -227,16 +227,17 @@ export default function LessonWorkspace({ initialMode, summaryModel, configured,
         <span className="lesson-board-icon"><Tv size={16}/></span>
         <div className="lesson-board-status">
           <strong>{board?.active ? t('Kast pågår', 'Cast in progress') : t('Tavlan', 'Board')}</strong>
-          <small>{!board?.configured ? t('Ange projektorns sida för att följa kasts. SchoolWork tittar bara – inget kast startas.', 'Set the projector page to follow casts. SchoolWork only views – no cast is started.') : board.error ? board.error : board.active ? (board.senders.filter(s => s.sending).map(s => s.name).join(', ') || t('Någon kastar', 'Someone is casting')) : t('Inget pågående kast just nu.', 'No active cast right now.')}</small>
+          <small>{!board?.configured ? t('Skriv koden på projektorn. Logga in på skolans YeetCast första gången.', 'Enter the code on the projector. Sign in to school YeetCast the first time.') : board.error ? board.error : board.active ? (board.senders.filter(s => s.sending).map(s => s.name).join(', ') || t('Tavlan är ansluten', 'Board connected')) : t('Projektorn är ansluten. Väntar på en presentation.', 'Projector connected. Waiting for a presentation.')}</small>
         </div>
         <div className="lesson-board-actions">
           {boardNote && <span role="status">{boardNote}</span>}
-          {boardConfig ? <form className="lesson-board-config" onSubmit={e => { e.preventDefault(); void boardConfigureSubmit(); }}>
-            <input value={boardUrlInput} onChange={e => setBoardUrlInput(e.target.value)} placeholder="https://yeet.ssis.nu/receiver/…" aria-label={t('Projektorns sida', 'Projector page')} disabled={boardBusy}/>
-            <button type="submit" className="lesson-primary" disabled={boardBusy || !boardUrlInput.trim()}>{t('Spara', 'Save')}</button>
-            <button type="button" className="lesson-outline" disabled={boardBusy} onClick={() => setBoardConfig(false)}>{t('Avbryt', 'Cancel')}</button>
+          {boardConfig || !board?.configured ? <form className="lesson-board-config" onSubmit={e => { e.preventDefault(); void boardConfigureSubmit(); }}>
+            <input value={boardUrlInput} onChange={e => setBoardUrlInput(e.target.value)} placeholder="123 456" inputMode="numeric" autoComplete="off" maxLength={500} aria-label={t('Projektorkod', 'Projector code')} disabled={boardBusy}/>
+            <button type="submit" className="lesson-primary" disabled={boardBusy || !boardUrlInput.trim()}>{boardBusy ? <><LoaderCircle size={14} className="spin"/>{t('Ansluter…', 'Connecting…')}</> : t('Anslut', 'Connect')}</button>
+            <button type="button" className="lesson-outline" onClick={() => {void window.schoolwork.boardCancelConnect();setBoardConfig(false);setBoardUrlInput('');}}>{t('Avbryt', 'Cancel')}</button>
           </form> : <>
-            <button className="lesson-outline" disabled={boardBusy} onClick={() => { setBoardUrlInput(board?.receiverUrl || ''); setBoardConfig(true); }}><Settings2 size={14}/>{t('Projektorns sida', 'Projector page')}</button>
+            <button className="lesson-outline" disabled={boardBusy} onClick={() => { setBoardUrlInput(''); setBoardConfig(true); }}><Settings2 size={14}/>{t('Byt projektor', 'Change projector')}</button>
+            <button className="lesson-outline" disabled={boardBusy} onClick={() => {void window.schoolwork.boardDisconnect().then(()=>boardLoad()).catch(e=>setBoardNote(errorText(e)));}}>{t('Koppla från', 'Disconnect')}</button>
             <button className="lesson-outline" disabled={boardBusy} onClick={() => void boardLoad()}><RefreshCw size={14}/>{t('Uppdatera', 'Refresh')}</button>
             <button className="lesson-outline" disabled={!board?.viewUrl || boardBusy} onClick={() => void boardToggle()}><Tv size={14}/>{board?.windowOpen ? t('Dölj fönstret', 'Hide window') : t('Visa tavlan', 'Show board')}</button>
             <button className="lesson-primary" disabled={!board?.windowOpen || !current || boardBusy} onClick={() => void boardCapture()}><Camera size={14}/>{t('Fotografera tavlan', 'Capture board')}</button>

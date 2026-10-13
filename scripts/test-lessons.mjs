@@ -133,3 +133,6 @@ try{
   console.log(`PASS: ${results.length} lesson/model UI checks; remote TeachGPT/Google traffic simulated; real Electron IPC and microphone capture exercised.`);
 }catch(error){console.error('LESSON_TEST_FAILURE',error);if(app){const page=await app.firstWindow().catch(()=>null);await page?.screenshot({path:path.join(shots,'failure.png')}).catch(()=>{});console.log('SAVED_SESSION_DIAGNOSTIC',await page?.evaluate(()=>window.schoolwork.lessonList()).catch(()=>[]));}throw error;}
 finally{if(app){app.process().kill();await app.close().catch(()=>{});}await fs.rm(data,{recursive:true,force:true});}
+// Projector setup is a lesson workflow: keep it behind the existing release
+// verification gate, with separate isolated windows and simulated services.
+await import('./test-projector.mjs');

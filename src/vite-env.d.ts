@@ -24,6 +24,8 @@ interface Window {
     lessonLiveSignal: (input: {id:string;sdp:string}) => Promise<string>;
     lessonLiveStop: (id:string) => Promise<boolean>;
     boardConfigure: (url:string) => Promise<string>;
+    boardCancelConnect: () => Promise<boolean>;
+    boardDisconnect: () => Promise<boolean>;
     boardStatus: () => Promise<import('./yeetcast').BoardStatus>;
     boardOpen: () => Promise<import('./yeetcast').BoardStatus>;
     boardHide: () => Promise<boolean>;

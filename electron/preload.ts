@@ -23,6 +23,8 @@ contextBridge.exposeInMainWorld("schoolwork", {
   lessonLivePrepare: (input: unknown) => ipcRenderer.invoke('lessons:live-prepare', input),
   lessonLiveStop: (id: string) => ipcRenderer.invoke('lessons:live-stop', id),
   boardConfigure: (url: string) => ipcRenderer.invoke('board:configure', url),
+  boardCancelConnect: () => ipcRenderer.invoke('board:cancel-connect'),
+  boardDisconnect: () => ipcRenderer.invoke('board:disconnect'),
   boardStatus: () => ipcRenderer.invoke('board:status'),
   boardOpen: () => ipcRenderer.invoke('board:open'),
   boardHide: () => ipcRenderer.invoke('board:hide'),

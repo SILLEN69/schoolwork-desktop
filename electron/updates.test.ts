@@ -30,3 +30,10 @@ it('keeps automatic check failures quiet and makes manual errors visible',async(
   await updates.check(false);expect(updates.state.notify).toBe(false);expect(updates.state.phase).toBe('error');
   await updates.check();expect(updates.state.notify).toBe(true);
 });
+it('beta installations follow the beta feed while stable installations stay on latest, without downgrading',()=>{
+  const {driver}=setup();
+  new Updates(driver,'0.11.0-beta.5',()=>{},()=>false);
+  expect(driver).toMatchObject({channel:'beta',allowPrerelease:true,allowDowngrade:false});
+  new Updates(driver,'0.10.1',()=>{},()=>false);
+  expect(driver).toMatchObject({channel:'latest',allowPrerelease:false,allowDowngrade:false});
+});
