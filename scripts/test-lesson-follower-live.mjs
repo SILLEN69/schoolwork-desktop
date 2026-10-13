@@ -54,6 +54,13 @@ try {
   assert.equal(settings.model, 'Qwen3.8-27B');
   console.log('configured:', settings.configured, 'model:', settings.model);
 
+  // Reset this isolated profile's follower state so the run is repeatable: previous runs
+  // leave lessons (and their review decks) behind, which the cross-lesson due queue would then report.
+  const leftover = await page.evaluate(() => window.schoolwork.followList());
+  for (const old of leftover) await page.evaluate(id => window.schoolwork.followDelete(id), old.id);
+  assert.equal((await page.evaluate(() => window.schoolwork.followList())).length, 0, 'the profile must start with no follower lessons');
+  assert.deepEqual(await page.evaluate(() => window.schoolwork.followDueQueue()), { count: 0, lessons: [] }, 'no due reviews may survive the reset');
+
   // 2) Import the sample lesson; the live model must structure it (4-10 titled segments, 2-5 concepts each).
   await page.getByRole('button', { name: 'Lesson Follower' }).click();
   await page.locator('.lesson-shell').waitFor();
