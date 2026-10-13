@@ -400,6 +400,10 @@ export class SchoolWorkStore {
       .map(row => ({ id: row.id, title: row.title, language: row.language, updatedAt: row.updated_at }));
   }
 
+  examIds(): string[] {
+    return (this.db.prepare('SELECT id FROM practice_exams').all() as any[]).map(row => row.id);
+  }
+
   listExams(): Array<{ id: string; title: string; sourceKind: 'lesson' | 'notes'; sourceTitle: string; questionCount: number; durationMin: number; status: 'ready' | 'in_progress' | 'submitted'; builtWith: 'model' | 'offline'; createdAt: number; updatedAt: number }> {
     const rows = this.db.prepare('SELECT id,title,source_kind,source_title,questions_json,duration_min,built_with,state_json,created_at,updated_at FROM practice_exams ORDER BY updated_at DESC').all() as any[];
     return rows.map(row => ({

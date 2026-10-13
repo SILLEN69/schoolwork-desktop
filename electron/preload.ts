@@ -42,6 +42,7 @@ contextBridge.exposeInMainWorld("schoolwork", {
   examStart: (id: string) => ipcRenderer.invoke('exam:start', id),
   examAnswer: (input: unknown) => ipcRenderer.invoke('exam:answer', input),
   examSubmit: (input: unknown) => ipcRenderer.invoke('exam:submit', input),
+  examGrade: (input: { id: string; model: string }) => ipcRenderer.invoke('exam:grade', input),
   examDelete: (id: string) => ipcRenderer.invoke('exam:delete', id),
   examCancel: (id: string) => ipcRenderer.invoke('exam:cancel', id),
   calendarStatus: () => ipcRenderer.invoke('calendar:status'),

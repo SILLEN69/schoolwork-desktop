@@ -457,16 +457,16 @@ export default function App() {
     }
   };
   /**
-   * Workbench "Explain this": sends the composed file-context message through
-   * the same path as a normal submit — steering the running task when the
-   * current conversation is busy, guarded against double sends.
+   * Shared send path for views outside the chat (workbench "Explain this", exam mistake
+   * review): appends the message locally and submits through the normal path — steering the
+   * running task when the current conversation is busy, guarded against double sends.
    */
-  const explainFromWorkbench = async (text: string): Promise<boolean> => {
+  const sendToConversation = async (text: string, close: () => void): Promise<boolean> => {
     if (submitting.current || importing) return false;
     const submittedId = id;
     submitting.current = true;
     stickToBottom.current = true;
-    setShowProject(false);
+    close();
     setError("");
     setMessages((m) => [...m, { role: "user", content: text, attachments: [] }]);
     taskStartedAt.current = Date.now();
@@ -521,6 +521,8 @@ export default function App() {
       submitting.current = false;
     }
   };
+  const explainFromWorkbench = (text: string) => sendToConversation(text, () => setShowProject(false));
+  const sendFromExamReview = (text: string) => sendToConversation(text, () => { setExamTarget(null); setShowExams(false); });
   const cancel = async () => {
     await window.schoolwork.cancel(id);
     setLoading(false);
@@ -612,7 +614,7 @@ export default function App() {
     {!introReady&&<StartupIntro onComplete={()=>{setIntroReady(true);setIntroPreview(false);}} swedish={isSv} preview={introPreview}/>}
       <TaskNotices swedish={isSv} onOpen={conversationId=>{setLessonMode(null);void chooseChat({id:conversationId});}}/>
       <AtomGame open={atomGame!==null} swedish={isSv} origin={atomGame?.origin??null} onClose={()=>setAtomGame(null)}/>
-    {showProject?<ProjectWorkbench workspace={settings.workspace} swedish={isSv} onBack={() => setShowProject(false)} onExplain={explainFromWorkbench} />:showExams?<ExamPrepView configured={settings.configured} model={settings.model} swedish={isSv} target={examTarget} onBack={() => {setExamTarget(null);setShowExams(false);}} />:showReviewQueue?<ReviewQueueView swedish={isSv} queue={dueQueue} onBack={() => {setShowReviewQueue(false);loadDueQueue();}} onReview={lessonId=>{setFollowerTarget({lessonId,review:true});setShowReviewQueue(false);setShowFollower(true);}} />:showFollower?<LessonFollower configured={settings.configured} model={settings.model} swedish={isSv} target={followerTarget} onBack={() => {setFollowerTarget(null);setShowFollower(false);loadDueQueue();}} onWork={chatId=>{setFollowerTarget(null);setShowFollower(false);void chooseChat({id:chatId});}} onExam={lessonId=>{setFollowerTarget(null);setShowFollower(false);setExamTarget({lessonId});setShowExams(true);}} />:lessonMode?<LessonWorkspace initialMode={lessonMode} summaryModel={settings.model} configured={settings.configured} onBack={() => setLessonMode(null)} onWork={chatId=>{setLessonMode(null);void chooseChat({id:chatId});}} />:<div className="shell" inert={!introReady}>
+    {showProject?<ProjectWorkbench workspace={settings.workspace} swedish={isSv} onBack={() => setShowProject(false)} onExplain={explainFromWorkbench} />:showExams?<ExamPrepView configured={settings.configured} model={settings.model} swedish={isSv} target={examTarget} onBack={() => {setExamTarget(null);setShowExams(false);}} onWork={sendFromExamReview} />:showReviewQueue?<ReviewQueueView swedish={isSv} queue={dueQueue} onBack={() => {setShowReviewQueue(false);loadDueQueue();}} onReview={lessonId=>{setFollowerTarget({lessonId,review:true});setShowReviewQueue(false);setShowFollower(true);}} />:showFollower?<LessonFollower configured={settings.configured} model={settings.model} swedish={isSv} target={followerTarget} onBack={() => {setFollowerTarget(null);setShowFollower(false);loadDueQueue();}} onWork={chatId=>{setFollowerTarget(null);setShowFollower(false);void chooseChat({id:chatId});}} onExam={lessonId=>{setFollowerTarget(null);setShowFollower(false);setExamTarget({lessonId});setShowExams(true);}} />:lessonMode?<LessonWorkspace initialMode={lessonMode} summaryModel={settings.model} configured={settings.configured} onBack={() => setLessonMode(null)} onWork={chatId=>{setLessonMode(null);void chooseChat({id:chatId});}} />:<div className="shell" inert={!introReady}>
       <aside className={"sidebar " + (sidebarCollapsed ? "collapsed" : "")}>
         <div className="brand">
           <div className="brand-mark">

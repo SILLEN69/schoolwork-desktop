@@ -2199,7 +2199,8 @@ function registerIpc() {
   ipcMain.handle('exam:build', (event, raw) => { trusted(event); const p = z.object({ input: examBuildInputSchema, model: z.string().min(1).max(160) }).parse(raw); return exams.build(p.input, p.model); });
   ipcMain.handle('exam:start', (event, raw) => { trusted(event); return exams.start(z.string().uuid().parse(raw)); });
   ipcMain.handle('exam:answer', (event, raw) => { trusted(event); const p = z.object({ id: z.string().uuid(), questionId: z.string().min(1).max(80), answer: examAnswerSchema }).parse(raw); return exams.answer(p.id, p.questionId, p.answer); });
-  ipcMain.handle('exam:submit', (event, raw) => { trusted(event); const p = z.object({ id: z.string().uuid(), answers: z.record(z.string().min(1).max(80), examAnswerSchema) }).parse(raw); return exams.submit(p.id, p.answers); });
+  ipcMain.handle('exam:submit', (event, raw) => { trusted(event); const p = z.object({ id: z.string().uuid(), answers: z.record(z.string().min(1).max(80), examAnswerSchema), model: z.string().min(1).max(160).optional() }).parse(raw); return exams.submit(p.id, p.answers, p.model || ''); });
+  ipcMain.handle('exam:grade', (event, raw) => { trusted(event); const p = z.object({ id: z.string().uuid(), model: z.string().min(1).max(160) }).parse(raw); return exams.grade(p.id, p.model); });
   ipcMain.handle('exam:delete', (event, raw) => { trusted(event); return exams.remove(z.string().uuid().parse(raw)); });
   ipcMain.handle('exam:cancel', (event, raw) => { trusted(event); exams.cancel(z.string().uuid().parse(raw)); return true; });
   ipcMain.handle('calendar:status', event => { trusted(event); return calendar.status(); });

@@ -21,6 +21,10 @@ export type ExamState = {
   timeUsedMs?: number;
   autoSubmitted?: boolean;
   answers: Record<string, ExamAnswer>;
+  /** Per-question grades, keyed by question id. Re-grading replaces entries; it never appends. */
+  grades?: Record<string, QuestionGrade>;
+  /** Where the model-grading run stands; absent until the first submit/grade. */
+  grading?: ExamGrading;
 };
 export type ExamDocument = {
   id: string;
@@ -162,6 +166,7 @@ export function offlineExamQuestions(language: AudioLanguage, parts: ExamPart[])
     for (let j = 0; j < parts.length && distractors.size < 3; j++) {
       if (j === i) continue;
       for (const candidate of parts[j].concepts) {
+        if (distractors.size >= 3) break;
         const key = byKey(candidate);
         if (key && key !== byKey(term) && !distractors.has(key)) distractors.set(key, candidate.trim());
       }
@@ -208,4 +213,141 @@ export function offlineExamQuestions(language: AudioLanguage, parts: ExamPart[])
 /** Splits raw notes into parts with key concepts, for an offline exam built from pasted notes. */
 export function notesToParts(text: string, language: AudioLanguage): ExamPart[] {
   return splitLessonText(text, language).segments.map(s => ({ heading: s.heading, text: s.text, concepts: extractKeyConcepts(s.text, language) }));
+}
+
+// --- Grading (phase 2) ------------------------------------------------------
+export type GradeVerdict = 'correct' | 'partial' | 'wrong' | 'needs_review';
+export type QuestionGrade = {
+  verdict: GradeVerdict;
+  /** Score 0-1, or null when no numeric claim is made (needs_review). */
+  score: number | null;
+  rationale?: string;
+  gradedAt: number;
+  gradedWith: 'local' | 'model' | 'none';
+};
+export type GradingStatus = 'idle' | 'running' | 'done' | 'error';
+export type ExamGrading = {
+  status: GradingStatus;
+  model?: string;
+  startedAt?: number;
+  finishedAt?: number;
+};
+export type GradingEvent = 'start' | 'complete' | 'fail';
+
+/** Verdict thresholds for a model-graded score: >= 0.85 correct, >= 0.45 partial (uncertain), below wrong. */
+export const CORRECT_SCORE_FLOOR = 0.85;
+export const PARTIAL_SCORE_FLOOR = 0.45;
+
+export function verdictForScore(score: number): 'correct' | 'partial' | 'wrong' {
+  const clamped = Math.max(0, Math.min(1, score));
+  if (clamped >= CORRECT_SCORE_FLOOR) return 'correct';
+  if (clamped >= PARTIAL_SCORE_FLOOR) return 'partial';
+  return 'wrong';
+}
+
+/** Local multiple-choice grading: exact, instant, never needs review. */
+export function gradeMcQuestion(
+  question: Pick<ExamQuestion, 'kind' | 'options' | 'correctIndex'>,
+  answer: ExamAnswer | undefined,
+  gradedAt = Date.now(),
+): QuestionGrade {
+  const correct = question.correctIndex !== undefined && answer?.optionIndex === question.correctIndex;
+  return { verdict: correct ? 'correct' : 'wrong', score: correct ? 1 : 0, gradedAt, gradedWith: 'local' };
+}
+
+/** Grades every multiple-choice question; short and explain questions are left to the model (or manual review). */
+export function gradeMcExam(questions: ExamQuestion[], answers: Record<string, ExamAnswer>, gradedAt = Date.now()): Record<string, QuestionGrade> {
+  const grades: Record<string, QuestionGrade> = {};
+  for (const question of questions) if (question.kind === 'mc') grades[question.id] = gradeMcQuestion(question, answers[question.id], gradedAt);
+  return grades;
+}
+
+/** A free-text question that the model cannot grade is marked for manual review, never auto-graded. */
+export function needsReviewGrade(rationale?: string, gradedAt = Date.now()): QuestionGrade {
+  return { verdict: 'needs_review', score: null, ...(rationale ? { rationale } : {}), gradedAt, gradedWith: 'none' };
+}
+
+/** The grading state machine. Invalid transitions are no-ops so a stale event can never corrupt the state. */
+export function gradingTransition(status: GradingStatus, event: GradingEvent): GradingStatus {
+  switch (status) {
+    case 'idle': return event === 'start' ? 'running' : 'idle';
+    case 'running': return event === 'complete' ? 'done' : event === 'fail' ? 'error' : 'running';
+    case 'done':
+    case 'error': return event === 'start' ? 'running' : status; // re-grade
+  }
+}
+
+/** A grading run can be (re)started except while one is running. */
+export function canGrade(status: GradingStatus | undefined): boolean {
+  return status !== 'running';
+}
+
+export type ExamScoreSummary = {
+  correct: number; partial: number; wrong: number; needsReview: number;
+  scored: number; total: number;
+  /** Average of the numeric scores, as a 0-100 percentage; 0 when nothing is numerically scored. */
+  percent: number;
+};
+
+export function examScoreSummary(questions: ExamQuestion[], grades: Record<string, QuestionGrade>): ExamScoreSummary {
+  let correct = 0, partial = 0, wrong = 0, needsReview = 0, scoreSum = 0, scored = 0;
+  for (const question of questions) {
+    const grade = grades[question.id];
+    if (!grade) continue;
+    if (grade.verdict === 'correct') correct++;
+    else if (grade.verdict === 'partial') partial++;
+    else if (grade.verdict === 'wrong') wrong++;
+    else needsReview++;
+    if (typeof grade.score === 'number') { scoreSum += Math.max(0, Math.min(1, grade.score)); scored++; }
+  }
+  return { correct, partial, wrong, needsReview, scored, total: questions.length, percent: scored ? Math.round((scoreSum / scored) * 100) : 0 };
+}
+
+/** Wrong, partial (uncertain) and needs-review questions in exam order — exactly what the mistake review walks. */
+export function missedQuestions(doc: Pick<ExamDocument, 'questions' | 'state'>): ExamQuestion[] {
+  const grades = doc.state.grades ?? {};
+  return doc.questions.filter(question => {
+    const grade = grades[question.id];
+    return grade ? grade.verdict !== 'correct' : question.kind !== 'mc';
+  });
+}
+
+/** Strict contract for one model-graded question: a 0-1 score plus a one-line rationale. */
+export const gradeResultSchema = z.object({
+  score: z.number().min(0).max(1),
+  rationale: z.string().trim().min(5).max(160),
+});
+
+const clip = (text: string, max: number) => {
+  const flat = text.replace(/\s+/g, ' ').trim();
+  return flat.length > max ? flat.slice(0, max - 1).trimEnd() + '…' : flat;
+};
+
+/** Composes the deeper-study message for missed questions; goes through the normal conversation send path. */
+export function missedTopicsMessage(
+  doc: Pick<ExamDocument, 'title' | 'language' | 'questions' | 'state'>,
+  questionIds: string[],
+): string {
+  const swedish = doc.language === 'sv';
+  const byId = new Map(doc.questions.map(q => [q.id, q]));
+  const picked = questionIds.map(id => byId.get(id)).filter((q): q is ExamQuestion => Boolean(q));
+  const grades = doc.state.grades ?? {};
+  const answerText = (q: ExamQuestion) => {
+    const answer = doc.state.answers[q.id];
+    if (q.kind === 'mc' && answer?.optionIndex !== undefined && q.options) return q.options[answer.optionIndex];
+    return answer?.text?.trim() || '';
+  };
+  const lines = picked.map((q, i) => {
+    const grade = grades[q.id];
+    const parts = [`${i + 1}. ${q.prompt}`];
+    const answer = answerText(q);
+    parts.push((swedish ? 'Mitt svar: ' : 'My answer: ') + (answer ? clip(answer, 300) : swedish ? '(inga svar)' : '(no answer)'));
+    parts.push((swedish ? 'Så ska det vara: ' : 'What a good answer looks like: ') + clip(q.reference, 300));
+    if (grade?.rationale) parts.push((swedish ? 'Bedömning: ' : 'Grading note: ') + clip(grade.rationale, 160));
+    return parts.join(' ');
+  });
+  const header = swedish
+    ? `Jag repeterar misstag från övningsprovet “${doc.title}”. Förklara varför svaren är felaktiga eller ofullständiga, gå igenom varje fråga och ge ett extra exempel eller en övningsfråga per ämne.`
+    : `I am reviewing my mistakes from the practice exam “${doc.title}”. Explain why each answer is wrong or incomplete, walk through each question, and give one extra example or practice question per topic.`;
+  return [header, '', ...lines].join('\n');
 }

@@ -1,20 +1,24 @@
 import { useEffect, useRef, useState } from 'react';
-import { ArrowLeft, Check, ChevronLeft, ChevronRight, ClipboardList, Flag, LoaderCircle, Plus, Timer, Trash2, X } from 'lucide-react';
-import { examClock, formatExamClock, MIN_NOTES_CHARS } from '../examPrep';
-import type { ExamAnswer, ExamDocument, ExamQuestion, ExamSummary } from '../examPrep';
+import { ArrowLeft, ArrowUpRight, Check, ChevronLeft, ChevronRight, ClipboardList, Flag, LoaderCircle, Plus, RefreshCw, Timer, Trash2, X } from 'lucide-react';
+import { examClock, examScoreSummary, formatExamClock, missedQuestions, missedTopicsMessage, MIN_NOTES_CHARS } from '../examPrep';
+import type { ExamAnswer, ExamDocument, ExamQuestion, ExamSummary, QuestionGrade } from '../examPrep';
 import './exam.css';
 
 type LessonSource = { id: string; title: string; language: 'sv' | 'en'; updatedAt: number };
 type Props = {
   configured: boolean; model: string; swedish: boolean; onBack: () => void;
+  /** Sends composed text through the normal conversation send path (Work); resolves to whether it was sent. */
+  onWork?: (text: string) => Promise<boolean>;
   target?: { examId?: string; lessonId?: string } | null;
 };
 const errorText = (e: unknown) => (e instanceof Error ? e.message : String(e));
 const kindLabel = (swedish: boolean, kind: ExamQuestion['kind']) =>
   kind === 'mc' ? t2('MULTIPLE CHOICE', 'FELVAL', swedish) : kind === 'short' ? t2('SHORT ANSWER', 'KORTSVAR', swedish) : t2('EXPLAIN', 'FÖRKLARA', swedish);
+const verdictLabel = (swedish: boolean, verdict: QuestionGrade['verdict']) =>
+  verdict === 'correct' ? t2('CORRECT', 'RÄTT', swedish) : verdict === 'partial' ? t2('PARTIAL', 'DELVIS RÄTT', swedish) : verdict === 'wrong' ? t2('WRONG', 'FEL', swedish) : t2('NEEDS REVIEW', 'BEHÖVER GENOMGÅNG', swedish);
 const t2 = (en: string, sv: string, swedish: boolean) => (swedish ? sv : en);
 
-export default function ExamPrepView({ configured, model, swedish, onBack, target }: Props) {
+export default function ExamPrepView({ configured, model, swedish, onBack, onWork, target }: Props) {
   const t = (en: string, sv: string) => (swedish ? sv : en);
   const [exams, setExams] = useState<ExamSummary[]>([]);
   const [current, setCurrent] = useState<ExamDocument | null>(null);
@@ -33,9 +37,12 @@ export default function ExamPrepView({ configured, model, swedish, onBack, targe
   const [deleteId, setDeleteId] = useState<string | null>(null);
   const [error, setError] = useState('');
   const [notice, setNotice] = useState('');
+  const [review, setReview] = useState<{ ids: string[]; index: number } | null>(null);
   const mounted = useRef(true);
   const targetUsed = useRef(false);
   const submitInFlight = useRef(false);
+  const gradingBusy = useRef(false);
+  const sendBusy = useRef(false);
   const textTimers = useRef<Record<string, number>>({});
   const currentRef = useRef<ExamDocument | null>(null);
   const answersRef = useRef(answers);
@@ -48,7 +55,7 @@ export default function ExamPrepView({ configured, model, swedish, onBack, targe
     return list;
   };
   const selectExam = (id: string) => {
-    setBuilderOpen(false); setError(''); setNotice(''); setConfirmSubmit(false);
+    setBuilderOpen(false); setError(''); setNotice(''); setConfirmSubmit(false); setReview(null);
     void window.schoolwork.examGet(id).then(doc => {
       if (!mounted.current) return;
       setCurrent(doc);
@@ -89,7 +96,7 @@ export default function ExamPrepView({ configured, model, swedish, onBack, targe
   }, []);
 
   const openBuilder = (mode: 'lesson' | 'notes') => {
-    setCurrent(null); setBuilderOpen(true); setBuilderMode(mode); setError(''); setNotice('');
+    setCurrent(null); setBuilderOpen(true); setBuilderMode(mode); setError(''); setNotice(''); setReview(null);
     if (mode === 'lesson' && !lessonSources.length) void loadSources();
   };
   const switchMode = (mode: 'lesson' | 'notes') => {
@@ -149,18 +156,41 @@ export default function ExamPrepView({ configured, model, swedish, onBack, targe
     if (!a) return false;
     return q.kind === 'mc' ? a.optionIndex !== undefined : Boolean((a.text ?? '').trim());
   };
+  const runGrade = async (id: string) => {
+    if (gradingBusy.current) return;
+    gradingBusy.current = true;
+    setReview(null);
+    try {
+      const updated = await window.schoolwork.examGrade({ id, model });
+      if (!mounted.current) return;
+      if (currentRef.current?.id === id) setCurrent(updated);
+      void refreshList();
+    } catch (e) { if (mounted.current) setError(errorText(e)); }
+    finally { gradingBusy.current = false; }
+  };
+  const sendMissed = async (ids: string[]) => {
+    const doc = currentRef.current;
+    if (!doc || !onWork || sendBusy.current) return;
+    sendBusy.current = true;
+    try {
+      const sent = await onWork(missedTopicsMessage(doc, ids));
+      if (mounted.current && sent) setNotice(t('Sent to your conversation — let the model walk you through it.', 'Skickat till din konversation — låt modellen gå igenom det med dig.'));
+    } finally { if (mounted.current) sendBusy.current = false; }
+  };
   const doSubmit = async (auto = false) => {
     const doc = currentRef.current;
     if (!doc || doc.state.status !== 'in_progress' || submitInFlight.current) return;
     submitInFlight.current = true;
     setConfirmSubmit(false);
     try {
-      const updated = await window.schoolwork.examSubmit({ id: doc.id, answers: answersRef.current });
+      const updated = await window.schoolwork.examSubmit({ id: doc.id, answers: answersRef.current, model });
       if (!mounted.current) return;
       setCurrent(updated);
       setAnswers(updated.state.answers);
       if (auto) setNotice(t('Time is up — the exam was submitted with the answers you had saved.', 'Tiden är ute — provet lämnades in med de svar du hade sparade.'));
       void refreshList();
+      // Multiple choice is already graded locally; run the model grading for the free-text answers.
+      if (updated.state.grading?.status === 'idle') void runGrade(updated.id);
     } catch (e) { if (mounted.current) setError(errorText(e)); }
     finally { submitInFlight.current = false; }
   };
@@ -310,29 +340,87 @@ export default function ExamPrepView({ configured, model, swedish, onBack, targe
           <button key={q.id} title={q.prompt} aria-label={`${t('Go to question', 'Gå till fråga')} ${i + 1}`} aria-current={i === index ? 'true' : undefined} onClick={() => setIndex(i)} className={(answers[q.id]?.flagged ? ' flagged' : '') + (isAnswered(q) ? ' answered' : '')}>{i + 1}</button>
         ))}</nav>
       </>}
-      {!builderOpen && doc && doc.state.status === 'submitted' && (
-        <div className="lesson-card exam-submitted-card">
+      {!builderOpen && doc && doc.state.status === 'submitted' && !review && (() => {
+        const grades = doc.state.grades ?? {};
+        const grading = doc.state.grading;
+        const summary = examScoreSummary(doc.questions, grades);
+        const missed = missedQuestions(doc);
+        const gradingRunning = grading?.status === 'running';
+        const hasGrades = doc.questions.some(q => grades[q.id]);
+        return <div className="lesson-card exam-submitted-card">
           <div className="lesson-card-head"><div><h2>{doc.title}</h2><p className="lesson-source">{sourceLine(doc)}</p></div><span className="exam-submitted-chip">{t('SUBMITTED', 'LÄMNAT IN')}</span></div>
           <div className="lesson-scroll exam-submitted-scroll">
             <div className="exam-submitted-banner"><Timer size={15}/><span>{t(`Submitted ${new Date(doc.state.submittedAt ?? doc.updatedAt).toLocaleString('sv-SE')} · took ${formatExamClock(doc.state.timeUsedMs ?? 0)}`, `Lämnad in ${new Date(doc.state.submittedAt ?? doc.updatedAt).toLocaleString('sv-SE')} · tog ${formatExamClock(doc.state.timeUsedMs ?? 0)}`)}{doc.state.autoSubmitted ? ` · ${t('time ran out', 'tiden gick ut')}` : ''}</span></div>
+            {gradingRunning && <div className="exam-grading-row" role="status"><LoaderCircle className="spin" size={14}/><span>{t(`Grading your answers with ${grading?.model ?? 'the model'}…`, `Rättar dina svar med ${grading?.model ?? 'modellen'}…`)}</span></div>}
+            {grading?.status === 'error' && <div className="exam-grading-row error"><span>{t('Model grading could not be finished — press re-grade to try again.', 'Modellrättningen klarade inte — tryck på rätta igen för att försöka på nytt.')}</span></div>}
+            {!gradingRunning && summary.needsReview > 0 && <div className="exam-grading-row warn"><span>{configured
+              ? t(`${summary.needsReview} answer${summary.needsReview === 1 ? ' needs' : 's need'} manual review or a fresh grading run.`, `${summary.needsReview} ${summary.needsReview === 1 ? 'svar behöver' : 'svar behöver'} manuell genomgång eller en ny rättning.`)
+              : t(`${summary.needsReview} free-text answer${summary.needsReview === 1 ? ' needs' : 's need'} manual review — add a TeachGPT key to grade them automatically.`, `${summary.needsReview} ${summary.needsReview === 1 ? 'fritextsvar behöver' : 'fritextsvar behöver'} manuell genomgång — lägg till en TeachGPT-nyckel för att rätta dem automatiskt.`)}</span></div>}
+            <div className="follow-stats exam-score-stats">
+              <div className="follow-stat"><small>{t('SCORE', 'POÄNG')}</small><strong>{hasGrades ? summary.percent + '%' : '—'}</strong></div>
+              <div className="follow-stat"><small>{t('CORRECT', 'RÄTT')}</small><strong className="good">{summary.correct}</strong></div>
+              <div className="follow-stat"><small>{t('PARTIAL', 'DELVIS')}</small><strong className="mid">{summary.partial}</strong></div>
+              <div className="follow-stat"><small>{t('WRONG', 'FEL')}</small><strong className="bad">{summary.wrong}</strong></div>
+              <div className="follow-stat"><small>{t('REVIEW', 'GENOMGÅNG')}</small><strong className="review">{summary.needsReview}</strong></div>
+            </div>
             {doc.questions.map((q, i) => {
               const a = doc.state.answers[q.id];
+              const grade = grades[q.id];
               const answered = a && (a.optionIndex !== undefined || (a.text ?? '').trim());
               const answerText = q.kind === 'mc'
                 ? (a?.optionIndex !== undefined && q.options ? String.fromCharCode(65 + a.optionIndex) + ' — ' + q.options[a.optionIndex] : t('(no answer)', '(inga svar)'))
                 : (a?.text || t('(no answer)', '(inga svar)'));
+              const showReference = grade ? grade.verdict !== 'correct' : false;
               return <div key={q.id} className="exam-review-row">
-                <div className="follow-answer-top"><span>{i + 1}. {q.prompt}</span>{a?.flagged && <Flag size={12} className="exam-flag-icon" aria-label={t('Flagged', 'Markerad')}/>}<span className={'exam-kind ' + q.kind}>{kindLabel(swedish, q.kind)}</span></div>
+                <div className="follow-answer-top"><span>{i + 1}. {q.prompt}</span>{a?.flagged && <Flag size={12} className="exam-flag-icon" aria-label={t('Flagged', 'Markerad')}/>}<span className={'exam-kind ' + q.kind}>{kindLabel(swedish, q.kind)}</span>{grade && <span className={'exam-verdict ' + grade.verdict}>{verdictLabel(swedish, grade.verdict)}{(typeof grade.score === 'number' && grade.gradedWith === 'model' && grade.verdict !== 'correct') ? ' · ' + grade.score.toFixed(2) : ''}</span>}</div>
                 <p className={'follow-answer-text' + (answered ? '' : ' muted')}>{answerText}</p>
+                {showReference && <div className="exam-correct-answer"><small>{t('CORRECT ANSWER', 'RÄTT SVAR')}</small><p>{q.reference}</p>{grade?.rationale && <p className="exam-rationale">{t('Grading note:', 'Bedömning:')} {grade.rationale}</p>}</div>}
               </div>;
             })}
-            <p className="follow-done-copy">{t('Your answers are stored with the exam. Grading and a mistake review come in the next phase.', 'Dina svar sparas med provet. Rättning och felgenomgång kommer i nästa fas.')}</p>
           </div>
-          <div className="lesson-card-foot">
-            <button className="lesson-outline" onClick={() => setCurrent(null)}><ChevronLeft size={16}/> {t('Back to my exams', 'Tillbaka till mina proven')}</button>
+          <div className="lesson-card-foot exam-results-foot">
+            <button className="lesson-outline" onClick={() => { setReview(null); setCurrent(null); }}><ChevronLeft size={16}/> {t('Back to my exams', 'Tillbaka till mina proven')}</button>
+            {!hasGrades && !gradingRunning && <button className="lesson-primary" data-exam-grade onClick={() => void runGrade(doc.id)}><Check size={15}/> {t('Grade exam', 'Rätta provet')}</button>}
+            {hasGrades && !gradingRunning && <button className="lesson-outline" data-exam-regrade onClick={() => void runGrade(doc.id)}><RefreshCw size={15}/> {t('Re-grade', 'Rätta igen')}</button>}
+            {missed.length > 0 && <button className="lesson-primary" data-exam-review-mistakes disabled={gradingRunning} onClick={() => setReview({ ids: missed.map(q => q.id), index: 0 })}><Flag size={15}/> {t('Review my mistakes', 'Repetera mina fel')}</button>}
           </div>
-        </div>
-      )}
+        </div>;
+      })()}
+      {!builderOpen && doc && doc.state.status === 'submitted' && review && (() => {
+        const list = missedQuestions(doc);
+        const safeIndex = Math.min(review.index, Math.max(0, list.length - 1));
+        const q = list[safeIndex];
+        if (!q) return null;
+        const grade = doc.state.grades?.[q.id];
+        const a = doc.state.answers[q.id];
+        const answered = a && (a.optionIndex !== undefined || (a.text ?? '').trim());
+        const answerText = q.kind === 'mc'
+          ? (a?.optionIndex !== undefined && q.options ? String.fromCharCode(65 + a.optionIndex) + ' — ' + q.options[a.optionIndex] : t('(no answer)', '(inga svar)'))
+          : (a?.text?.trim() || t('(no answer)', '(inga svar)'));
+        return <>
+          <section className="lesson-intro"><div>
+            <div className="lesson-eyebrow exam-eyebrow"><Flag size={13}/>{t('MISTAKE REVIEW', 'FELGENOMGÅNG')}</div>
+            <h1>{t('Study exactly what you missed.', 'Läs på exakt det du missade.')}</h1>
+            <p className="lesson-source">{doc.title} · {t(`Question ${safeIndex + 1} of ${list.length}`, `Fråga ${safeIndex + 1} av ${list.length}`)}</p>
+          </div></section>
+          <div className="lesson-card exam-question-card">
+            <div className="lesson-card-head"><div><h2>{q.prompt}</h2></div><span className={'exam-kind ' + q.kind}>{kindLabel(swedish, q.kind)}</span>{grade && <span className={'exam-verdict ' + grade.verdict}>{verdictLabel(swedish, grade.verdict)}</span>}</div>
+            <div className="lesson-scroll exam-question-scroll">
+              <div className="exam-review-answer"><small>{t('YOUR ANSWER', 'DITT SVAR')}</small><p className={'follow-answer-text' + (answered ? '' : ' muted')}>{answerText}</p></div>
+              <div className="exam-review-answer reference"><small>{t('WHAT A GOOD ANSWER LOOKS LIKE', 'SÅ SKA SVARET VARA')}</small><p className="follow-answer-text">{q.reference}</p></div>
+              {grade?.rationale && <p className="exam-rationale">{t('Grading note:', 'Bedömning:')} {grade.rationale}</p>}
+            </div>
+            <div className="lesson-card-foot exam-review-foot">
+              <button className="lesson-outline" data-exam-ask onClick={() => void sendMissed([q.id])}><ArrowUpRight size={15}/> {t('Ask about this', 'Fråga om detta')}</button>
+              <button className="lesson-outline" data-exam-ask-all onClick={() => void sendMissed(list.map(x => x.id))}><ArrowUpRight size={15}/> {t('Send all missed topics', 'Skicka alla ämnen')}</button>
+              <button className="lesson-outline" data-exam-review-prev disabled={safeIndex === 0} onClick={() => setReview(r => r && { ...r, index: safeIndex - 1 })}><ChevronLeft size={16}/> {t('Previous', 'Föregående')}</button>
+              {safeIndex + 1 < list.length
+                ? <button className="lesson-primary" data-exam-review-next onClick={() => setReview(r => r && { ...r, index: safeIndex + 1 })}>{t('Next', 'Nästa')}<ChevronRight size={16}/></button>
+                : <button className="lesson-primary" data-exam-review-done onClick={() => setReview(null)}><Check size={15}/> {t('Done', 'Klart')}</button>}
+            </div>
+          </div>
+        </>;
+      })()}
       {notice && <div className="lesson-notice">{notice}</div>}
       {error && <div className="lesson-error" role="alert"><span>{error}</span><button aria-label={t('Dismiss message', 'Stäng meddelande')} onClick={() => setError('')}><X size={15}/></button></div>}
     </main>

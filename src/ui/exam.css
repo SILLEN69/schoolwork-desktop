@@ -42,3 +42,26 @@
 .exam-review-row .follow-answer-top{flex-wrap:wrap}
 .exam-flag-icon{color:#e0c284}
 .exam-review-row .follow-answer-text{font-size:13px;color:#c9d6bd}
+.exam-score-stats{margin-top:14px}
+.exam-score-stats .follow-stat strong.good{color:#9fd39a}
+.exam-score-stats .follow-stat strong.mid{color:#e0c284}
+.exam-score-stats .follow-stat strong.bad{color:#e09a8a}
+.exam-score-stats .follow-stat strong.review{color:#a9bb97}
+.exam-verdict{font-size:8px;letter-spacing:1.2px;border:1px solid #35422d;border-radius:20px;padding:4px 10px;color:#8fa27d;white-space:nowrap}
+.exam-verdict.correct{color:#9fd39a;border-color:#3d5c38;background:#1c2a1a}
+.exam-verdict.partial{color:#e0c284;border-color:#6b5736;background:#2c2818}
+.exam-verdict.wrong{color:#e09a8a;border-color:#6b3a33;background:#2c1d1a}
+.exam-verdict.needs_review{color:#a9bb97;border-color:#46543f;background:#1f271e}
+.exam-grading-row{display:flex;align-items:center;gap:10px;border:1px solid #3d4c33;background:#1e2820;color:#c9d6bd;border-radius:9px;padding:10px 14px;font-size:12px;margin-bottom:12px}
+.exam-grading-row.warn{border-color:#6b5736;background:#2c2818;color:#e0c284}
+.exam-grading-row.error{border-color:#6b3a33;background:#2c1d1a;color:#e09a8a}
+.exam-correct-answer{margin-top:10px;border:1px solid #3d5c38;background:#1c2a1a;border-radius:9px;padding:10px 12px}
+.exam-correct-answer small{display:block;font-size:8px;letter-spacing:1.4px;color:#9fd39a;margin-bottom:4px}
+.exam-correct-answer p{margin:0;font-size:13px;line-height:1.6;color:#c9d6bd}
+.exam-rationale{margin:8px 0 0;font-size:12px;font-style:italic;color:#a9bb97;line-height:1.5}
+.exam-review-answer{border:1px solid #2f3b2c;background:#1a231a;border-radius:9px;padding:10px 12px;margin-bottom:10px}
+.exam-review-answer small{display:block;font-size:8px;letter-spacing:1.4px;color:#8fa27d;margin-bottom:4px}
+.exam-review-answer.reference{border-color:#3d5c38;background:#1c2a1a}
+.exam-review-answer.reference small{color:#9fd39a}
+.exam-review-answer .follow-answer-text{margin:0;font-size:13px;line-height:1.6}
+.exam-results-foot,.exam-review-foot{gap:8px;flex-wrap:wrap}

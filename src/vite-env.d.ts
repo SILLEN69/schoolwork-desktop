@@ -42,7 +42,8 @@ interface Window {
     examBuild: (input: { kind: 'lesson'; lessonId: string } | { kind: 'notes'; title?: string; text: string; language: 'sv' | 'en' }, model: string) => Promise<import('./examPrep').ExamDocument>;
     examStart: (id: string) => Promise<import('./examPrep').ExamDocument>;
     examAnswer: (input: { id: string; questionId: string; answer: import('./examPrep').ExamAnswer }) => Promise<import('./examPrep').ExamDocument>;
-    examSubmit: (input: { id: string; answers: Record<string, import('./examPrep').ExamAnswer> }) => Promise<import('./examPrep').ExamDocument>;
+    examSubmit: (input: { id: string; answers: Record<string, import('./examPrep').ExamAnswer>; model?: string }) => Promise<import('./examPrep').ExamDocument>;
+    examGrade: (input: { id: string; model: string }) => Promise<import('./examPrep').ExamDocument>;
     examDelete: (id: string) => Promise<void>;
     examCancel: (id: string) => Promise<boolean>;
     calendarStatus: () => Promise<import('./lesson').CalendarStatus & {error?:string}>;
