@@ -15,3 +15,5 @@ publisher-client.json
 *.log
 *.tsbuildinfo
 *.schoolwork.bak.*
+
+temp/alpha-verify/
