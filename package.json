@@ -19,6 +19,7 @@
     "test:desktop": "npm run build && node scripts/test-desktop.mjs",
     "test:lessons": "npm run build && node scripts/test-lessons.mjs",
     "test:follower": "npm run build && node scripts/test-lesson-follower.mjs",
+    "test:workbench": "npm run build && node scripts/test-project-workbench.mjs",
     "test:pointer-ui": "npm run build && node scripts/test-pointer-ui.mjs",
     "animation:studio": "npm --prefix remotion-startup run dev -- --no-open --port=3210",
     "animation:render": "npm --prefix remotion-startup run render:startup",

@@ -72,6 +72,15 @@ if (!window.schoolwork) {
     inspectProject: async () => {
       throw new Error("File navigation requires the desktop application.");
     },
+    projectTree: async () => {
+      throw new Error("The project workbench requires the desktop application.");
+    },
+    projectRead: async () => {
+      throw new Error("The project workbench requires the desktop application.");
+    },
+    projectWatchStart: async () => false,
+    projectWatchStop: async () => false,
+    onProjectChanged: () => () => {},
     openUrl: async (url: string) => {
       window.open(url, "_blank", "noopener,noreferrer");
     },

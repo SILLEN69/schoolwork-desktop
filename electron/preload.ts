@@ -74,6 +74,17 @@ contextBridge.exposeInMainWorld("schoolwork", {
     ipcRenderer.invoke("settings:file-access", value),
   inspectProject: (input: unknown) =>
     ipcRenderer.invoke("project:inspect", input),
+  projectTree: () => ipcRenderer.invoke("project:tree"),
+  projectRead: (input: { path: string }) =>
+    ipcRenderer.invoke("project:read", input),
+  projectWatchStart: () => ipcRenderer.invoke("project:watch:start"),
+  projectWatchStop: () => ipcRenderer.invoke("project:watch:stop"),
+  onProjectChanged: (callback: (workspace: string) => void) => {
+    const listener = (_event: Electron.IpcRendererEvent, data: any) =>
+      callback(data && data.workspace ? data.workspace : "");
+    ipcRenderer.on("project:changed", listener);
+    return () => ipcRenderer.removeListener("project:changed", listener);
+  },
   openUrl: (url: string) => ipcRenderer.invoke("app:open-url", url),
   settingsGet: () => ipcRenderer.invoke("settings:get"),
   setKey: (key: string) => ipcRenderer.invoke("settings:set-key", key),

@@ -6,6 +6,7 @@ import {
   ChevronDown,
   ChevronRight,
   FileText,
+  Files,
   Folder,
   Globe,
   History,
@@ -34,6 +35,7 @@ import LessonWorkspace from "./LessonWorkspace";
 import LessonFollower from "./LessonFollower";
 import ReviewQueueView from "./ReviewQueue";
 import type { ReviewQueue as DueQueue } from "../reviewDeck";
+import ProjectWorkbench from "./ProjectWorkbench";
 import VoiceInput from './VoiceInput';
 import ConnectionsSettings from './ConnectionsSettings';
 import './studio.css';
@@ -103,6 +105,7 @@ export default function App() {
   const [lessonMode, setLessonMode] = useState<"lesson" | "transcription" | null>(null);
   const [showFollower, setShowFollower] = useState(false);
   const [showReviewQueue, setShowReviewQueue] = useState(false);
+  const [showProject, setShowProject] = useState(false);
   const [followerTarget, setFollowerTarget] = useState<{ lessonId: string; review: boolean } | null>(null);
   const [dueQueue, setDueQueue] = useState<DueQueue | null>(null);
   const modelRevision = useRef(0);
@@ -540,7 +543,7 @@ export default function App() {
     {!introReady&&<StartupIntro onComplete={()=>{setIntroReady(true);setIntroPreview(false);}} swedish={isSv} preview={introPreview}/>}
       <TaskNotices swedish={isSv} onOpen={conversationId=>{setLessonMode(null);void chooseChat({id:conversationId});}}/>
       <AtomGame open={atomGame!==null} swedish={isSv} origin={atomGame?.origin??null} onClose={()=>setAtomGame(null)}/>
-    {showReviewQueue?<ReviewQueueView swedish={isSv} queue={dueQueue} onBack={() => {setShowReviewQueue(false);loadDueQueue();}} onReview={lessonId=>{setFollowerTarget({lessonId,review:true});setShowReviewQueue(false);setShowFollower(true);}} />:showFollower?<LessonFollower configured={settings.configured} model={settings.model} swedish={isSv} target={followerTarget} onBack={() => {setFollowerTarget(null);setShowFollower(false);loadDueQueue();}} onWork={chatId=>{setFollowerTarget(null);setShowFollower(false);void chooseChat({id:chatId});}} />:lessonMode?<LessonWorkspace initialMode={lessonMode} summaryModel={settings.model} configured={settings.configured} onBack={() => setLessonMode(null)} onWork={chatId=>{setLessonMode(null);void chooseChat({id:chatId});}} />:<div className="shell" inert={!introReady}>
+    {showProject?<ProjectWorkbench workspace={settings.workspace} swedish={isSv} onBack={() => setShowProject(false)} />:showReviewQueue?<ReviewQueueView swedish={isSv} queue={dueQueue} onBack={() => {setShowReviewQueue(false);loadDueQueue();}} onReview={lessonId=>{setFollowerTarget({lessonId,review:true});setShowReviewQueue(false);setShowFollower(true);}} />:showFollower?<LessonFollower configured={settings.configured} model={settings.model} swedish={isSv} target={followerTarget} onBack={() => {setFollowerTarget(null);setShowFollower(false);loadDueQueue();}} onWork={chatId=>{setFollowerTarget(null);setShowFollower(false);void chooseChat({id:chatId});}} />:lessonMode?<LessonWorkspace initialMode={lessonMode} summaryModel={settings.model} configured={settings.configured} onBack={() => setLessonMode(null)} onWork={chatId=>{setLessonMode(null);void chooseChat({id:chatId});}} />:<div className="shell" inert={!introReady}>
       <aside className={"sidebar " + (sidebarCollapsed ? "collapsed" : "")}>
         <div className="brand">
           <div className="brand-mark">
@@ -584,6 +587,10 @@ export default function App() {
           <Repeat size={16}/>
           <span>{t("Due reviews", "Att repetera")}</span>
           {(dueQueue?.count ?? 0) > 0 && <span className="review-badge">{dueQueue!.count > 99 ? "99+" : dueQueue!.count}</span>}
+        </button>
+        <button className="nav-item project-nav" onClick={() => setShowProject(true)}>
+          <Files size={16}/>
+          <span>{t("Project", "Projekt")}</span>
         </button>
         <button
           className="nav-item memory-nav"

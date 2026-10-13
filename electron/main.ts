@@ -47,6 +47,11 @@ import {
   executeProjectTool,
 } from "./projectTools";
 import {
+  buildProjectTree,
+  readWorkbenchFile,
+  watchWorkspace,
+} from "./projectView";
+import {
   processInputs,
   processToolSchemas,
   executeProcess,
@@ -143,6 +148,8 @@ let updates: Updates;
 let lessons: Lessons;
 let follower: LessonFollower;
 let calendar: GoogleCalendar;
+let workbenchWatch: (() => void) | null = null;
+const workbenchWorkspace = () => settings.get("workspace") || app.getPath("documents");
 const calendarWrites = new Set<string>();
 let updateTimer: ReturnType<typeof setInterval>|undefined;
 const capabilities = () =>
@@ -2589,6 +2596,35 @@ function registerIpc() {
       ),
     );
   });
+  ipcMain.handle('project:tree', (event) => {
+    trusted(event);
+    return buildProjectTree(workbenchWorkspace());
+  });
+  ipcMain.handle('project:read', (event, raw) => {
+    trusted(event);
+    const p = z.object({ path: z.string().min(1).max(4096) }).parse(raw);
+    return readWorkbenchFile(workbenchWorkspace(), p.path);
+  });
+  ipcMain.handle('project:watch:start', (event) => {
+    trusted(event);
+    if (workbenchWatch) {
+      workbenchWatch();
+      workbenchWatch = null;
+    }
+    const workspace = workbenchWorkspace();
+    workbenchWatch = watchWorkspace(workspace, (ws) => {
+      if (win && !win.isDestroyed()) win.webContents.send('project:changed', { workspace: ws });
+    });
+    return true;
+  });
+  ipcMain.handle('project:watch:stop', (event) => {
+    trusted(event);
+    if (workbenchWatch) {
+      workbenchWatch();
+      workbenchWatch = null;
+    }
+    return true;
+  });
   ipcMain.handle("settings:set-key", (event, raw) => {
     trusted(event);
     const input = z.string().trim().min(12).max(512).parse(raw);
@@ -2956,6 +2992,7 @@ else {
     telegram?.stop();
     calendar?.stop();
     connections?.stop();
+    if(workbenchWatch){workbenchWatch();workbenchWatch=null;}
     for (const lesson of lessons?.list() || []) lessons.cancel(lesson.id);
     for (const lesson of follower?.list() || []) follower.cancel(lesson.id);
     for (const controller of active.values()) controller.abort();

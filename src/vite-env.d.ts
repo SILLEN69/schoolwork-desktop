@@ -95,6 +95,22 @@ interface Window {
       args: unknown;
       conversationId?: string;
     }) => Promise<any>;
+    projectTree: () => Promise<{
+      workspace: string;
+      entries: Array<{ name: string; path: string; type: "dir" | "file"; size: number }>;
+      truncated: boolean;
+    }>;
+    projectRead: (input: { path: string }) => Promise<{
+      path: string;
+      name: string;
+      size: number;
+      text?: string;
+      binary?: boolean;
+      tooLarge?: boolean;
+    }>;
+    projectWatchStart: () => Promise<boolean>;
+    projectWatchStop: () => Promise<boolean>;
+    onProjectChanged: (cb: (workspace: string) => void) => () => void;
     openUrl: (url: string) => Promise<void>;
     getActivity: (id: string) => Promise<any[]>;
     settingsGet: () => Promise<any>;
