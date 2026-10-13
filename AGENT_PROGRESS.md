@@ -1,5 +1,13 @@
 # Autonomous engineering checkpoint
 
+## TeachGPT Realtime fixed and beta.4 published — 13 October 2026
+
+- Realtime already exists. The earlier `/api/v1/realtime` probe hit the API proxy's route rejection; it did not establish that the speech service was missing. The existing Sanctum-protected `/audio/live/signal` route accepts an API bearer token together with its normal CSRF cookie pair. No website password/login or school server patch is required. Read `docs/teachgpt-realtime.md` before changing this integration.
+- The desktop main process fetches the protected `/audio` configuration, resolves full KBLab/Systran speech model IDs and fresh STUN/TURN settings, then relays SDP with paired bearer/cookie/CSRF authentication. Pending HTTP operations cancel on Stop. Live teardown closes the peer without stopping the recorder's shared microphone; fragment duplicates and stale callbacks are guarded.
+- Real Electron/WebRTC tests against both deployed ASR models returned synthetic speech transcripts. The actual lesson UI displayed `Solve exercise 3` from the real KBLab service, then paused successfully with recorded-file transcription intact (the file/summary/Google fixture responses are simulated). All 196 unit tests, six release/asset/native-build checks, full Windows build and 13 lesson/model UI checks passed.
+- Published prerelease `v0.11.0-beta.4` from `df11ada8621ceb5cc47c20c5116adc699ef031f3`. Beta branch CI `38370161034` and release workflow `38370164101` passed. Installer, portable app, blockmap, `beta.yml` and SHA-256 manifest all downloaded publicly with HTTP 200 and verified hashes; a beta-feed audit from simulated beta.3 downloaded the identical installer. Installer SHA-256: `051b8ac204c7beedcb1e26dc01a1327d8a7cd97bbcfaae34acf421c872e6ae97`.
+- Use the beta.4 installer download for this update. Stable remains v0.10.1; no main merge, installed-profile replacement, new Google permission or personal provider/model change occurred. Historical checkpoints below describe their dated state.
+
 ## Beta-to-main promotion — 12 October 2026
 
 - Owner requests integrating beta into main, removing the visible startup Skip intro button, checking current Google OAuth publication and validating the combined app. This supersedes earlier beta-only/no-merge scope for this promotion; installer publication remains a separate tagged operation.
