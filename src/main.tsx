@@ -15,6 +15,7 @@ if (!window.schoolwork) {
     followList: async () => [], followImport: desktopOnly, followGet: desktopOnly, followDelete: desktopOnly,
     followAdvance: desktopOnly, followExplain: desktopOnly, followFile: async () => null, followCancel: async () => false,
     followQuestions: desktopOnly, followAnswer: desktopOnly, followSkip: desktopOnly, followFinish: desktopOnly,
+    followDeck: async () => null, followDeckGenerate: desktopOnly, followReviewMark: desktopOnly, followDueQueue: async () => ({ count: 0, lessons: [] }),
     calendarStatus: async () => ({configured:false,connected:false,connecting:false,calendarId:'primary'}),
     calendarConfigure: desktopOnly, calendarConnect: desktopOnly, calendarCancelConnect: desktopOnly, calendarDisconnect: desktopOnly, calendarAdd: desktopOnly,
     updateStatus: async () => ({phase:'unsupported',currentVersion:'preview',message:'Updates are available in the installed app.'}),

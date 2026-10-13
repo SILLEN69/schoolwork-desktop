@@ -9,5 +9,6 @@
 .activity-timers{display:flex;flex-wrap:wrap;gap:12px;color:#a6bd7f;font:9px ui-monospace,Consolas,monospace}.activity-timers span{white-space:nowrap}
 
 .model-rank-note{font-size:9px!important;line-height:1.55;color:#92978c!important;margin-top:8px!important}.model-rank-note span{display:block;margin-top:5px;color:#777e70}
+.review-badge{margin-left:auto;min-width:19px;height:17px;padding:0 5px;border-radius:9px;background:#d5f268;color:#202511;font:700 10px 'DM Sans',sans-serif;display:inline-flex;align-items:center;justify-content:center;flex:none}
 
 

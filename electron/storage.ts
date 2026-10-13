@@ -1,6 +1,7 @@
 import path from 'node:path';
 import { DatabaseSync } from 'node:sqlite';
 import type { FollowLesson } from '../src/lessonFollower';
+import type { ReviewCard, ReviewItemState, ReviewQuestion } from '../src/reviewDeck';
 
 export type StoredMessage = {
   id: string;
@@ -102,6 +103,21 @@ export class SchoolWorkStore {
         created_at INTEGER NOT NULL, updated_at INTEGER NOT NULL
       );
       CREATE INDEX IF NOT EXISTS follow_lessons_updated ON follow_lessons(updated_at DESC);
+      CREATE TABLE IF NOT EXISTS review_decks (
+        lesson_id TEXT PRIMARY KEY REFERENCES follow_lessons(id) ON DELETE CASCADE,
+        source TEXT NOT NULL, generated_at INTEGER NOT NULL,
+        cards_json TEXT NOT NULL, quiz_json TEXT NOT NULL
+      );
+      CREATE TABLE IF NOT EXISTS review_items (
+        id TEXT PRIMARY KEY,
+        lesson_id TEXT NOT NULL REFERENCES follow_lessons(id) ON DELETE CASCADE,
+        kind TEXT NOT NULL, item_index INTEGER NOT NULL,
+        due_at INTEGER NOT NULL, last_reviewed_at INTEGER,
+        interval_index INTEGER NOT NULL DEFAULT 0, attempts INTEGER NOT NULL DEFAULT 0,
+        correct INTEGER NOT NULL DEFAULT 0, status TEXT NOT NULL DEFAULT 'learning',
+        UNIQUE(lesson_id, kind, item_index)
+      );
+      CREATE INDEX IF NOT EXISTS review_items_due ON review_items(due_at);
     `);
     this.migrateLegacyJson(userDataPath);
     this.recoverInterruptedTasks();
@@ -329,6 +345,60 @@ export class SchoolWorkStore {
 
   removeFollowLesson(id: string): void {
     this.db.prepare('DELETE FROM follow_lessons WHERE id=?').run(id);
+  }
+
+  getReviewDeck(lessonId: string): { source: 'model' | 'offline'; generatedAt: number; cards: ReviewCard[]; quiz: ReviewQuestion[] } | undefined {
+    const row = this.db.prepare('SELECT source,generated_at,cards_json,quiz_json FROM review_decks WHERE lesson_id=?').get(lessonId) as any;
+    if (!row) return undefined;
+    return { source: row.source, generatedAt: row.generated_at, cards: JSON.parse(row.cards_json), quiz: JSON.parse(row.quiz_json) };
+  }
+
+  /** Replaces the lesson's single deck and resets its spaced-review items (regeneration is idempotent). */
+  setReviewDeck(lessonId: string, deck: { source: 'model' | 'offline'; generatedAt: number; cards: ReviewCard[]; quiz: ReviewQuestion[] }, items: ReviewItemState[]): void {
+    this.transaction(() => {
+      this.db.prepare('INSERT INTO review_decks(lesson_id,source,generated_at,cards_json,quiz_json) VALUES(?,?,?,?,?) ON CONFLICT(lesson_id) DO UPDATE SET source=excluded.source,generated_at=excluded.generated_at,cards_json=excluded.cards_json,quiz_json=excluded.quiz_json').run(
+        lessonId, deck.source, deck.generatedAt, JSON.stringify(deck.cards), JSON.stringify(deck.quiz),
+      );
+      this.db.prepare('DELETE FROM review_items WHERE lesson_id=?').run(lessonId);
+      const insert = this.db.prepare('INSERT INTO review_items(id,lesson_id,kind,item_index,due_at,last_reviewed_at,interval_index,attempts,correct,status) VALUES(?,?,?,?,?,?,?,?,?,?)');
+      for (const item of items) insert.run(item.id, item.lessonId, item.kind, item.itemIndex, item.dueAt, item.lastReviewedAt, item.intervalIndex, item.attempts, item.correct, item.status);
+    });
+  }
+
+  private mapReviewItem(row: any): ReviewItemState {
+    return { id: row.id, lessonId: row.lesson_id, kind: row.kind, itemIndex: row.item_index, dueAt: row.due_at, lastReviewedAt: row.last_reviewed_at, intervalIndex: row.interval_index, attempts: row.attempts, correct: row.correct, status: row.status };
+  }
+
+  reviewItems(lessonId: string): ReviewItemState[] {
+    const rows = this.db.prepare('SELECT * FROM review_items WHERE lesson_id=? ORDER BY kind,item_index').all(lessonId) as any[];
+    return rows.map(row => this.mapReviewItem(row));
+  }
+
+  reviewItem(lessonId: string, kind: 'card' | 'quiz', itemIndex: number): ReviewItemState | undefined {
+    const row = this.db.prepare('SELECT * FROM review_items WHERE lesson_id=? AND kind=? AND item_index=?').get(lessonId, kind, itemIndex) as any;
+    return row ? this.mapReviewItem(row) : undefined;
+  }
+
+  updateReviewItem(item: ReviewItemState): void {
+    this.db.prepare('UPDATE review_items SET due_at=?,last_reviewed_at=?,interval_index=?,attempts=?,correct=?,status=? WHERE id=? AND lesson_id=?').run(
+      item.dueAt, item.lastReviewedAt, item.intervalIndex, item.attempts, item.correct, item.status, item.id, item.lessonId,
+    );
+  }
+
+  /** Lessons that have due review items, for the sidebar badge and the review queue. */
+  dueReviewQueue(now: number): { count: number; lessons: Array<{ lessonId: string; title: string; cards: number; quiz: number }> } {
+    const rows = this.db.prepare(`
+      SELECT i.lesson_id AS lesson_id, l.title AS title,
+        COALESCE(SUM(CASE WHEN i.kind='card' THEN 1 ELSE 0 END),0) AS cards,
+        COALESCE(SUM(CASE WHEN i.kind='quiz' THEN 1 ELSE 0 END),0) AS quiz,
+        COUNT(*) AS total
+      FROM review_items i JOIN follow_lessons l ON l.id = i.lesson_id
+      WHERE i.due_at <= ? GROUP BY i.lesson_id ORDER BY l.updated_at DESC
+    `).all(now) as any[];
+    return {
+      count: rows.reduce((sum, r) => sum + r.total, 0),
+      lessons: rows.map(r => ({ lessonId: r.lesson_id, title: r.title, cards: r.cards, quiz: r.quiz })),
+    };
   }
 
   getTask(id: string): any {

@@ -6,6 +6,7 @@ import path from 'node:path';
 import { LessonFollower } from './lessonFollower';
 import { SchoolWorkStore } from './storage';
 import { offlineQuestions } from '../src/lessonFollower';
+import { isReviewDue } from '../src/reviewDeck';
 
 let dir: string, store: SchoolWorkStore;
 beforeEach(() => {
@@ -186,6 +187,116 @@ it('records answers with model verdicts, heuristic verdicts on model failure, an
   store.close();
   store = new SchoolWorkStore(dir);
   expect(new LessonFollower(store, () => 'key').get(lesson.id).follow.report!.completedSegments).toBe(2);
+});
+
+const deckJson = JSON.stringify({
+  cards: [
+    { front: 'What captures the light?', back: 'Chlorophyll captures the light in the thylakoid membranes.' },
+    { front: 'Where is ATP made?', back: 'ATP is made during the light reactions.' },
+    { front: 'What is fixed in the Calvin cycle?', back: 'Carbon dioxide is fixed into sugar.' },
+    { front: 'Name the green pigment.', back: 'Chlorophyll is the green pigment.' },
+    { front: 'What stores the energy?', back: 'Sugar stores the energy in chemical bonds.' },
+  ],
+  quiz: [
+    { question: 'Which part explains the light reactions?', options: ['Ljusreaktioner', 'Kalvinyxlet', 'Klorofyll', 'Sammanfattning'], answer: 0 },
+    { question: 'Where does the Calvin cycle fix carbon?', options: ['Stromat', 'Thylakoid', 'Mitokondrie', 'Cytoplasma'], answer: 0 },
+    { question: 'Which pigment captures the light?', options: ['Klorofyll', 'Hemoglobin', 'Karoten', 'Melanin'], answer: 0 },
+  ],
+});
+
+it('builds an offline review deck from the stored key concepts and stores one due item per card', async () => {
+  const follower = make(noKey, vi.fn() as typeof fetch);
+  const lesson = await follower.import({ text: LESSON, language: 'sv' }, 'Qwen3.8-27B');
+  const deck = await follower.deckGenerate(lesson.id, 'Qwen3.8-27B');
+  expect(deck.source).toBe('offline');
+  expect(deck.cards.length).toBeGreaterThanOrEqual(5);
+  expect(deck.cards.length).toBeLessThanOrEqual(10);
+  expect(deck.cards.every(c => c.front && c.back)).toBe(true);
+  // The two-part fixture has no location quiz, and a second instance sees the same single deck.
+  expect(deck.quiz).toEqual([]);
+  expect(deck.items).toHaveLength(deck.cards.length);
+  expect(deck.items.every(i => isReviewDue(i, Date.now()))).toBe(true);
+  expect(follower.deckGet(lesson.id)?.items).toHaveLength(deck.items.length);
+  // Deck generation must not touch the lesson document or its follow state.
+  const after = follower.get(lesson.id);
+  expect(after.text).toBe(LESSON);
+  expect(after.follow.segments).toHaveLength(2);
+  expect(after.follow.current).toBe(0);
+});
+
+it('uses the model to generate a review deck with strict validation and falls back offline on broken answers', async () => {
+  let reply = deckJson;
+  const rawFetcher = vi.fn(async (_url: string | URL, init?: RequestInit) => { void init; return sse(reply); });
+  const follower = make(() => 'key', rawFetcher as unknown as typeof fetch);
+  const lesson = await follower.import({ text: LESSON, language: 'sv' }, 'Qwen3.8-27B');
+  const deck = await follower.deckGenerate(lesson.id, 'Qwen3.8-27B');
+  expect(deck.source).toBe('model');
+  expect(deck.cards).toHaveLength(5);
+  expect(deck.quiz).toHaveLength(3);
+  const request = JSON.parse((rawFetcher.mock.calls.at(-1)![1] as RequestInit).body as string);
+  expect(request.model).toBe('Qwen3.8-27B');
+  expect(String(request.messages.at(-1).content)).toContain('Fotosyntes');
+  reply = 'not JSON at all';
+  expect((await follower.deckGenerate(lesson.id, 'Qwen3.8-27B')).source).toBe('offline');
+  reply = JSON.stringify({ cards: [{ front: 'a', back: 'b' }], quiz: [] });
+  expect((await follower.deckGenerate(lesson.id, 'Qwen3.8-27B')).source).toBe('offline');
+  // Regeneration is idempotent: one deck per lesson, schedule state reset.
+  expect(follower.dueQueue().lessons).toHaveLength(1);
+  expect(follower.deckGet(lesson.id)?.items.every(i => i.attempts === 0)).toBe(true);
+});
+
+it('schedules review marks: still-learning returns tomorrow, got-it climbs the ladder, and the due queue follows', async () => {
+  const follower = make(noKey, vi.fn() as typeof fetch);
+  const lesson = await follower.import({ text: LESSON, language: 'sv' }, 'Qwen3.8-27B');
+  const deck = await follower.deckGenerate(lesson.id, 'Qwen3.8-27B');
+  const before = Date.now();
+  const missed = follower.reviewMark(lesson.id, 'card', 0, 'still');
+  expect(missed.item).toMatchObject({ intervalIndex: 0, attempts: 1, correct: 0, status: 'learning' });
+  expect(missed.item.dueAt).toBeGreaterThanOrEqual(before + 24 * 3600 * 1000);
+  expect(missed.item.dueAt).toBeLessThanOrEqual(before + 24 * 3600 * 1000 + 5000);
+  const got = follower.reviewMark(lesson.id, 'card', 1, 'got');
+  expect(got.item).toMatchObject({ intervalIndex: 1, correct: 1 });
+  expect(got.item.dueAt).toBeGreaterThanOrEqual(before + 48 * 3600 * 1000);
+  const mastered = follower.reviewMark(lesson.id, 'card', 1, 'got');
+  expect(mastered.item.status).toBe('mastered');
+  expect(follower.reviewMark(lesson.id, 'card', 1, 'still').item.intervalIndex).toBe(0);
+  expect(follower.dueQueue().count).toBe(deck.items.length - 2);
+  expect(follower.dueQueue().lessons[0]).toMatchObject({ lessonId: lesson.id, title: 'Fotosyntes', cards: deck.items.length - 2, quiz: 0 });
+  expect(() => follower.reviewMark(lesson.id, 'card', 99, 'got')).toThrow(/not found/i);
+});
+
+it('persists the deck and schedule across instances and cascades them on lesson deletion', async () => {
+  const follower = make(noKey, vi.fn() as typeof fetch);
+  const lesson = await follower.import({ text: LESSON, language: 'sv' }, 'Qwen3.8-27B');
+  const deck = await follower.deckGenerate(lesson.id, 'Qwen3.8-27B');
+  follower.reviewMark(lesson.id, 'card', 0, 'got');
+  store.close();
+  store = new SchoolWorkStore(dir);
+  const reopened = new LessonFollower(store, noKey);
+  expect(reopened.deckGet(lesson.id)?.items[0]).toMatchObject({ correct: 1, attempts: 1, intervalIndex: 1 });
+  expect(reopened.dueQueue().count).toBe(deck.items.length - 1);
+  await reopened.remove(lesson.id);
+  expect(reopened.dueQueue()).toEqual({ count: 0, lessons: [] });
+  expect(() => reopened.deckGet(lesson.id)).toThrow(/not found/i);
+});
+
+it('cancels a hanging deck generation without storing a partial deck', async () => {
+  let ready!: () => void;
+  const requested = new Promise<void>(resolve => { ready = resolve; });
+  let calls = 0;
+  const fetcher = vi.fn(async (_url: unknown, init?: RequestInit) => {
+    calls++;
+    if (calls === 1) return sse(structureJson);
+    ready();
+    return new Promise<Response>((_resolve, reject) => { init!.signal!.addEventListener('abort', () => reject(init!.signal!.reason), { once: true }); });
+  }) as typeof fetch;
+  const follower = make(() => 'key', fetcher);
+  const lesson = await follower.import({ text: LESSON, language: 'en' }, 'Qwen3.8-27B');
+  const request = follower.deckGenerate(lesson.id, 'Qwen3.8-27B');
+  await requested;
+  follower.cancel(lesson.id);
+  await expect(request).rejects.toThrow(/cancelled/i);
+  expect(follower.deckGet(lesson.id)).toBeNull();
 });
 
 it('cancels a hanging model request without storing partial questions', async () => {

@@ -32,6 +32,10 @@ interface Window {
     followAnswer: (input: { id: string; segmentId: string; answers: string[]; model: string }) => Promise<import('./lessonFollower').FollowLesson>;
     followSkip: (input: { id: string; segmentId: string }) => Promise<import('./lessonFollower').FollowLesson>;
     followFinish: (id: string) => Promise<import('./lessonFollower').FollowLesson>;
+    followDeck: (id: string) => Promise<import('./reviewDeck').ReviewDeckView | null>;
+    followDeckGenerate: (input: { id: string; model: string }) => Promise<import('./reviewDeck').ReviewDeckView>;
+    followReviewMark: (input: { id: string; kind: 'card' | 'quiz'; itemIndex: number; result: 'got' | 'still' }) => Promise<{ item: import('./reviewDeck').ReviewItemState; dueCount: number }>;
+    followDueQueue: () => Promise<import('./reviewDeck').ReviewQueue>;
     calendarStatus: () => Promise<import('./lesson').CalendarStatus & {error?:string}>;
     calendarConfigure: (input:{clientId:string;clientSecret:string;calendarId?:string}) => Promise<import('./lesson').CalendarStatus>;
     calendarConnect: () => Promise<import('./lesson').CalendarStatus>;

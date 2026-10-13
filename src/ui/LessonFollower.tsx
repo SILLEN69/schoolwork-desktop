@@ -1,11 +1,15 @@
 import { useEffect, useRef, useState } from 'react';
-import { ArrowLeft, ArrowUpRight, BookOpenCheck, Check, ChevronLeft, ChevronRight, FileText, Flag, LoaderCircle, Plus, SkipForward, Sparkles, Trash2, X } from 'lucide-react';
+import { ArrowLeft, ArrowUpRight, BookOpenCheck, Check, ChevronLeft, ChevronRight, Eye, FileText, Flag, Layers, LoaderCircle, Plus, RefreshCw, Repeat, RotateCcw, SkipForward, Sparkles, Trash2, X } from 'lucide-react';
 import MessageMarkdown from './MessageMarkdown';
 import type { FollowLesson, FollowSegment } from '../lessonFollower';
+import type { ReviewDeckView, ReviewMark } from '../reviewDeck';
 import './lessons.css';
-type Props = { configured: boolean; model: string; swedish: boolean; onBack: () => void; onWork: (chatId: string) => void };
+type Props = {
+  configured: boolean; model: string; swedish: boolean; onBack: () => void; onWork: (chatId: string) => void;
+  target?: { lessonId: string; review: boolean } | null;
+};
 const errorText = (e: unknown) => (e instanceof Error ? e.message : String(e));
-export default function LessonFollower({ configured, model, swedish, onBack, onWork }: Props) {
+export default function LessonFollower({ configured, model, swedish, onBack, onWork, target }: Props) {
   const t = (en: string, sv: string) => (swedish ? sv : en);
   const [lessons, setLessons] = useState<FollowLesson[]>([]);
   const [current, setCurrent] = useState<FollowLesson | null>(null);
@@ -22,9 +26,20 @@ export default function LessonFollower({ configured, model, swedish, onBack, onW
   const [error, setError] = useState('');
   const [notice, setNotice] = useState('');
   const [deleteId, setDeleteId] = useState<string | null>(null);
-  const mounted = useRef(true), selected = useRef<FollowLesson | null>(null), firstLoad = useRef(true);
+  const [deck, setDeck] = useState<ReviewDeckView | null>(null);
+  const [inReview, setInReview] = useState(false);
+  const [building, setBuilding] = useState(false);
+  const [stage, setStage] = useState<'cards' | 'quiz' | 'done'>('cards');
+  const [cardIndex, setCardIndex] = useState(0);
+  const [revealed, setRevealed] = useState(false);
+  const [quizIndex, setQuizIndex] = useState(0);
+  const [quizPicked, setQuizPicked] = useState<number | null>(null);
+  const [quizCorrect, setQuizCorrect] = useState(0);
+  const [gotCards, setGotCards] = useState(0);
+  const [confirmRegen, setConfirmRegen] = useState(false);
+  const mounted = useRef(true), selected = useRef<FollowLesson | null>(null), firstLoad = useRef(true), targetUsed = useRef(false);
   selected.current = current;
-  const select = (lesson: FollowLesson) => { selected.current = lesson; setCurrent(lesson); setError(''); setNotice(''); setShowReport(Boolean(lesson.follow.report)); };
+  const select = (lesson: FollowLesson) => { selected.current = lesson; setCurrent(lesson); setError(''); setNotice(''); setShowReport(Boolean(lesson.follow.report)); setDeck(null); setInReview(false); setConfirmRegen(false); };
   const accept = (lesson: FollowLesson) => {
     if (!mounted.current) return;
     setLessons(previous => [lesson, ...previous.filter(x => x.id !== lesson.id)]);
@@ -35,7 +50,11 @@ export default function LessonFollower({ configured, model, swedish, onBack, onW
       const list = await window.schoolwork.followList();
       if (!mounted.current) return;
       setLessons(list);
-      if (firstLoad.current && !selected.current && list.length) select(list[0]);
+      if (firstLoad.current && !selected.current) {
+        const wanted = target ? list.find(x => x.id === target.lessonId) : undefined;
+        if (wanted) select(wanted);
+        else if (list.length) select(list[0]);
+      }
       firstLoad.current = false;
     } catch (e) { if (mounted.current) setError(errorText(e)); }
   };
@@ -133,6 +152,64 @@ export default function LessonFollower({ configured, model, swedish, onBack, onW
     try { accept(await window.schoolwork.followFinish(lesson.id)); setShowReport(true); }
     catch (e) { setError(errorText(e)); }
   };
+  const startDeck = (d: ReviewDeckView) => {
+    setDeck(d); setInReview(true); setShowReport(false); setConfirmRegen(false);
+    setStage(d.cards.length ? 'cards' : d.quiz.length ? 'quiz' : 'done');
+    setCardIndex(0); setRevealed(false); setQuizIndex(0); setQuizPicked(null); setQuizCorrect(0); setGotCards(0);
+  };
+  /** Builds (or rebuilds) the lesson's single review deck through the model when a key is configured. */
+  const buildDeck = async () => {
+    const lesson = selected.current;
+    if (!lesson || building) return;
+    setBuilding(true); setError(''); setNotice('');
+    try { startDeck(await window.schoolwork.followDeckGenerate({ id: lesson.id, model })); }
+    catch (e) { setError(errorText(e)); }
+    finally { setBuilding(false); }
+  };
+  const openDeck = async () => {
+    const lesson = selected.current;
+    if (!lesson) return;
+    try {
+      const d = await window.schoolwork.followDeck(lesson.id);
+      if (!d) { setNotice(t('No review deck yet — build one first.', 'Ingen repeteringsdeck ännu — bygg en först.')); return; }
+      startDeck(d);
+    } catch (e) { setError(errorText(e)); }
+  };
+  const markCard = async (result: ReviewMark) => {
+    const lesson = selected.current;
+    if (!lesson || !deck) return;
+    try {
+      const res = await window.schoolwork.followReviewMark({ id: lesson.id, kind: 'card', itemIndex: cardIndex, result });
+      setDeck(previous => (previous ? { ...previous, items: previous.items.map(it => (it.id === res.item.id ? res.item : it)) } : previous));
+      if (result === 'got') setGotCards(n => n + 1);
+      if (cardIndex + 1 < deck.cards.length) { setCardIndex(i => i + 1); setRevealed(false); }
+      else if (deck.quiz.length) setStage('quiz');
+      else setStage('done');
+    } catch (e) { setError(errorText(e)); }
+  };
+  const pickQuiz = async (option: number) => {
+    const lesson = selected.current;
+    if (!lesson || !deck || quizPicked !== null) return;
+    const question = deck.quiz[quizIndex];
+    if (!question) return;
+    const hit = option === question.answer;
+    setQuizPicked(option);
+    if (hit) setQuizCorrect(n => n + 1);
+    try {
+      const res = await window.schoolwork.followReviewMark({ id: lesson.id, kind: 'quiz', itemIndex: quizIndex, result: hit ? 'got' : 'still' });
+      setDeck(previous => (previous ? { ...previous, items: previous.items.map(it => (it.id === res.item.id ? res.item : it)) } : previous));
+    } catch (e) { setError(errorText(e)); }
+  };
+  const nextQuiz = () => {
+    if (!deck) return;
+    if (quizIndex + 1 < deck.quiz.length) { setQuizIndex(i => i + 1); setQuizPicked(null); }
+    else setStage('done');
+  };
+  const exitReview = () => {
+    const lesson = selected.current;
+    setInReview(false); setConfirmRegen(false);
+    setShowReport(Boolean(lesson?.follow.report));
+  };
   useEffect(() => {
     const chatId = current?.follow.explainChatId;
     if (!chatId) { setChat(null); return; }
@@ -142,6 +219,22 @@ export default function LessonFollower({ configured, model, swedish, onBack, onW
     const timer = setInterval(() => void loadChat(), 2500);
     return () => { active = false; clearInterval(timer); };
   }, [current?.follow.explainChatId]);
+  // Keep the footer in sync with the lesson's persisted deck, so an existing deck offers “Open review deck” instead of a rebuild.
+  useEffect(() => {
+    if (!current?.id) { setDeck(null); return; }
+    let active = true;
+    window.schoolwork.followDeck(current.id).then(d => { if (active) setDeck(d); }).catch(() => {});
+    return () => { active = false; };
+  }, [current?.id]);
+  // Deep link from the due-review queue: open this lesson's review deck directly.
+  useEffect(() => {
+    if (targetUsed.current || !target?.review || !current || current.id !== target.lessonId) return;
+    targetUsed.current = true;
+    void window.schoolwork.followDeck(current.id).then(d => {
+      if (mounted.current && d) startDeck(d);
+    }).catch(() => {});
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [current?.id]);
   const doDelete = async () => {
     if (!deleteId) return;
     try {
@@ -195,7 +288,61 @@ export default function LessonFollower({ configured, model, swedish, onBack, onW
           </div>
         </div></div>
       </>}
-      {lesson && state && showReport && report && <>
+      {lesson && state && deck && inReview && (() => {
+        const totalItems = deck.cards.length + deck.quiz.length;
+        const doneItems = stage === 'cards' ? cardIndex : stage === 'quiz' ? deck.cards.length + quizIndex : totalItems;
+        const card = deck.cards[cardIndex], question = deck.quiz[quizIndex];
+        return <>
+        <section className="lesson-intro"><div>
+          <div className="lesson-eyebrow"><Repeat size={13}/>{stage === 'cards' ? t('REVIEW DECK / CARDS', 'REPIETERINGSDECK / KORT') : stage === 'quiz' ? t('REVIEW DECK / QUIZ', 'REPIETERINGSDECK / PROV') : t('REVIEW DECK / RESULTS', 'REPIETERINGSDECK / RESULTAT')}</div>
+          <h1>{lesson.title}</h1>
+          <p className="lesson-source">{deck.source === 'model' ? t(`Built with ${model}`, `Byggd med ${model}`) : t('Built offline from the lesson’s key concepts.', 'Byggd offline från lektionens nyckelbegrepp.')}{state.sourceName ? ` · ${state.sourceName}` : ''}</p>
+        </div>
+          <div className="follower-progress-row"><span className="follower-progress-label">{totalItems ? t(`Item ${stage === 'done' ? totalItems : doneItems + 1} of ${totalItems}`, `Post ${stage === 'done' ? totalItems : doneItems + 1} av ${totalItems}`) : t('EMPTY DECK', 'TOM DECK')}<span className="follow-progress"><span style={{ width: `${totalItems ? Math.round((doneItems / totalItems) * 100) : 0}%` }}/></span></span></div>
+        </section>
+        <div className="lesson-card follow-deck">
+          {stage === 'cards' && card && <>
+            <div className="lesson-card-head"><div><h2>{t('FLASHCARD', 'FLASHKORT')}</h2></div><span>{t('card', 'kort')} {cardIndex + 1}/{deck.cards.length}</span></div>
+            <div className="lesson-scroll follow-deck-scroll">
+              <p className="follow-card-front">{card.front}</p>
+              {revealed ? <div className="follow-card-back">{card.back}</div> : <p className="follow-card-hint">{t('Think of your answer, then reveal it.', 'Tänk dig ditt svar, visa det sedan.')}</p>}
+            </div>
+            <div className="lesson-card-foot follow-deck-actions">
+              {!revealed ? <button className="lesson-primary" onClick={() => setRevealed(true)}><Eye size={15}/> {t('Reveal answer', 'Visa svaret')}</button>
+                : <><button className="lesson-outline" disabled={building} onClick={() => void markCard('still')}><RotateCcw size={15}/> {t('Still learning', 'Fortfarande lär mig')}</button>
+                  <button className="lesson-primary" disabled={building} onClick={() => void markCard('got')}><Check size={15}/> {t('Got it', 'Klart')}</button></>}
+            </div>
+          </>}
+          {stage === 'quiz' && question && <>
+            <div className="lesson-card-head"><div><h2>{question.question}</h2></div><span>{t('question', 'fråga')} {quizIndex + 1}/{deck.quiz.length}</span></div>
+            <div className="lesson-scroll follow-deck-scroll">
+              <div className="follow-quiz-options">{question.options.map((opt, i) => {
+                const cls = quizPicked === null ? '' : i === question.answer ? ' correct' : i === quizPicked ? ' wrong' : ' dim';
+                return <button key={i} className={'follow-quiz-option' + cls} disabled={quizPicked !== null} onClick={() => void pickQuiz(i)}><span>{String.fromCharCode(65 + i)}</span>{opt}</button>;
+              })}</div>
+              {quizPicked !== null && <p className={'follow-quiz-result' + (quizPicked === question.answer ? ' correct' : ' wrong')}>{quizPicked === question.answer ? t('Correct — it now comes back in two days.', 'Rätt — den återkommer om två dagar.') : t(`Not quite. The correct answer is “${question.options[question.answer]}” — it comes back tomorrow.`, `Nej. Rätt svar är “${question.options[question.answer]}” — den kommer tillbaka imorgon.`)}</p>}
+            </div>
+            <div className="lesson-card-foot follow-deck-actions">
+              <span className="follow-quiz-score">{t('SCORE', 'POÄNG')} {quizCorrect}/{quizIndex + (quizPicked !== null ? 1 : 0)}</span>
+              {quizPicked !== null && <button className="lesson-primary" onClick={nextQuiz}>{quizIndex + 1 < deck.quiz.length ? t('Next question', 'Nästa fråga') : t('See my results', 'Se mitt resultat')}<ChevronRight size={15}/></button>}
+            </div>
+          </>}
+          {stage === 'done' && <div className="lesson-scroll follow-done-scroll">
+            <div className="follow-stats">
+              <div className="follow-stat"><small>{t('CARDS GOT IT', 'KORT KLARA')}</small><strong>{gotCards}<span className="follow-stat-sub">of {deck.cards.length}</span></strong></div>
+              <div className="follow-stat"><small>{t('QUIZ CORRECT', 'PROV RÄTT')}</small><strong>{quizCorrect}<span className="follow-stat-sub">of {deck.quiz.length}</span></strong></div>
+            </div>
+            <p className="follow-done-copy">{t('Everything you answered goes back into your due-review queue. Items marked “still learning” are due tomorrow; items you got right come back in two days and spread out further with each correct answer.', 'Allt du svarat på hamnar tillbaka i kön för att repetera. Poster markerade som “fortfarande lär mig” är aktuella imorgon; poster du fått rätt på återkommer om två dagar och sprids ut mer med varje rätt svar.')}</p>
+          </div>}
+          <div className="lesson-card-foot">
+            <button className="lesson-outline" onClick={exitReview}><ChevronLeft size={16}/> {t('Back', 'Tillbaka')}</button>
+            <button className="lesson-outline" disabled={building} onClick={() => { void (confirmRegen ? buildDeck() : setConfirmRegen(true)); }}>{building ? <LoaderCircle className="spin" size={14}/> : <RefreshCw size={14}/>}{confirmRegen ? t('Really regenerate? Progress resets.', 'Byggas om? Framstegen nollställs.') : t('Regenerate deck', 'Bygg om decken')}</button>
+            {stage === 'done' && <button className="lesson-primary" onClick={exitReview}><Check size={15}/> {t('Done', 'Klart')}</button>}
+          </div>
+        </div>
+        </>;
+      })()}
+      {lesson && state && showReport && report && !inReview && <>
         <section className="lesson-intro"><div>
           <div className="lesson-eyebrow"><Flag size={13}/>{t('GAP REPORT', 'LUCKRAPPORT')}</div>
           <h1>{t('What to review before the exam.', 'Att repetera inför provet.')}</h1>
@@ -232,11 +379,13 @@ export default function LessonFollower({ configured, model, swedish, onBack, onW
           </div>
           <div className="lesson-card-foot follow-nav">
             <button className="lesson-outline" onClick={() => setShowReport(false)}><ChevronLeft size={15}/> {t('Back to lesson', 'Tillbaka till lektionen')}</button>
-            {firstFlagged >= 0 ? <button className="lesson-primary" onClick={() => void reviewFirst()}><Flag size={15}/> {t('Review weak segments', 'Repetera svaga delar')}</button> : <span>{t('Nothing to review', 'Inget att repetera')}</span>}
+            {firstFlagged >= 0 ? <button className={deck ? 'lesson-primary' : 'lesson-outline'} onClick={() => void reviewFirst()}><Flag size={15}/> {t('Review weak segments', 'Repetera svaga delar')}</button> : <span>{t('Nothing to review', 'Inget att repetera')}</span>}
+            {deck ? <button className="lesson-outline" onClick={() => void openDeck()}><Layers size={15}/> {t('Open review deck', 'Öppna repeteringsdeck')}</button>
+              : <button className="lesson-primary" disabled={building} onClick={() => void buildDeck()}>{building ? <LoaderCircle className="spin" size={15}/> : <Layers size={15}/>}{building ? t('Building your review deck…', 'Bygger din repeteringsdeck…') : t('Build review deck', 'Bygg repeteringsdeck')}</button>}
           </div>
         </div>
       </>}
-      {lesson && state && !showReport && segment && <>
+      {lesson && state && !showReport && !inReview && segment && <>
         <section className="lesson-intro"><div>
           <div className="lesson-eyebrow"><BookOpenCheck size={13}/>{t(`SEGMENT ${done} OF ${total}`, `AVSNITT ${done} AV ${total}`)}</div>
           <h1>{lesson.title}</h1>

@@ -3,6 +3,9 @@
 // this script). The key file path arrives only via SCHOOLWORK_FOLLOWER_KEY_FILE.
 // Phase 2: also verifies live model self-check questions, live verdicts, the
 // persisted gap report and the "Review weak segments" jump after a restart.
+// Phase 3: also verifies a live model review deck (5-10 cards, 3-5 quiz
+// questions), card/quiz marks, the due-review badge and queue, and a queue
+// deep-link that resumes the deck after a second restart.
 import { _electron as electron } from 'playwright';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
@@ -160,9 +163,87 @@ try {
   const firstFlagged = reopened.follow.segments.findIndex(s => s.id === reopened.follow.report.reviewSegmentIds[0]);
   await page2.getByRole('button', { name: 'Review weak segments' }).click();
   await page2.locator('.follower-jump button[aria-current="true"]', { hasText: String(firstFlagged + 1) }).waitFor({ timeout: 30_000 });
-  assert.deepEqual(errors, []);
   await page2.screenshot({ path: path.join(shots, 'live-review-jump.png') });
-  console.log(`LIVE-FOLLOWER-VERIFY PASS — ${total} live-structured segments, live explain, live self-check questions and verdicts, gap report persisted and reopened with the review jump to segment ${firstFlagged + 1}.`);
+
+  // 9) Phase 3, live: the model builds the finished lesson's review deck.
+  await page2.locator('.follower-jump button').nth(total - 1).click();
+  await page2.getByRole('button', { name: 'Refresh gap report' }).click();
+  await page2.locator('.lesson-intro .lesson-eyebrow', { hasText: 'GAP REPORT' }).waitFor({ timeout: 30_000 });
+  await page2.getByRole('button', { name: 'Build review deck' }).click();
+  await page2.locator('.follow-card-front').waitFor({ timeout: 300_000 });
+  let liveDeck = await page2.evaluate(id => window.schoolwork.followDeck(id), imported.id);
+  assert.equal(liveDeck.source, 'model', 'a live key must build a model review deck');
+  assert.ok(liveDeck.cards.length >= 5 && liveDeck.cards.length <= 10, '5-10 cards: ' + liveDeck.cards.length);
+  assert.ok(liveDeck.quiz.length >= 3 && liveDeck.quiz.length <= 5, '3-5 quiz questions: ' + liveDeck.quiz.length);
+  assert.ok(liveDeck.quiz.every(q => q.options.length === 4 && new Set(q.options.map(o => o.toLowerCase())).size === 4), 'model quiz options are four distinct choices');
+  assert.ok(liveDeck.items.length === liveDeck.cards.length + liveDeck.quiz.length, 'every deck item has schedule state');
+  console.log('live review deck:', liveDeck.cards.length, 'cards, ' + liveDeck.quiz.length, 'quiz questions');
+  await page2.screenshot({ path: path.join(shots, 'live-deck-built.png') });
+
+  // 10) Mark the cards: one “still learning”, the rest “got it”.
+  await page2.getByRole('button', { name: 'Reveal answer' }).click();
+  await page2.getByRole('button', { name: 'Still learning' }).click();
+  for (let i = 1; i < liveDeck.cards.length; i++) {
+    await page2.getByRole('button', { name: 'Reveal answer' }).click();
+    await page2.getByRole('button', { name: 'Got it' }).click();
+  }
+
+  // 11) Answer the first quiz question right and the second wrong, then back out: the rest stays due.
+  await page2.locator('.follow-quiz-option').first().waitFor({ timeout: 15_000 });
+  const optionIndexByText = async (text) => {
+    const n = await page2.locator('.follow-quiz-option').count();
+    for (let i = 0; i < n; i++) {
+      const label = (await page2.locator('.follow-quiz-option').nth(i).textContent()).replace(/^[A-D]\s*/, '').trim();
+      if (label === text) return i;
+    }
+    throw new Error('quiz option not found: ' + text);
+  };
+  await page2.locator('.follow-quiz-option').nth(await optionIndexByText(liveDeck.quiz[0].options[liveDeck.quiz[0].answer])).click();
+  await page2.locator('.follow-quiz-result.correct').waitFor({ timeout: 30_000 });
+  await page2.getByRole('button', { name: 'Next question' }).click();
+  await page2.locator('.follow-quiz-option').nth(await optionIndexByText(liveDeck.quiz[1].options[liveDeck.quiz[1].answer === 0 ? 1 : 0])).click();
+  await page2.locator('.follow-quiz-result.wrong').waitFor({ timeout: 30_000 });
+  await page2.screenshot({ path: path.join(shots, 'live-deck-quiz.png') });
+  await page2.getByRole('button', { name: 'Back' }).click();
+  await page2.locator('.lesson-intro .lesson-eyebrow', { hasText: 'GAP REPORT' }).waitFor({ timeout: 30_000 });
+  liveDeck = await page2.evaluate(id => window.schoolwork.followDeck(id), imported.id);
+  assert.ok(liveDeck.items[0].dueAt > Date.now(), 'the still-learning card comes back tomorrow');
+  assert.equal(liveDeck.items[liveDeck.cards.length].correct, 1, 'the correct quiz answer is recorded');
+  assert.equal(liveDeck.items[liveDeck.cards.length + 1].correct, 0, 'the wrong quiz answer is recorded as still learning');
+  let queue = await page2.evaluate(() => window.schoolwork.followDueQueue());
+  assert.deepEqual(queue, { count: liveDeck.quiz.length - 2, lessons: [{ lessonId: imported.id, title: 'Fotosyntes', cards: 0, quiz: liveDeck.quiz.length - 2 }] }, 'only the unanswered quiz questions are due: ' + JSON.stringify(queue));
+
+  // 12) The sidebar badge shows the due count.
+  await page2.getByRole('button', { name: 'SchoolWork', exact: true }).click();
+  await page2.waitForFunction(() => { const el = document.querySelector('.shell'); return el && !el.hasAttribute('inert'); }, null, { timeout: 30_000 });
+  await page2.locator('.review-nav .review-badge', { hasText: String(queue.count) }).waitFor({ timeout: 15_000 });
+  console.log('due reviews badge:', queue.count);
+
+  // 13) Restart: the badge and queue survive, and “Review now” deep-links back into the model deck.
+  await app.close();
+  app = await electron.launch({
+    executablePath: process.platform === 'win32' ? path.resolve('node_modules/electron/dist/electron.exe') : path.resolve('node_modules/electron/dist/electron'),
+    args: ['.', '--user-data-dir=' + profile, ...(process.platform === 'linux' ? ['--no-sandbox'] : [])],
+    timeout: 60_000,
+  });
+  const page3 = await app.firstWindow();
+  page3.setDefaultTimeout(60_000);
+  page3.on('pageerror', e => errors.push(e.message));
+  await page3.waitForFunction(() => Boolean(window.schoolwork), null, { timeout: 45_000 });
+  await page3.waitForFunction(() => { const el = document.querySelector('.shell'); return el && !el.hasAttribute('inert'); }, null, { timeout: 30_000 });
+  await page3.locator('.review-nav .review-badge', { hasText: String(queue.count) }).waitFor({ timeout: 15_000 });
+  await page3.getByRole('button', { name: 'Due reviews' }).click();
+  await page3.locator('.follow-review-row', { hasText: 'Fotosyntes' }).waitFor({ timeout: 15_000 });
+  await page3.getByRole('button', { name: 'Review now' }).click();
+  await page3.locator('.follow-card-front').waitFor({ timeout: 30_000 });
+  const resumed = await page3.evaluate(id => window.schoolwork.followDeck(id), imported.id);
+  assert.equal(resumed.source, 'model', 'the model deck survives the restart');
+  assert.equal(resumed.items.filter(i => i.dueAt <= Date.now()).length, queue.count, 'the due items survive the restart');
+  const afterReview = await page3.evaluate(id => window.schoolwork.followGet(id), imported.id);
+  assert.equal(afterReview.text, lesson, 'the lesson document is untouched by reviewing');
+  assert.deepEqual(errors, []);
+  await page3.screenshot({ path: path.join(shots, 'live-review-queue.png') });
+  console.log(`LIVE-FOLLOWER-VERIFY PASS — ${total} live-structured segments, live explain, live self-check questions and verdicts, gap report persisted and reopened with the review jump to segment ${firstFlagged + 1}, plus a live model review deck (${liveDeck.cards.length} cards, ${liveDeck.quiz.length} quiz) with marks, badge, and a queue that resumes after a restart.`);
 } catch (error) {
   console.error('LIVE_FOLLOWER_FAILURE', error);
   if (app) {

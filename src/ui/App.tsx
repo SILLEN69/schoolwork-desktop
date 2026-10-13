@@ -16,6 +16,7 @@ import {
   MoreHorizontal,
   PanelRightClose,
   Plus,
+  Repeat,
   Send,
   Settings,
   Shield,
@@ -31,6 +32,8 @@ import DesktopSettings from "./DesktopSettings";
 import TelegramSettings from "./TelegramSettings";
 import LessonWorkspace from "./LessonWorkspace";
 import LessonFollower from "./LessonFollower";
+import ReviewQueueView from "./ReviewQueue";
+import type { ReviewQueue as DueQueue } from "../reviewDeck";
 import VoiceInput from './VoiceInput';
 import ConnectionsSettings from './ConnectionsSettings';
 import './studio.css';
@@ -99,6 +102,9 @@ export default function App() {
     [atomGame, setAtomGame] = useState<{ origin: { x: number; y: number } | null } | null>(null);
   const [lessonMode, setLessonMode] = useState<"lesson" | "transcription" | null>(null);
   const [showFollower, setShowFollower] = useState(false);
+  const [showReviewQueue, setShowReviewQueue] = useState(false);
+  const [followerTarget, setFollowerTarget] = useState<{ lessonId: string; review: boolean } | null>(null);
+  const [dueQueue, setDueQueue] = useState<DueQueue | null>(null);
   const modelRevision = useRef(0);
   const pendingModel = useRef<string | null>(null);
   const confirmedModel = useRef(defaults[0]);
@@ -121,8 +127,12 @@ export default function App() {
   const [clockNow, setClockNow] = useState(Date.now());
   const t = (en: string, sv: string) => (isSv ? sv : en);
   const rankedModels = rankTeachGPTModels([...models, settings.model].filter(m => !isSpeechModel(m)));
+  const loadDueQueue = () => {
+    void window.schoolwork.followDueQueue().then(setDueQueue).catch(() => setDueQueue({ count: 0, lessons: [] }));
+  };
   const refresh = async () => {
     const revision = modelRevision.current;
+    loadDueQueue();
     const [s, c] = await Promise.all([
       window.schoolwork.settingsGet(),
       window.schoolwork.listChats(true),
@@ -530,7 +540,7 @@ export default function App() {
     {!introReady&&<StartupIntro onComplete={()=>{setIntroReady(true);setIntroPreview(false);}} swedish={isSv} preview={introPreview}/>}
       <TaskNotices swedish={isSv} onOpen={conversationId=>{setLessonMode(null);void chooseChat({id:conversationId});}}/>
       <AtomGame open={atomGame!==null} swedish={isSv} origin={atomGame?.origin??null} onClose={()=>setAtomGame(null)}/>
-    {showFollower?<LessonFollower configured={settings.configured} model={settings.model} swedish={isSv} onBack={() => setShowFollower(false)} onWork={chatId=>{setShowFollower(false);void chooseChat({id:chatId});}} />:lessonMode?<LessonWorkspace initialMode={lessonMode} summaryModel={settings.model} configured={settings.configured} onBack={() => setLessonMode(null)} onWork={chatId=>{setLessonMode(null);void chooseChat({id:chatId});}} />:<div className="shell" inert={!introReady}>
+    {showReviewQueue?<ReviewQueueView swedish={isSv} queue={dueQueue} onBack={() => {setShowReviewQueue(false);loadDueQueue();}} onReview={lessonId=>{setFollowerTarget({lessonId,review:true});setShowReviewQueue(false);setShowFollower(true);}} />:showFollower?<LessonFollower configured={settings.configured} model={settings.model} swedish={isSv} target={followerTarget} onBack={() => {setFollowerTarget(null);setShowFollower(false);loadDueQueue();}} onWork={chatId=>{setFollowerTarget(null);setShowFollower(false);void chooseChat({id:chatId});}} />:lessonMode?<LessonWorkspace initialMode={lessonMode} summaryModel={settings.model} configured={settings.configured} onBack={() => setLessonMode(null)} onWork={chatId=>{setLessonMode(null);void chooseChat({id:chatId});}} />:<div className="shell" inert={!introReady}>
       <aside className={"sidebar " + (sidebarCollapsed ? "collapsed" : "")}>
         <div className="brand">
           <div className="brand-mark">
@@ -570,6 +580,11 @@ export default function App() {
         </div>
         <button className="nav-item lesson-nav" onClick={() => setLessonMode("lesson")}><GraduationCap size={16}/><span>{t("Follow a lesson", "Följ en lektion")}</span></button>
         <button className="nav-item follower-nav" onClick={() => setShowFollower(true)}><BookOpenCheck size={16}/><span>{t("Lesson Follower", "Lektionsföljare")}</span></button>
+        <button className="nav-item review-nav" onClick={() => setShowReviewQueue(true)}>
+          <Repeat size={16}/>
+          <span>{t("Due reviews", "Att repetera")}</span>
+          {(dueQueue?.count ?? 0) > 0 && <span className="review-badge">{dueQueue!.count > 99 ? "99+" : dueQueue!.count}</span>}
+        </button>
         <button
           className="nav-item memory-nav"
           onClick={() => setShowMemory(true)}

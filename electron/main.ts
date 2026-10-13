@@ -2167,6 +2167,10 @@ function registerIpc() {
   ipcMain.handle('follow:skip', (event, raw) => { trusted(event); const p = z.object({ id: z.string().uuid(), segmentId: z.string().min(1).max(80) }).parse(raw); return follower.skip(p.id, p.segmentId); });
   ipcMain.handle('follow:advance', (event, raw) => { trusted(event); const p = z.object({ id: z.string().uuid(), index: z.number().int().min(0).max(1000) }).parse(raw); return follower.advance(p.id, p.index); });
   ipcMain.handle('follow:finish', (event, raw) => { trusted(event); return follower.finish(z.string().uuid().parse(raw)); });
+  ipcMain.handle('follow:deck', (event, raw) => { trusted(event); return follower.deckGet(z.string().uuid().parse(raw)); });
+  ipcMain.handle('follow:deckGenerate', (event, raw) => { trusted(event); const p = z.object({ id: z.string().uuid(), model: z.string().min(1).max(160) }).parse(raw); return follower.deckGenerate(p.id, p.model); });
+  ipcMain.handle('follow:reviewMark', (event, raw) => { trusted(event); const p = z.object({ id: z.string().uuid(), kind: z.enum(['card', 'quiz']), itemIndex: z.number().int().min(0).max(100), result: z.enum(['got', 'still']) }).parse(raw); return follower.reviewMark(p.id, p.kind, p.itemIndex, p.result); });
+  ipcMain.handle('follow:dueQueue', event => { trusted(event); return follower.dueQueue(); });
   ipcMain.handle('calendar:status', event => { trusted(event); return calendar.status(); });
   ipcMain.handle('calendar:check',event=>{trusted(event);return calendar.check();});
   ipcMain.handle('calendar:drive',(event,raw)=>{trusted(event);return calendar.enableDrive(z.boolean().parse(raw));});
