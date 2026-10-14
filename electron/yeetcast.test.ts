@@ -17,6 +17,20 @@ function setup(fetcher:typeof fetch, resolver=async(_code:string)=>'https://yeet
 }
 const page=(active=true)=>new Response(`<div wire:snapshot='${JSON.stringify({memo:{name:'receiver-screen'},data:{active,connections:active,receiverUri:active?'https://vdo.ninja/?view=abc123':'',senders:[[],{s:'clctn'}]}})}'>`);
 afterEach(()=>{vi.useRealTimers();viewerFixture.media={videoCount:1,readyState:4};viewerFixture.loadGate=null;viewerFixture.captureGate=null;viewerFixture.windows=[];});
+it('opens a reference-only candidate and confirms activity from decoded video across refreshes',async()=>{
+  const fetcher=(async()=>new Response(`<div wire:snapshot='${JSON.stringify({memo:{name:'ReceiverScreen'},data:{active:false,connections:true,receiverUri:'https://vdo.ninja/?view=teacher',senders:[null,{s:'elcln',keys:[42]}]}})}'>`)) as typeof fetch;
+  const {board}=setup(fetcher);await board.configure('123456');
+  expect(await board.refresh()).toMatchObject({active:false,connections:true,viewUrl:'https://vdo.ninja/?view=teacher'});
+  const file=await board.capture(true);
+  try {expect(file).toBeTruthy();expect(await board.refresh(true)).toMatchObject({active:true});
+    board.stopMonitoring();expect(board.status().active).toBe(false);
+  } finally {if(file)await fs.unlink(file);board.close();}
+});
+it('does not mistake connected but non-presenting Eloquent references for a ready picture',async()=>{
+  const fetcher=(async()=>new Response(`<div wire:snapshot='${JSON.stringify({memo:{name:'ReceiverScreen'},data:{active:false,connections:true,receiverUri:'https://vdo.ninja/?view=teacher',senders:[null,{s:'elcln',keys:[42]}]}})}'>`)) as typeof fetch;
+  const {board}=setup(fetcher);await board.configure('123456');viewerFixture.media={videoCount:0,readyState:0};
+  await expect(board.capture(true)).rejects.toThrow(/video is still connecting/);expect(board.status().active).toBe(false);board.close();
+});
 it('reuses a saved receiver with its rotated visible code without joining or deleting a sender',async()=>{
   const resolve=vi.fn(async()=> 'https://yeet.ssis.nu/receiver/42');
   const {board}=setup((async()=>new Response('<span class="tabular-nums">654 321</span>')) as typeof fetch,resolve);

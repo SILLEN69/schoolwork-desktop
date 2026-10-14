@@ -27,6 +27,13 @@ it('reads only a visible formatted receiver code, not arbitrary digits or hidden
   expect(displayedProjectorCode('<span class="text-6xl font-bold tabular-nums block m-6">001 234</span>')).toBe('001234');
   expect(displayedProjectorCode('<script>{"code":"001234"}</script><p>001 234</p>')).toBeNull();
 });
+it('reads real Livewire 4 Eloquent references without inventing sender fields or active state',()=>{
+  const data={active:false,connections:true,receiverUri:'https://vdo.ninja/?view=teacher',
+    senders:[null,{s:'elcln',class:'Illuminate\\Database\\Eloquent\\Collection',modelClass:'App\\Models\\Sender',keys:[42]}]};
+  const html=`<div wire:snapshot='${JSON.stringify({memo:{name:'ReceiverScreen'},data})}'>`;
+  expect(parseReceiverPage(html)).toMatchObject({active:false,connections:true,receiverUri:'https://vdo.ninja/?view=teacher',senderCount:1,senders:[]});
+  expect(parseReceiverPage(`<div wire:snapshot='${JSON.stringify({memo:{name:'ReceiverScreen'},data:{active:false,connections:false,senders:[null,{s:'elcln',keys:[]}]}})}'>`)).toMatchObject({active:false,connections:false,senderCount:0});
+});
 
 it('reads the live cast state from a Livewire v3 receiver page', () => {
   const state = parseReceiverPage(v3Page({

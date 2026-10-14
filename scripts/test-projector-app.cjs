@@ -31,7 +31,7 @@ app.whenReady().then(()=>{
   if(String(url).startsWith('https://teachgpt.ssis.nu/api/v1/models'))return Response.json({data:[{id:'Qwen3.8-27B'}]});
   if(String(url)==='https://yeet.ssis.nu/receiver/42'){
    if(state.offline)throw new Error('Simulated offline');
-   return new Response(`<span class="text-6xl tabular-nums">${state.code.slice(0,3)} ${state.code.slice(3)}</span><div wire:snapshot='${JSON.stringify({memo:{name:'receiver-screen'},data:{active:false,connections:state.active,receiverUri:state.active?'https://vdo.ninja/?view=teacher-stream':'',senders:[[{name:'Teacher',sending:state.active}],{s:'clctn'}]}})}'>`);
+   return new Response(`<span class="text-6xl tabular-nums">${state.code.slice(0,3)} ${state.code.slice(3)}</span><div wire:snapshot='${JSON.stringify({memo:{name:'ReceiverScreen'},data:{active:false,connections:state.active,receiverUri:state.active?'https://vdo.ninja/?view=teacher-stream':'',senders:[null,{s:'elcln',class:'Illuminate\\Database\\Eloquent\\Collection',modelClass:'App\\Models\\Sender',keys:state.active?[8]:[]}]}})}'>`);
   }
   throw new Error('Unexpected external request in isolated projector fixture.');
  };

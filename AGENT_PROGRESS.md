@@ -1,5 +1,14 @@
 # Autonomous engineering checkpoint
 
+## Live projector failure corrected in beta.9 — 14 October 2026
+
+- The user's Downloads export confirms beta.8 reached HTTP 200 and connected but repeatedly reported active=false, connections=true and senderCount=0. The user reconnected for investigation.
+- A read-only query of only the selected receiver metadata and a GET of that exact receiver confirmed real Livewire 4 data: component ReceiverScreen, active=false, connections=true, one valid view stream, senders=[null,{s:elcln,keys:[one model reference]}]. No codes, sender identities or stream IDs were printed or persisted in ordinary diagnostics.
+- Livewire's locked 4.4.7 dependency serializes Eloquent collections as model references, not sender fields. Earlier fixtures supplied inline sending/name fields and therefore missed the real failure. The new fixture matches the observed structure.
+- Board opens a validated connected candidate despite unknown active state, verifies decoded video before capture, preserves observed readiness across fresh HTML checks and clears it when the viewer closes or stream changes. UI separates candidate availability from observed active video; diagnostics count references without exposing their keys.
+- Live verification used the actual saved receiver in a separate hidden read-only Electron viewer. A decoded frame arrived after initial connection and capture succeeded; the actual presentation image was visually inspected. No code join/delete, school server modification, production app closure or user-profile write occurred. The private frame and probe scripts stay under ignored work/.
+- Local proof: 54 focused tests, full Windows build and 10 Electron projector workflows passed. This fixes the observed waiting/capture failure; first-time join flash still needs a school server change for complete elimination.
+
 ## Projector beta.8 observation and temporal context — 14 October 2026
 
 - Diagnosed against YeetCast 3bdcdc9: receiver mount leaves active=false even when sending=true and a view URI exists. Parser now accepts that evidence, while capture still requires decoded video frames.

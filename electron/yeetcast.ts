@@ -23,6 +23,7 @@ export class Board {
   private win: BrowserWindow | null = null;
   private state: YeetCastState | null = null;
   private currentView = '';
+  private mediaView = '';
   private timer: ReturnType<typeof setInterval> | null = null;
   private refreshing: Promise<void> | null = null;
   private lastError: string | undefined;
@@ -89,10 +90,10 @@ export class Board {
     return {
       configured: Boolean(this.receiverUrl),
       receiverUrl: this.receiverUrl,
-      active: this.state?.active === true,
+      active: this.state?.active === true || Boolean(this.mediaView && this.mediaView===this.currentView && this.win && !this.win.isDestroyed()),
       connections: this.state?.connections === true,
       senders: this.state?.senders || [],
-      viewUrl: this.state?.active ? this.state.receiverUri || null : null,
+      viewUrl: this.currentView || null,
       windowOpen: Boolean(this.win && !this.win.isDestroyed() && this.win.isVisible()),
       lastChecked: this.lastChecked,
       error: this.lastError,
@@ -123,7 +124,7 @@ export class Board {
         const html = await response.text();
         if (generation !== this.generation) return;
         const parsed = parseReceiverPage(html);
-        this.trace('board.refresh',{outcome:parsed?'succeeded':'failed',...(parsed?{active:parsed.active,connections:parsed.connections,senderCount:parsed.senders.length}:{reason:'parse_failed'})});
+        this.trace('board.refresh',{outcome:parsed?'succeeded':'failed',...(parsed?{active:parsed.active,connections:parsed.connections,senderCount:parsed.senderCount??parsed.senders.length}:{reason:'parse_failed'})});
         this.lastError = parsed ? undefined : 'Could not read this projector. Connect using the current code shown on its screen.';
         if (parsed) this.adopt(parsed);
         else this.adopt({receiverUri:'',active:false,connections:false,senders:[]});
@@ -147,10 +148,12 @@ export class Board {
   }
 
   private adopt(parsed: YeetCastState) {
-    const changed = this.currentView !== parsed.receiverUri;
+    const nextView=parsed.active||parsed.connections ? parsed.receiverUri : '';
+    const changed = this.currentView !== nextView;
     this.state = parsed;
-    this.currentView = parsed.active ? parsed.receiverUri : '';
-    if ((changed || !parsed.active) && this.win && !this.win.isDestroyed() && this.win.webContents.getURL() !== this.currentView) {
+    this.currentView = nextView;
+    if(changed)this.mediaView='';
+    if (changed && this.win && !this.win.isDestroyed() && this.win.webContents.getURL() !== this.currentView) {
       void this.win.webContents.loadURL(this.currentView || 'about:blank').catch(() => {});
     }
   }
@@ -161,7 +164,7 @@ export class Board {
     const status = (await this.refresh()) as BoardStatus;
     if(background&&monitor!==this.monitorGeneration)throw new Error('Board monitoring paused.');
     if(generation!==this.generation)throw new Error('Projector connection changed. Open the selected board again.');
-    if (status.error || !status.active || !status.viewUrl) {
+    if (status.error || !status.viewUrl) {
       throw new Error(
         status.error || (status.configured
           ? 'No cast is running on that projector right now. Try again when someone starts presenting.'
@@ -190,6 +193,7 @@ export class Board {
       this.win.setMenuBarVisibility(false);
       this.win.on('closed', () => {
         this.win = null;
+        this.mediaView = '';
         this.stopPolling();
       });
     }
@@ -223,6 +227,7 @@ export class Board {
     this.stopPolling();
     if (this.win && !this.win.isDestroyed()) this.win.destroy();
     this.win = null;
+    this.mediaView='';
   }
 
   private startPolling() {
@@ -245,11 +250,13 @@ export class Board {
     if(background)await this.open(true,monitor);
     if(background&&monitor!==this.monitorGeneration)return null;
     await this.refresh(true);
-    if (!this.state?.active || !this.win || this.win.isDestroyed() || (!background && (!this.win.isVisible() || this.win.isMinimized()))) return null;
+    if (!this.currentView || !this.win || this.win.isDestroyed() || (!background && (!this.win.isVisible() || this.win.isMinimized()))) return null;
     if (this.win.webContents.getURL() !== this.currentView) return null;
     const viewer=this.win,generation=this.generation,view=this.currentView;
     const media=await viewer.webContents.executeJavaScript(`(()=>{const videos=[...document.querySelectorAll('video')];const ready=videos.find(v=>v.readyState>=2&&v.videoWidth>0&&v.videoHeight>0);return {videoCount:videos.length,readyState:ready?.readyState||0};})()`);
     if(media?.readyState<2||!media?.videoCount){this.trace('board.capture',{outcome:'not_ready',reason:'no_video_frame',videoCount:Number(media?.videoCount)||0,readyState:Number(media?.readyState)||0});throw new Error('The board video is still connecting. Wait for the picture in the board window, then capture again.');}
+    if(generation!==this.generation||this.win!==viewer||view!==this.currentView||viewer.isDestroyed())return null;
+    this.mediaView=view;
     const at=Date.now();
     const image = await viewer.webContents.capturePage(undefined,{stayHidden:true,stayAwake:true});
     if(generation!==this.generation||this.win!==viewer||view!==this.currentView||viewer.isDestroyed()||(!background&&!viewer.isVisible())||(background&&monitor!==this.monitorGeneration)){this.trace('board.capture',{outcome:'stale',reason:'selection_changed'});return null;}

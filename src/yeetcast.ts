@@ -2,7 +2,7 @@
  * Receiver pages and VDO view streams are read-only. Never treat a PIN as an ID. */
 export const yeetCastOrigin = 'https://yeet.ssis.nu';
 export type YeetCastSenders = { name: string; sending: boolean }[];
-export type YeetCastState = { receiverUri: string; active: boolean; connections: boolean; senders: YeetCastSenders };
+export type YeetCastState = { receiverUri: string; active: boolean; connections: boolean; senders: YeetCastSenders; senderCount?: number };
 export type BoardStatus = {
   configured: boolean; receiverUrl: string; active: boolean; connections: boolean;
   senders: YeetCastSenders; viewUrl: string | null; windowOpen: boolean; lastChecked: number; error?: string; diagnosticsAvailable?: boolean;
@@ -62,8 +62,12 @@ export function parseReceiverPage(html: string): YeetCastState | null {
   for (const candidate of candidates) {
     try {
       const parsed = JSON.parse(candidate); const snapshot = parsed.snapshot ?? parsed;
+      const references=snapshot.data?.senders;
+      // Eloquent collections expose only model keys, never sending/name fields.
+      const senderCount=Array.isArray(references)&&references[1]?.s==='elcln'&&Array.isArray(references[1]?.keys)
+        ? Math.min(10000,references[1].keys.length) : undefined;
       const data = unwrap(snapshot.data);
-      if (!data || (snapshot.memo?.name !== 'receiver-screen' && typeof data.receiverUri !== 'string')) continue;
+      if (!data || (String(snapshot.memo?.name||'').toLowerCase().replace(/[-_]/g,'') !== 'receiverscreen' && typeof data.receiverUri !== 'string')) continue;
       const senders: YeetCastSenders = Array.isArray(data.senders) ? data.senders
         .filter((s: any) => s && typeof s.name === 'string')
         .map((s: any) => ({ name: s.name.slice(0, 200), sending: s.sending === true })) : [];
@@ -72,7 +76,8 @@ export function parseReceiverPage(html: string): YeetCastState | null {
       // ReceiverScreen::mount never initializes active. Sending rows and a
       // validated view URI are evidence even when the fresh HTML says false.
       const active = Boolean(receiverUri) && (data.active === true || senders.some(s => s.sending));
-      return { receiverUri, active, connections: data.connections === true || senders.some(s => s.sending), senders };
+      return { receiverUri, active, connections: data.connections === true || senders.some(s => s.sending), senders,
+        ...(senderCount===undefined?{}:{senderCount}) };
     } catch { /* Another component or malformed snapshot. */ }
   }
   const iframe = /<iframe\b[^>]*\bsrc\s*=\s*(["'])([\s\S]*?)\1/i.exec(html);

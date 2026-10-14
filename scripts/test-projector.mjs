@@ -22,13 +22,13 @@ try{
  await input.fill('001 234');const connecting=board.getByRole('button',{name:'Ansluter…'});await board.getByRole('button',{name:'Anslut',exact:true}).click();await connecting.waitFor();
  let login;for(let i=0;i<80;i++){login=app.windows().find(w=>w.url()==='https://yeet.ssis.nu/');if(login)break;await page.waitForTimeout(100);}
  assert.ok(login,'first connection opens the school sign-in window');await login.getByRole('button',{name:'Sign in to school'}).click();
- await board.getByText('Teacher',{exact:true}).waitFor({timeout:20000});
+ await board.getByText(/Bildström hittad/).waitFor({timeout:20000});
  assert.equal(await page.evaluate(()=>window.schoolwork.boardStatus().then(s=>s.receiverUrl)),'https://yeet.ssis.nu/receiver/42');
  assert.deepEqual(await app.evaluate(()=>({lookups:global.__projectorTest.lookups,deletes:global.__projectorTest.deletes,joined:global.__projectorTest.joined,pushLoads:global.__projectorTest.pushLoads})),{lookups:1,deletes:1,joined:0,pushLoads:0});
  pass('a spaced six-digit code resolves through normal sign-in, stores the receiver, deletes its temporary sender and never loads a push stream');
  await app.evaluate(()=>{global.__projectorTest.code='654321';});
  await board.getByRole('button',{name:'Byt projektor'}).click();await input.fill('654321');await board.getByRole('button',{name:'Anslut',exact:true}).click();
- await board.getByText('Teacher',{exact:true}).waitFor();
+ await board.getByText(/Bildström hittad/).waitFor();
  assert.equal(await app.evaluate(()=>global.__projectorTest.lookups),1);
  pass('a rotated visible code reconnects read-only without adding or removing a sender; active=false mount does not hide the cast');
  await board.getByRole('button',{name:'Visa tavlan'}).click();await board.getByRole('button',{name:'Dölj fönstret'}).waitFor();
