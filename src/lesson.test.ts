@@ -1,5 +1,13 @@
 import {expect,it} from 'vitest';
-import {detectSubject,mergeLessonTasks,transcriptText,emptyAnalysis,type LessonTask,type LessonSession} from './lesson';
+import {detectSubject,mergeLessonTasks,transcriptText,emptyAnalysis,boardContext,type LessonTask,type LessonSession} from './lesson';
+it('resolves speech arriving after a timestamped frame and never invents legacy alignment',()=>{
+  const session={segments:[],pending:[],boardSnapshots:[{id:'frame',path:'local',at:1000,audioTime:125},{id:'old',path:'local2',at:900}]} as unknown as LessonSession;
+  expect(boardContext(session)[0]).toMatchObject({capturedAt:'1970-01-01T00:00:01.000Z',audioTime:125,speechStatus:'not-yet-available'});
+  session.segments=[{id:'speech',start:120,duration:30,text:'Explanation of the shared video',language:'en',model:'whisper'},
+    {id:'other',start:10,duration:10,text:'Unrelated earlier speech',language:'en',model:'whisper'}];
+  expect(boardContext(session)[0].speech.map(s=>s.text)).toEqual(['Explanation of the shared video']);
+  expect(boardContext(session)[1]).toMatchObject({alignment:'unknown',audioTime:null,speech:[]});
+});
 const task=(id:string,title:string,details=title):LessonTask=>({id,title,details,evidence:details,kind:'assignment',dueDate:'2026-10-13'});
 it('merges reading recaps and preserves completed/calendar identity, but not different page ranges',()=>{
   const old={...task('stable','Läs sidor 23 till 76'),completed:true,calendarEventId:'sc123'};

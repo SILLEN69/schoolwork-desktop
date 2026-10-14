@@ -44,7 +44,7 @@ export default function LessonWorkspace({ initialMode, summaryModel, configured,
   useEffect(() => {
     mounted.current = true;
     window.schoolwork.lessonList().then(s => { if(mounted.current) setSessions(s); }).catch(e => setError(errorText(e)));
-    return () => { mounted.current = false; void window.schoolwork.boardCancelConnect().catch(()=>{}); stopLive(); recorder.current?.stop(); recorder.current = null; };
+    return () => { mounted.current = false; void window.schoolwork.boardCancelConnect().catch(()=>{}); void window.schoolwork.boardStopMonitor().catch(()=>{}); stopLive(); recorder.current?.stop(); recorder.current = null; };
   }, []);
   useEffect(() => {
     let active = true;
@@ -108,9 +108,26 @@ export default function LessonWorkspace({ initialMode, summaryModel, configured,
   };
   const boardCapture = async () => {
     const session = current; if (!session || boardBusy) return; setBoardBusy(true); setBoardNote('');
-    try { const updated = await window.schoolwork.boardCapture(session.id); accept(updated); setBoardNote(t('Tavlan sparas som AI-kontext.', 'Board saved as AI context.')); setTimeout(() => { if (mounted.current) setBoardNote(''); }, 5_000); }
+    try { const updated = await window.schoolwork.boardCapture({sessionId:session.id,clock:recorder.current?.boardClock}); accept(updated); setBoardNote(t('Tavlan sparas som AI-kontext.', 'Board saved as AI context.')); setTimeout(() => { if (mounted.current) setBoardNote(''); }, 5_000); }
     catch (e) { setBoardNote(errorText(e)); } finally { if (mounted.current) setBoardBusy(false); }
   };
+  useEffect(() => {
+    if (!recording || mode!=='lesson' || !board?.configured || !current?.id) return;
+    const sessionId=current.id;
+    let active=true,timer:ReturnType<typeof setTimeout>;
+    const sample=async()=>{
+      let delay=5000;
+      try {
+        const clock=recorder.current?.boardClock;
+        if(!active||!clock)return;
+        const updated=await window.schoolwork.boardCapture({sessionId,background:true,clock});
+        if(active){accept(updated);setBoardNote('');delay=30000;}
+      } catch(error){if(active)setBoardNote(errorText(error));}
+      if(active)timer=setTimeout(()=>void sample(),delay);
+    };
+    void sample();
+    return()=>{active=false;clearTimeout(timer);void window.schoolwork.boardStopMonitor().catch(()=>{});};
+  },[recording,mode,board?.configured,current?.id]);
   const enqueue = (input: AudioInput) => {
     queued.current++; setUploads(queued.current);
     if (queued.current >= 4) { stop(); setError(t('Inspelningen pausades för att hinna transkribera ljudet. Vänta och fortsätt sedan.', 'Recording paused to catch up with transcription. Wait, then continue.')); }
@@ -227,6 +244,7 @@ export default function LessonWorkspace({ initialMode, summaryModel, configured,
         <span className="lesson-board-icon"><Tv size={16}/></span>
         <div className="lesson-board-status">
           <strong>{board?.active ? t('Kast pågår', 'Cast in progress') : t('Tavlan', 'Board')}</strong>
+          {current?.boardSnapshots?.length ? <small>{recording?t('Bilder hämtas automatiskt · ','Automatic snapshots · '):t('Senaste bild · ','Latest snapshot · ')}{new Date(current.boardSnapshots.at(-1)!.at).toLocaleTimeString(language,{hour:'2-digit',minute:'2-digit',second:'2-digit'})}{current.boardSnapshots.at(-1)!.audioTime!==undefined?' · '+formatAudioTime(current.boardSnapshots.at(-1)!.audioTime!):''}</small>:null}
           <small>{!board?.configured ? t('Skriv koden på projektorn. Logga in på skolans YeetCast första gången.', 'Enter the code on the projector. Sign in to school YeetCast the first time.') : board.error ? board.error : board.active ? (board.senders.filter(s => s.sending).map(s => s.name).join(', ') || t('Tavlan är ansluten', 'Board connected')) : t('Projektorn är ansluten. Väntar på en presentation.', 'Projector connected. Waiting for a presentation.')}</small>
         </div>
         <div className="lesson-board-actions">

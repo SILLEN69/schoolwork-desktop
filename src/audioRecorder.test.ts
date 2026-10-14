@@ -1,6 +1,12 @@
 import { describe, it, expect } from 'vitest';
 import { encodeWav, audioBase64, PcmSegments } from './audioRecorder';
 import { nextDate, validDate } from './lesson';
+it('uses captured sample time with a resumed audio offset, including an unflushed chunk',()=>{
+  const emitted:any[]=[];const segments=new PcmSegments(1000,(...args)=>emitted.push(args),120);
+  segments.push(new Float32Array(5000));expect(segments.audioTime).toBe(125);
+  segments.flush();expect(segments.audioTime).toBe(125);
+  segments.push(new Float32Array(2000));expect(segments.audioTime).toBe(127);
+});
 describe('audio segments', () => {
   it('does not duplicate audio when backpressure stops during an emission',()=>{
     let calls=0;const s=new PcmSegments(100,()=>{calls++;s.flush();});s.push(new Float32Array(3000).fill(.1));expect(calls).toBe(1);

@@ -1,5 +1,16 @@
 # Autonomous engineering checkpoint
 
+## Projector beta.8 observation and temporal context — 14 October 2026
+
+- Diagnosed against YeetCast 3bdcdc9: receiver mount leaves active=false even when sending=true and a view URI exists. Parser now accepts that evidence, while capture still requires decoded video frames.
+- Saved-receiver visible-code matching avoids creating/deleting a temporary sender on reconnect. First-time code lookup still changes the physical receiver iframe URL; fully eliminating that flash requires a school-side change. No school server was changed.
+- Lesson recording samples full frames every 30 seconds in a hidden non-focusing read-only viewer; initial connection errors retry at five seconds. Pause/unmount releases the hidden viewer, including cancellation during startup.
+- Images store actual capture time and an approximate audio position derived from captured samples, preserving resumed offsets. Nearby speech is resolved at context-use time after late transcription. Summaries get up to three recent images, marked in bounded metadata; historical/imported audio without alignment is not assigned guessed times.
+- Verification: 51 focused unit tests, 13 real Electron lesson/model workflows and 10 projector workflows passed with simulated remote services and actual microphone/video capture. Full Windows build and five release/debug-policy checks passed.
+- Built unsigned local installer and portable beta.8 packages. Extracted portable app launched with an isolated profile, reported beta.8, exposed monitor IPC and beta diagnostics, validated bad codes and had zero renderer errors. Local build does not contain publisher Google configuration; use the normal credential-provisioned release workflow for distribution.
+- No live classroom code or real teacher stream was available. School API/account restrictions remain unchanged. No personal profile, active user task, school credentials or main branch was modified. Keep temporary diagnostics beta-only and remove them before main promotion.
+- OpenCode work remains uncommitted in the canonical checkout, separate from this projector package. Its checkpoint is work/OPENCODE_CHECKPOINT.md.
+
 ## Projector beta.7 reliability and diagnostic work — 14 October 2026
 
 - Refreshed local beta to c43708a. Beta.5's release/CI failed on the Windows spaced-path batch launcher assertion. The hosted fixture stopped after 10.667s with a 10s command limit; the same isolated fixture passed locally. Batch commands now use direct cmd.exe quoting and explicit Windows verbatim argv, avoiding PowerShell cold initialization without broadening permitted arguments.

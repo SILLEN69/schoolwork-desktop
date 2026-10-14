@@ -72,7 +72,9 @@ it('uses the captured board image as summary context when the model has vision',
   const bodies:any[]=[];
   const fetcher=vi.fn(async(url:unknown,init?:RequestInit)=>{if(String(url).endsWith('/audio/transcriptions'))return Response.json({text:'Gör uppgift 3 nu. Lämna in rapporten den 16 oktober.'});bodies.push(JSON.parse(String(init!.body)));return summary(JSON.stringify(notes));}) as typeof fetch;
   const lessons=new Lessons(db,root,()=> 'test',fetcher,()=>true),s=lessons.create('lesson','sv','Test');
-  await lessons.upload(audio(s.id));lessons.attachBoardSnapshot(s.id,file);
+  const capturedAt=Date.now()-1000;
+  lessons.attachBoardSnapshot(s.id,file,capturedAt,.05);
+  await lessons.upload(audio(s.id));
   expect(lessons.get(s.id).boardSnapshots).toHaveLength(1);
   const result=await lessons.analyse(s.id,'Qwen3.8-27B');
   const body=bodies[bodies.length-1];
@@ -80,6 +82,9 @@ it('uses the captured board image as summary context when the model has vision',
   const user=body.messages[1].content;
   expect(Array.isArray(user)).toBe(true);
   expect(user.some((part:any)=>part.type==='image_url'&&part.image_url.url.startsWith('data:image/jpeg;base64,'))).toBe(true);
+  const payload=JSON.parse(user.find((part:any)=>part.type==='text').text);
+  expect(payload.boards[0]).toMatchObject({capturedAt:new Date(capturedAt).toISOString(),audioTime:.05,imageAttached:true,speechStatus:'available'});
+  expect(payload.boards[0].speech[0].text).toContain('Gör uppgift 3');
   expect(result.analysis.tasks).toHaveLength(2);
 });
 it('retries the summary without the board image when the provider rejects images',async()=>{

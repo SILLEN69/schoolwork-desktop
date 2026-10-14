@@ -1,5 +1,5 @@
 import { it, expect } from 'vitest';
-import { normalizeReceiverUrl, parseReceiverPage, projectorCode, readOnlyViewUrl, viewId } from './yeetcast';
+import { normalizeReceiverUrl, parseReceiverPage, projectorCode, readOnlyViewUrl, viewId, displayedProjectorCode } from './yeetcast';
 
 it('normalizes projector page URLs', () => {
   expect(normalizeReceiverUrl('https://yeet.ssis.nu/receiver/12')).toBe('https://yeet.ssis.nu/receiver/12');
@@ -17,6 +17,16 @@ it('preserves leading zeroes and accepts the spaced code shown on the projector'
 const v3Page = (data: Record<string, unknown>) => `<!doctype html><html><body>
 <script type="text/json" data-wire:snapshot>${JSON.stringify({ snapshot: { data } })}</script>
 </body></html>`;
+it('recognizes a shared tab despite the receiver mount active=false default',()=>{
+  expect(parseReceiverPage(v3Page({active:false,connections:true,receiverUri:'https://vdo.ninja/?view=teacher',
+    senders:[[{name:'Teacher',sending:true}],{s:'clctn'}]}))).toMatchObject({active:true,connections:true});
+  expect(parseReceiverPage(v3Page({active:false,connections:true,receiverUri:'https://vdo.ninja/?view=teacher',
+    senders:[{name:'Teacher',sending:false}]}))).toMatchObject({active:false});
+});
+it('reads only a visible formatted receiver code, not arbitrary digits or hidden Livewire data',()=>{
+  expect(displayedProjectorCode('<span class="text-6xl font-bold tabular-nums block m-6">001 234</span>')).toBe('001234');
+  expect(displayedProjectorCode('<script>{"code":"001234"}</script><p>001 234</p>')).toBeNull();
+});
 
 it('reads the live cast state from a Livewire v3 receiver page', () => {
   const state = parseReceiverPage(v3Page({

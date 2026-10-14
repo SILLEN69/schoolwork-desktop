@@ -9,6 +9,7 @@ vi.mock('electron',()=>({BrowserWindow:class extends EventEmitter {
   show(){this.visible=true;}hide(){this.visible=false;}focus(){}destroy(){this.destroyed=true;this.emit('closed');}
 }}));
 import {Board} from './yeetcast';
+import fs from 'node:fs/promises';
 function setup(fetcher:typeof fetch, resolver=async(_code:string)=>'https://yeet.ssis.nu/receiver/42') {
   const metadata=new Map<string,string>();
   const store={getMetadata:(key:string)=>metadata.get(key),setMetadata:(key:string,value:string)=>metadata.set(key,value)};
@@ -16,6 +17,28 @@ function setup(fetcher:typeof fetch, resolver=async(_code:string)=>'https://yeet
 }
 const page=(active=true)=>new Response(`<div wire:snapshot='${JSON.stringify({memo:{name:'receiver-screen'},data:{active,connections:active,receiverUri:active?'https://vdo.ninja/?view=abc123':'',senders:[[],{s:'clctn'}]}})}'>`);
 afterEach(()=>{vi.useRealTimers();viewerFixture.media={videoCount:1,readyState:4};viewerFixture.loadGate=null;viewerFixture.captureGate=null;viewerFixture.windows=[];});
+it('reuses a saved receiver with its rotated visible code without joining or deleting a sender',async()=>{
+  const resolve=vi.fn(async()=> 'https://yeet.ssis.nu/receiver/42');
+  const {board}=setup((async()=>new Response('<span class="tabular-nums">654 321</span>')) as typeof fetch,resolve);
+  await board.configure('https://yeet.ssis.nu/receiver/42');
+  await board.configure('654321');
+  expect(resolve).not.toHaveBeenCalled();expect(board.receiverUrl).toBe('https://yeet.ssis.nu/receiver/42');
+});
+it('captures a ready shared video in a hidden viewer without stealing focus and stops on pause',async()=>{
+  const {board}=setup((async()=>page()) as typeof fetch);await board.configure('123456');
+  let at=0;const file=await board.capture(true,value=>at=value);
+  try {expect(file).toBeTruthy();expect(at).toBeGreaterThan(0);expect(board.status().windowOpen).toBe(false);
+    expect(viewerFixture.windows[0].visible).toBe(false);
+    board.stopMonitoring();expect(viewerFixture.windows[0].destroyed).toBe(true);
+  } finally {if(file)await fs.unlink(file);board.close();}
+});
+it('pausing before a background fetch completes cannot create a hidden monitor afterward',async()=>{
+  let resolve!:(response:Response)=>void;
+  const {board}=setup((()=>new Promise<Response>(r=>resolve=r)) as typeof fetch);
+  await board.configure('123456');const pending=board.capture(true);
+  board.stopMonitoring();resolve(page());
+  await expect(pending).rejects.toThrow(/paused/);expect(viewerFixture.windows).toHaveLength(0);
+});
 it('resolves the displayed PIN to the real receiver, stores no PIN, and survives code rotation',async()=>{
   const resolve=vi.fn(async()=> 'https://yeet.ssis.nu/receiver/42');const fetcher=vi.fn(async(_url:any)=>page());const {board,metadata}=setup(fetcher as typeof fetch,resolve);
   await board.configure('001 234');expect(resolve).toHaveBeenCalledWith('001234');expect([...metadata.values()]).toEqual(['https://yeet.ssis.nu/receiver/42']);

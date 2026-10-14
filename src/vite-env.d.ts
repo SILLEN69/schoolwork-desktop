@@ -31,7 +31,8 @@ interface Window {
     boardOpen: () => Promise<import('./yeetcast').BoardStatus>;
     boardHide: () => Promise<boolean>;
     boardClose: () => Promise<boolean>;
-    boardCapture: (sessionId:string) => Promise<import('./lesson').LessonSession>;
+    boardCapture: (input:string | {sessionId:string;background?:boolean;clock?:{at:number;audioTime:number}}) => Promise<import('./lesson').LessonSession>;
+    boardStopMonitor: () => Promise<boolean>;
     calendarStatus: () => Promise<import('./lesson').CalendarStatus & {error?:string}>;
     calendarConfigure: (input:{clientId:string;clientSecret:string;calendarId?:string}) => Promise<import('./lesson').CalendarStatus>;
     calendarConnect: () => Promise<import('./lesson').CalendarStatus>;

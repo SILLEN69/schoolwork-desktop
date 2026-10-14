@@ -3,7 +3,7 @@ import path from 'node:path';
 import crypto from 'node:crypto';
 import { BrowserWindow } from 'electron';
 import type { SchoolWorkStore } from './storage';
-import { parseReceiverPage, normalizeReceiverUrl, projectorCode, readOnlyViewUrl, type BoardStatus, type YeetCastState } from '../src/yeetcast';
+import { parseReceiverPage, normalizeReceiverUrl, projectorCode, displayedProjectorCode, readOnlyViewUrl, type BoardStatus, type YeetCastState } from '../src/yeetcast';
 import { ProjectorConnector } from './projectorConnect';
 import type { ProjectorTrace } from './projectorDiagnostics';
 
@@ -31,6 +31,7 @@ export class Board {
   private connector: ProjectorConnector;
   private refreshController: AbortController | null = null;
   private refreshGeneration = -1;
+  private monitorGeneration = 0;
   constructor(
     private store: SchoolWorkStore,
     private root: string,
@@ -52,7 +53,20 @@ export class Board {
     this.trace('board.configure',{outcome:'started'});
     const code = projectorCode(raw);
     let url:string;
-    try {url=normalizeReceiverUrl(code?await (this.codeResolver?this.codeResolver(code):this.connector.resolve(code)):raw);}
+    try {
+      let remembered = '';
+      if (code && this.receiverUrl) {
+        const controller = new AbortController(); this.refreshController = controller;
+        try {
+          const response = await this.fetcher(this.receiverUrl, {redirect:'error', headers:{Accept:'text/html'},
+            signal:AbortSignal.any([controller.signal,AbortSignal.timeout(5000)])});
+          if (response.ok && displayedProjectorCode(await response.text()) === code) remembered = this.receiverUrl;
+        } catch { /* A hidden code or an unavailable saved receiver uses normal authorization. */ }
+        finally { if(this.refreshController===controller)this.refreshController=null; }
+        if(generation!==this.generation)throw new Error('Projector connection cancelled.');
+      }
+      url=normalizeReceiverUrl(remembered || (code?await (this.codeResolver?this.codeResolver(code):this.connector.resolve(code)):raw));
+    }
     catch(error){this.trace('board.configure',{outcome:'failed',reason:code?'lookup_rejected':'invalid_input'});throw error;}
     if (generation !== this.generation) throw new Error('Projector connection cancelled.');
     this.closeWindow();
@@ -142,9 +156,10 @@ export class Board {
   }
 
   /** Open the floating board window on the active cast's read-only view. */
-  async open(): Promise<BoardStatus> {
+  async open(background=false, monitor=this.monitorGeneration): Promise<BoardStatus> {
     const generation=this.generation;
     const status = (await this.refresh()) as BoardStatus;
+    if(background&&monitor!==this.monitorGeneration)throw new Error('Board monitoring paused.');
     if(generation!==this.generation)throw new Error('Projector connection changed. Open the selected board again.');
     if (status.error || !status.active || !status.viewUrl) {
       throw new Error(
@@ -158,11 +173,12 @@ export class Board {
         width: BOARD_WIDTH,
         height: BOARD_HEIGHT,
         title: 'Tavlan',
+        show: false,
         resizable: true,
         alwaysOnTop: true,
         fullscreenable: false,
         backgroundColor: '#000000',
-        webPreferences: { partition: 'schoolwork-board-view', contextIsolation: true, nodeIntegration: false, sandbox: true },
+        webPreferences: { partition: 'schoolwork-board-view', contextIsolation: true, nodeIntegration: false, sandbox: true, backgroundThrottling:false },
       });
       this.win.webContents.session.setPermissionRequestHandler((_contents, _permission, callback) => callback(false));
       this.win.webContents.session.setPermissionCheckHandler(() => false);
@@ -184,7 +200,7 @@ export class Board {
       catch { if(this.win===viewer)this.closeWindow();this.trace('board.view',{outcome:'failed',reason:'stream_load'});throw new Error('Could not open the board stream. Check your connection and try again.'); }
     }
     if(generation!==this.generation||this.win!==viewer||viewer.isDestroyed()||status.viewUrl!==this.currentView)throw new Error('Projector connection changed. Open the selected board again.');
-    viewer.show();viewer.focus();
+    if(!background){viewer.show();viewer.focus();}
     this.trace('board.view',{outcome:'opened'});
     this.startPolling();
     return this.status();
@@ -194,6 +210,10 @@ export class Board {
     if (this.win && !this.win.isDestroyed()) this.win.hide();
     this.trace('board.view',{outcome:'hidden'});
     return this.status().windowOpen;
+  }
+  stopMonitoring(): void {
+    this.monitorGeneration++;
+    if(this.win && !this.win.isDestroyed() && !this.win.isVisible()) this.closeWindow();
   }
 
   close(): void {
@@ -220,21 +240,26 @@ export class Board {
 
   /** Capture the board window to a JPEG under the board root. Returns the
    *  file path, or null when no board window is visible. */
-  async capture(): Promise<string | null> {
+  async capture(background=false, captured?: (at:number)=>void): Promise<string | null> {
+    const monitor=this.monitorGeneration;
+    if(background)await this.open(true,monitor);
+    if(background&&monitor!==this.monitorGeneration)return null;
     await this.refresh(true);
-    if (!this.state?.active || !this.win || this.win.isDestroyed() || !this.win.isVisible() || this.win.isMinimized()) return null;
+    if (!this.state?.active || !this.win || this.win.isDestroyed() || (!background && (!this.win.isVisible() || this.win.isMinimized()))) return null;
     if (this.win.webContents.getURL() !== this.currentView) return null;
     const viewer=this.win,generation=this.generation,view=this.currentView;
     const media=await viewer.webContents.executeJavaScript(`(()=>{const videos=[...document.querySelectorAll('video')];const ready=videos.find(v=>v.readyState>=2&&v.videoWidth>0&&v.videoHeight>0);return {videoCount:videos.length,readyState:ready?.readyState||0};})()`);
     if(media?.readyState<2||!media?.videoCount){this.trace('board.capture',{outcome:'not_ready',reason:'no_video_frame',videoCount:Number(media?.videoCount)||0,readyState:Number(media?.readyState)||0});throw new Error('The board video is still connecting. Wait for the picture in the board window, then capture again.');}
-    const image = await viewer.webContents.capturePage();
-    if(generation!==this.generation||this.win!==viewer||view!==this.currentView||viewer.isDestroyed()||!viewer.isVisible()){this.trace('board.capture',{outcome:'stale',reason:'selection_changed'});return null;}
+    const at=Date.now();
+    const image = await viewer.webContents.capturePage(undefined,{stayHidden:true,stayAwake:true});
+    if(generation!==this.generation||this.win!==viewer||view!==this.currentView||viewer.isDestroyed()||(!background&&!viewer.isVisible())||(background&&monitor!==this.monitorGeneration)){this.trace('board.capture',{outcome:'stale',reason:'selection_changed'});return null;}
     if (image.isEmpty()) {this.trace('board.capture',{outcome:'failed',reason:'empty_image'});return null;}
     await fs.mkdir(this.root, { recursive: true, mode: 0o700 });
     const file = path.join(this.root, 'board-' + Date.now() + '-' + crypto.randomBytes(3).toString('hex') + '.jpg');
     await fs.writeFile(file, image.toJPEG(78), { mode: 0o600 });
     if(generation!==this.generation||view!==this.currentView){await fs.unlink(file).catch(()=>{});return null;}
     this.trace('board.capture',{outcome:'succeeded'});
+    captured?.(at);
     return file;
   }
 

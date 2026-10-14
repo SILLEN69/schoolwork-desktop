@@ -25,6 +25,7 @@ export function audioBase64(buffer: ArrayBuffer) {
 export class PcmSegments {
   private blocks:Float32Array[]=[]; private size=0; private fresh=0; private elapsed=0; private quiet=0;
   constructor(private rate:number,private emit:(samples:Float32Array,start:number,duration:number)=>void,private offset=0) {}
+  get audioTime() { return this.offset + this.elapsed + this.fresh / this.rate; }
   push(data:Float32Array) {
     this.blocks.push(data.slice());this.size+=data.length;this.fresh+=data.length;
     let energy=0;for(const x of data)energy+=x*x;
@@ -52,6 +53,7 @@ export class LessonRecorder {
     private ended: () => void, private offset = 0) {}
   /** The live microphone stream; the real-time WebRTC session shares its track. */
   get mediaStream(): MediaStream | undefined { return this.stopping ? undefined : this.stream; }
+  get boardClock() { return this.stopping || !this.segments ? undefined : {at:Date.now(),audioTime:this.segments.audioTime}; }
   async start() {
     try {
       this.stream = await navigator.mediaDevices.getUserMedia({ audio: { channelCount: 1, echoCancellation: true, noiseSuppression: true }, video: false });

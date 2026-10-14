@@ -21,7 +21,7 @@ import { GoogleCalendar } from "./calendar";
 import { publishedGoogleClient } from "./googleClient";
 import { DesktopPointer } from './desktopPointer';
 import { TaskNotifications } from './taskNotifications';
-import { transcriptText, lessonSubjects } from '../src/lesson';
+import { transcriptText, lessonSubjects, boardContext } from '../src/lesson';
 import { Connections,connectionSchemas,connectionTools } from './connections';
 import { isSpeechModel } from "../src/speechModels";
 import { Updates } from './updates';
@@ -2145,12 +2145,18 @@ function registerIpc() {
   ipcMain.handle('board:open',async (event)=>{trusted(event);return board.open();});
   ipcMain.handle('board:hide',(event)=>{trusted(event);return board.hide();});
   ipcMain.handle('board:close',(event)=>{trusted(event);board.close();return true;});
+  ipcMain.handle('board:stop-monitor',(event)=>{trusted(event);board.stopMonitoring();return true;});
   ipcMain.handle('board:capture',async (event,raw)=>{
     trusted(event);
-    const sessionId=z.string().uuid().parse(raw);
-    const file=await board.capture();
+    const input=z.union([z.string().uuid(),z.object({sessionId:z.string().uuid(),background:z.boolean().optional(),
+      clock:z.object({at:z.number().finite().positive(),audioTime:z.number().finite().min(0).max(86400)}).optional()})]).parse(raw);
+    const {sessionId,background,clock}=typeof input==='string'?{sessionId:input,background:false,clock:undefined}:input;
+    lessons.get(sessionId); // Validate ownership before creating a file.
+    if(clock&&Math.abs(Date.now()-clock.at)>5000)throw new Error('Recording clock is stale. Capture again.');
+    let at=Date.now();
+    const file=await board.capture(background,value=>{at=value;});
     if(!file)throw new Error('Open the board window first, then capture it.');
-    return lessons.attachBoardSnapshot(sessionId,file);
+    return lessons.attachBoardSnapshot(sessionId,file,at,clock?Math.max(0,clock.audioTime+(at-clock.at)/1000):undefined);
   });
   ipcMain.handle('lessons:chat',async (event,raw)=>{
     trusted(event);const p=z.object({id:z.string().uuid(),model:z.string().min(1).max(160),question:z.string().trim().min(1).max(10000)}).parse(raw);
@@ -2163,7 +2169,9 @@ function registerIpc() {
       catch{ /* Board context is best effort; the question continues text-only. */ }
     }
     const existing=store.getActiveTasks().find(t=>t.conversationId===chatId && ['running','queued'].includes(t.state));
-    const reference=JSON.stringify({title:s.title,subject:s.subject,notes:s.analysis,transcript:transcriptText(s).slice(-35000)});
+    const boards=boardContext(s);
+    const reference=JSON.stringify({title:s.title,subject:s.subject,notes:s.analysis,transcript:transcriptText(s).slice(-35000),
+      boards:boards.map((frame,i)=>({...frame,imageAttached:Boolean(boardAttachmentIds.length)&&i===boards.length-1}))});
     let taskId:string;
     if(existing){store.steerTask({taskId:existing.id,conversationId:chatId,clientRequestId:crypto.randomUUID(),text:p.question,attachmentIds:boardAttachmentIds});emit(existing,'steering-queued',{text:'Your follow-up is saved for the next step.'});taskId=existing.id;}
     else taskId=submitTask({chatId,userText:p.question,model:p.model,attachmentIds:boardAttachmentIds},undefined,reference);

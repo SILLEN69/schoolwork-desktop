@@ -17,7 +17,22 @@ export type AudioLanguage = 'sv' | 'en';
 export type AudioInput = { sessionId: string; id: string; base64: string; mime: string; name: string; start: number; duration: number; language: AudioLanguage };
 export type TranscriptSegment = { id: string; start: number; duration: number; text: string; language: AudioLanguage; model: string };
 export type PendingAudio = Omit<AudioInput, 'base64' | 'sessionId'> & { error?: string };
-export type BoardSnapshot = { id: string; path: string; at: number };
+export type BoardSnapshot = { id: string; path: string; at: number; audioTime?: number; source?: 'yeetcast' };
+/** Resolve speech at use time, including transcription that arrived after capture.
+ * Chunk-level overlap is approximate; it is not word-level audio alignment. */
+export function boardContext(session: LessonSession) {
+  return (session.boardSnapshots || []).slice(-8).map(frame => {
+    const time = frame.audioTime;
+    const speech = time === undefined ? [] : session.segments.filter(s =>
+      s.start <= time + 15 && s.start + s.duration >= time - 15);
+    const pending = time !== undefined && session.pending.some(s => s.start <= time + 15 && s.start + s.duration >= time - 15);
+    return { id:frame.id, capturedAt:new Date(frame.at).toISOString(), audioTime:time ?? null,
+      alignment:time === undefined ? 'unknown' : 'approximate-chunk-window',
+      speechStatus:pending ? 'transcription-pending' : speech.length ? 'available' : 'not-yet-available',
+      speech:speech.map(s => ({start:s.start,duration:s.duration,text:s.text.slice(0,500)})).slice(-3),
+      imageAttached:false };
+  });
+}
 export type LessonSession = {
   id: string; title: string; mode: 'lesson' | 'transcription'; language: AudioLanguage;
   subject?: string; subjectLocked?: boolean;

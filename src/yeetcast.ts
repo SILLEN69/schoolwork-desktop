@@ -11,6 +11,12 @@ export function projectorCode(raw: string): string | null {
   const value = raw.trim().replace(/[\s-]/g, '');
   return /^\d{6}$/.test(value) ? value : null;
 }
+/** Only the displayed code on a saved receiver; never enumerate receiver IDs. */
+export function displayedProjectorCode(html: string): string | null {
+  if (html.length > 2_000_000) return null;
+  const match = /<span\b[^>]*class=["'][^"']*\btabular-nums\b[^"']*["'][^>]*>\s*(\d{3}\s+\d{3})\s*<\/span>/i.exec(html);
+  return match ? projectorCode(match[1]) : null;
+}
 /** Retain existing saved links; new users enter a code instead. */
 export function normalizeReceiverUrl(raw: string): string {
   let url: URL;
@@ -63,7 +69,10 @@ export function parseReceiverPage(html: string): YeetCastState | null {
         .map((s: any) => ({ name: s.name.slice(0, 200), sending: s.sending === true })) : [];
       const receiverUri = readOnlyViewUrl(data.receiverUri);
       if (data.active === true && !receiverUri) return null;
-      return { receiverUri, active: data.active === true, connections: data.connections === true || senders.some(s => s.sending), senders };
+      // ReceiverScreen::mount never initializes active. Sending rows and a
+      // validated view URI are evidence even when the fresh HTML says false.
+      const active = Boolean(receiverUri) && (data.active === true || senders.some(s => s.sending));
+      return { receiverUri, active, connections: data.connections === true || senders.some(s => s.sending), senders };
     } catch { /* Another component or malformed snapshot. */ }
   }
   const iframe = /<iframe\b[^>]*\bsrc\s*=\s*(["'])([\s\S]*?)\1/i.exec(html);
