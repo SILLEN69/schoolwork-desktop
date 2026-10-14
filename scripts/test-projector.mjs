@@ -1,12 +1,18 @@
-import {_electron as electron} from 'playwright';
+// Hosted startup failures must include the child's launch/exit diagnostics.
+if(process.env.CI)process.env.DEBUG=[process.env.DEBUG,'pw:browser'].filter(Boolean).join(',');
+const {_electron:electron}=await import('playwright');
 import assert from 'node:assert/strict';
 import fs from 'node:fs/promises';import os from 'node:os';import path from 'node:path';
+import {execFileSync} from 'node:child_process';
+const launchEnv={...process.env};delete launchEnv.ELECTRON_RUN_AS_NODE;delete launchEnv.ELECTRON_SKIP_BINARY_DOWNLOAD;
+execFileSync(process.execPath,[path.resolve('node_modules/electron/install.js')],{stdio:'inherit',windowsHide:true,env:launchEnv});
 const data=await fs.mkdtemp(path.join(os.tmpdir(),'schoolwork-projector-test-'));
 const shots=path.resolve('work/projector-verification');await fs.mkdir(shots,{recursive:true});
 const results=[];const pass=text=>{results.push(text);console.log('PASS:',text);};
 let app;
 try{
- app=await electron.launch({executablePath:path.resolve('node_modules/electron/dist',process.platform==='win32'?'electron.exe':'electron'),args:[path.resolve('scripts/test-projector-app.cjs'),'--user-data-dir='+data,...(process.platform==='linux'?['--no-sandbox']:[])],env:{...process.env,SCHOOLWORK_PROJECTOR_TEST_DATA:data},timeout:30000});
+ app=await electron.launch({executablePath:path.resolve('node_modules/electron/dist',process.platform==='win32'?'electron.exe':'electron'),args:[path.resolve('scripts/test-projector-app.cjs'),'--user-data-dir='+data,...(process.platform==='linux'?['--no-sandbox']:[])],env:{...launchEnv,SCHOOLWORK_PROJECTOR_TEST_DATA:data},timeout:30000});
+ app.process().stderr.on('data',chunk=>{void fs.appendFile(path.join(shots,'electron-stderr.log'),chunk);});
  const page=await app.firstWindow();const errors=[];page.on('pageerror',e=>errors.push(e.message));
  await page.getByRole('button',{name:'Follow a lesson'}).click();
  const board=page.getByRole('region',{name:'Tavlan (YeetCast)'});const input=board.getByRole('textbox',{name:'Projektorkod'});await input.waitFor();

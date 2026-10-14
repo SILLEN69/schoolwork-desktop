@@ -1,6 +1,6 @@
 # Autonomous engineering checkpoint
 
-## Projector beta.6 reliability and diagnostic work — 14 October 2026
+## Projector beta.7 reliability and diagnostic work — 14 October 2026
 
 - Refreshed local beta to c43708a. Beta.5's release/CI failed on the Windows spaced-path batch launcher assertion. The hosted fixture stopped after 10.667s with a 10s command limit; the same isolated fixture passed locally. Batch commands now use direct cmd.exe quoting and explicit Windows verbatim argv, avoiding PowerShell cold initialization without broadening permitted arguments.
 - Checked the school's current YeetCast source at 3bdcdc9a2c10b585348da1d7541d3b854293f7ff. PIN resolution uses the normal Livewire checkCode action and deletes only its own temporary sender; no permission/login bypass.
@@ -8,7 +8,8 @@
 - Added bounded, allowlisted local beta projector traces and an IPC-validated export button. Main branch/stable versions disable logging; repository instructions and docs/projector-debug-removal.md require actual removal before promotion. Saved the owner's removal reminder in personal memory notes as explicitly requested.
 - Local evidence: 218 unit tests, seven release/asset/native/debug-policy checks, full Windows build, 13 lesson/model checks and eight projector workflows passed. Main-configured build exercised the same setup/capture flow with no logging UI. Later targeted sanitation/cleanup checks and hosted publication results follow below.
 - The lesson regression initially failed because Windows kept the real app focused after blur(), so the expected away-user completion notice was correctly suppressed. An owned second foreground fixture window now verifies the real focus boundary, without mocking production focus APIs. All lesson checks then passed.
-- Release publication is in progress; real signed-in school code/video remain unverified without a current classroom code. No installed app/profile was replaced or forced closed.
+- Hosted beta.6 exposed a separate 5s archive fixture timeout and an Electron process-launch failure before the projector UI appeared. The source CI now installs the pinned runtime before GUI checks; the standalone harness does the same, clears inherited Electron Node/download-skip flags, and emits CI child-startup details. Its complete workflow passes locally even with both flags set. The memory archive regression retains disk/index assertions with a bounded 20s hosted-filesystem allowance; its six focused tests pass.
+- Beta.5 and beta.6 release tags failed publication and are retained as honest historical records. Beta.7 source validation is now pending; tag only after the hosted source checks pass. Real signed-in school code/video remain unverified without a current classroom code. No installed app/profile was replaced or forced closed.
 
 ## TeachGPT Realtime fixed and beta.4 published — 13 October 2026
 

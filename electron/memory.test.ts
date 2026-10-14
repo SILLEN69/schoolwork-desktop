@@ -64,7 +64,7 @@ describe('Obsidian-compatible memory vault', () => {
     expect(vault.search('older project fact', { projectId: vault.projectId })).toHaveLength(0);
     expect(await fs.readFile(path.join(vault.root, archived.relativePath), 'utf8')).toContain('status: "archived"');
     store.close(); await fs.rm(dir, { recursive: true, force: true });
-  });
+  }, 20_000);
 
   it('preserves external Obsidian edits when an older editor revision tries to save', async () => {
     const dir = await fs.mkdtemp(path.join(os.tmpdir(), 'schoolwork-memory-'));

@@ -24,6 +24,9 @@ jobs:
           node-version: '24'
           cache: npm
       - run: npm ci
+      - if: runner.os == 'Windows'
+        name: Install the pinned Electron runtime before GUI checks
+        run: node node_modules/electron/install.js
       - name: Verify assets, type-check and build (no publisher credentials)
         run: npm run build
       - run: npm test -- --maxWorkers=4
