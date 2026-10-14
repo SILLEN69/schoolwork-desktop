@@ -41,5 +41,18 @@ try {
   assert.equal(await page.getByRole('button',{name:'Test Windows notification',exact:true}).count(),0);
   await page.reload();await page.locator('img.startup-media').waitFor();assert.equal(await page.locator('video.startup-media').count(),0);
   await page.locator('.startup-splash').waitFor({state:'detached',timeout:1200});
+  assert.equal(await page.locator('.welcome-orb').count(),0,'The extra welcome icon is removed.');
+  const star=page.locator('.brand-mark .atom-working svg g circle').first();
+  const before=await star.getAttribute('cx');await page.waitForTimeout(340);
+  assert.notEqual(await star.getAttribute('cx'),before,'Brand icon moves while idle even with OS reduced motion.');
+  await page.getByRole('button',{name:/Settings/}).first().click();
+  await page.getByRole('checkbox',{name:'Animate icons',exact:true}).uncheck();
+  await page.waitForTimeout(150);const stopped=await star.getAttribute('cx');await page.waitForTimeout(340);
+  assert.equal(await star.getAttribute('cx'),stopped,'The app animation setting can stop the icon.');
+  await page.getByRole('checkbox',{name:'Animate icons',exact:true}).check();
+  await page.waitForTimeout(340);assert.notEqual(await star.getAttribute('cx'),stopped);
+  await page.reload();await page.locator('.brand-mark .atom-working').waitFor();
+  const restored=await star.getAttribute('cx');await page.waitForTimeout(340);assert.notEqual(await star.getAttribute('cx'),restored,'Animation preference survives reload.');
+  console.log('PASS: extra welcome icon removed; idle brand animation works with reduced motion; animation switch and persisted preference work.');
   console.log('PASS: muted intro/explicit replay plays; automatic startup respects reduced motion, explicit preview plays even with reduced motion; skip/error/stall exit, keyboard, inert UI and concise settings without notification test all pass.');
 } finally {await app?.close();}

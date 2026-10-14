@@ -38,6 +38,9 @@ jobs:
       - if: runner.os == 'Windows'
         run: node scripts/test-ui-motion.mjs
       - if: runner.os == 'Windows'
+        name: Verify bundled Work engine, questions, restart and game hint
+        run: node scripts/test-opencode.mjs
+      - if: runner.os == 'Windows'
         run: node scripts/test-development.mjs
       - uses: actions/upload-artifact@v4
         if: always() && runner.os == 'Windows'

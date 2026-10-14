@@ -76,7 +76,11 @@ jobs:
           node scripts/test-projector.mjs
           if ($LASTEXITCODE -ne 0) { throw 'Projector setup verification failed.' }
       - name: Package installer and portable app without publishing
-        run: node scripts/package-win.mjs
+        # The runtime/client protocol and real UI must pass before distribution.
+        run: |
+          node scripts/test-opencode.mjs
+          if ($LASTEXITCODE -ne 0) { throw 'Work engine verification failed.' }
+          node scripts/package-win.mjs
       - name: Verify update manifest and generate SHA-256 checksums
         run: |
           node scripts/verify-release.cjs release

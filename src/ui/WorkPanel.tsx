@@ -1,3 +1,4 @@
+import {userError} from '../userError';
 import { useEffect, useRef, useState } from "react";
 import {
   ArrowUp,
@@ -170,7 +171,7 @@ export default function WorkPanel({
       <div className="work-panel-content" role="tabpanel">
         {error && (
           <p className="panel-error" role="alert">
-            {error}
+            {userError(error,swedish?'sv':'en')}
           </p>
         )}
         {tab === "activity" && (

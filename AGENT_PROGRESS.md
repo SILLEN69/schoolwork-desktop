@@ -1,3 +1,12 @@
+## Current: 0.12.0-beta.1 implementation and verification (14 October 2026)
+
+- OpenCode 2.0.28 backbone, native questions in both views, lesson study-note prompts/manual editing, independent speech/UI languages and user-facing error normalization are implemented.
+- Animated top-left/thinking atoms work despite OS reduced motion; welcome atom is removed; one-minute game hint is verified via the real UI.
+- Live Qwen/TeachGPT with the existing protected credential service completed file creation and a real Node assertion in 30 seconds. Live audio-only notes preserved earlier theory and added correct formulas/units/examples across two updates without invented tasks.
+- Unit suite: 243 passed across 41 files; native JSON fallback, menu and text-only image exclusion checks passed. Real Electron OpenCode pause/restart/resume, question reply and game hint passed; 15 lesson checks and 10 projector checks passed separately. Agent recovery and development launcher checks passed.
+- Remaining release steps: final build/regression gates, source/secret review, beta CI/publisher-provisioned package, official download/checksum and packaged runtime verification. No main merge or forced update of active user work.
+- Detailed architecture/resume notes: docs/work-backbone-handoff.md. Private live evidence remains in ignored work/work-v012-verification and must not be committed.
+
 # Autonomous engineering checkpoint
 
 ## Live projector failure corrected in beta.9 — 14 October 2026

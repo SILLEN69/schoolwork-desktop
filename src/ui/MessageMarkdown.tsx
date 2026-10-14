@@ -12,9 +12,11 @@ import {
 } from "react";
 import { Check, Copy } from "lucide-react";
 import { normalizeMath } from "../markdown";
+import {useLanguage} from './Language';
 import "katex/dist/katex.min.css";
 
 function CodeBlock({ children, ...props }: ComponentPropsWithoutRef<"pre">) {
+  const {t}=useLanguage();
   const [feedback, setFeedback] = useState("");
   const pre = useRef<HTMLPreElement>(null);
   const timer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
@@ -41,9 +43,9 @@ function CodeBlock({ children, ...props }: ComponentPropsWithoutRef<"pre">) {
     <div className="code-block">
       <div className="code-header">
         <span>{language}</span>
-        <button type="button" onClick={copy} aria-label="Copy code">
+        <button type="button" onClick={copy} aria-label={t('Copy code','Kopiera kod')}>
           {feedback === "Copied" ? <Check size={14} /> : <Copy size={14} />}
-          <span aria-live="polite">{feedback || "Copy"}</span>
+          <span aria-live="polite">{feedback==='Copied'?t('Copied','Kopierat'):feedback?t('Copy failed','Kunde inte kopiera'):t('Copy','Kopiera')}</span>
         </button>
       </div>
       <pre ref={pre} {...props}>
@@ -53,6 +55,7 @@ function CodeBlock({ children, ...props }: ComponentPropsWithoutRef<"pre">) {
   );
 }
 export default function MessageMarkdown({ text }: { text: string }) {
+  const {t}=useLanguage();
   const normalized = useMemo(() => normalizeMath(text), [text]);
   return (
     <div className="markdown">
@@ -65,7 +68,7 @@ export default function MessageMarkdown({ text }: { text: string }) {
         skipHtml
         components={{
           pre: ({ node: _node, ...props }) => <CodeBlock {...props} />,
-          img: ({ alt }) => <span>{alt || "Image"}</span>,
+          img: ({ alt }) => <span>{alt || t('Image','Bild')}</span>,
           a: ({ href, children }) => (
             <a
               href={href}

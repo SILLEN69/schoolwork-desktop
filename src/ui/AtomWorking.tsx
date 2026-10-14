@@ -44,6 +44,7 @@ export default function AtomWorking({
   size = 26,
   className = "",
   animated = true,
+  respectReducedMotion = true,
   onClick,
   title,
 }: {
@@ -51,6 +52,7 @@ export default function AtomWorking({
   className?: string;
   /** Set false to render the atom at rest (no rAF loop). */
   animated?: boolean;
+  respectReducedMotion?: boolean;
   onClick?: (e: MouseEvent<HTMLSpanElement>) => void;
   title?: string;
 }) {
@@ -61,7 +63,7 @@ export default function AtomWorking({
 
   useEffect(() => {
     if (!animated) return;
-    if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
+    if (respectReducedMotion && window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
     let raf = 0;
     const t0 = performance.now();
     const tick = (now: number) => {
@@ -95,7 +97,7 @@ export default function AtomWorking({
     };
     raf = requestAnimationFrame(tick);
     return () => cancelAnimationFrame(raf);
-  }, [animated]);
+  }, [animated,respectReducedMotion]);
 
   return (
     <span
@@ -109,6 +111,8 @@ export default function AtomWorking({
       }}
       aria-label={title || "Working"}
       role={onClick ? "button" : "img"}
+      tabIndex={onClick ? 0 : undefined}
+      onKeyDown={onClick ? (event) => { if(event.key === "Enter" || event.key === " ") { event.preventDefault(); event.currentTarget.click(); } } : undefined}
       title={title}
       onClick={onClick}
     >

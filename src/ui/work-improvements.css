@@ -1,0 +1,20 @@
+.brand .brand-mark{background:transparent!important;width:48px;height:48px;flex:0 0 48px}
+.sidebar.collapsed .brand .brand-mark{display:flex;width:32px;height:32px;flex-basis:32px}
+.sidebar.collapsed .brand-mark .atom-working{max-width:32px;max-height:32px}
+.activity .activity-icon{position:relative;overflow:visible}
+.surprise-hint{position:absolute;left:38px;top:-8px;z-index:5;display:flex;align-items:center;gap:10px;width:max-content;max-width:250px;background:#dcf2a3;color:#23301a;padding:10px 12px;border-radius:13px;box-shadow:0 4px 18px #0003;font-size:13px}
+.surprise-hint:before{content:"";position:absolute;left:-6px;top:16px;width:12px;height:12px;transform:rotate(45deg);background:inherit}
+.surprise-hint button{border:0;background:transparent;padding:2px;color:inherit;cursor:pointer}
+.work-question{margin:16px 0;padding:22px;border:1px solid #46563a;border-radius:16px;background:#172016}
+.work-question fieldset{border:0;margin:0 0 20px;padding:0}
+.work-question legend{font-size:17px;padding:0;margin-bottom:12px}
+.work-question label{display:flex;gap:10px;align-items:flex-start;padding:9px 0}
+.work-question label span{display:grid;gap:3px}
+.work-question small{color:#a5ae9c}
+.work-question textarea,.notes-editor textarea{width:100%;background:#111713;border:1px solid #4b5646;border-radius:9px;color:#f1f5eb;padding:12px;resize:vertical;font:inherit}
+.work-question textarea{min-height:70px}
+.work-question>div,.notes-editor>div{display:flex;justify-content:flex-end;gap:10px;margin-top:14px}
+.work-question button,.notes-editor button{padding:9px 15px;border:1px solid #46563a;border-radius:9px;background:#d4ed96;color:#1e2714;cursor:pointer}
+.notes-editor{width:min(760px,92vw);max-height:85vh}
+.notes-editor textarea{height:50vh;line-height:1.7}
+.lesson-card-head .lesson-text-button{margin-left:auto}

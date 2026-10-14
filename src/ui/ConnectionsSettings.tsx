@@ -1,3 +1,4 @@
+import {userError} from '../userError';
 import {useEffect,useState} from 'react';
 import {Plug,Plus,Trash2,CheckCircle2} from 'lucide-react';
 import {CalendarDialog} from './LessonWorkspace';
@@ -15,7 +16,7 @@ export default function ConnectionsSettings({swedish}:{swedish:boolean}){
     {items.map(c=><div className="connection-row" key={c.id}><label><input type="checkbox" checked={c.enabled} onChange={async e=>{try{setItems(await window.schoolwork.connectionSave({...c,enabled:e.target.checked}));}catch(e:any){setError(e.message);}}}/>{c.name}</label><button className="tool-pill" disabled={busy || !c.enabled} onClick={async()=>{setBusy(true);setError('');try{const tools=await window.schoolwork.connectionTest(c.id);setNotice(`${c.name}: ${tools.length} ${t('verktyg tillgängliga','tools available')}`);}catch(e:any){setError(e.message);}finally{setBusy(false);}}}><CheckCircle2 size={13}/>{t('Testa','Test')}</button><button className="icon" aria-label={t('Ta bort ','Remove ')+c.name} onClick={()=>void window.schoolwork.connectionRemove(c.id).then(setItems).catch(e=>setError(e.message))}><Trash2 size={14}/></button></div>)}
     <form onSubmit={async e=>{e.preventDefault();setBusy(true);setError('');try{setItems(await window.schoolwork.connectionSave({name,url,token,enabled:true}));setName('');setUrl('');setToken('');}catch(e:any){setError(e.message);}finally{setBusy(false);}}}>
       <label>{t('Namn','Name')}<input value={name} onChange={e=>setName(e.target.value)} required maxLength={80}/></label><label>MCP URL<input type="url" value={url} onChange={e=>setUrl(e.target.value)} placeholder="https://…/mcp" required/></label><label>{t('Token (valfri, krypteras lokalt)','Token (optional, encrypted locally)')}<input type="password" autoComplete="new-password" value={token} onChange={e=>setToken(e.target.value)}/></label><button className="tool-pill" disabled={busy}><Plus size={14}/>{t('Lägg till anslutning','Add connection')}</button>
-    </form><small>{t('HTTP/token · inte OAuth eller stdio.','HTTP/token · no OAuth or stdio.')}</small>{error && <p role="alert">{error}</p>}{notice && <p role="status">{notice}</p>}
+    </form>{error && <p role="alert">{userError(error,swedish?'sv':'en')}</p>}{notice && <p role="status">{notice}</p>}
     {google && <CalendarDialog swedish={swedish} status={calendar} onStatus={setCalendar} onClose={()=>setGoogle(false)} onError={setError}/>}
   </section>;
 }

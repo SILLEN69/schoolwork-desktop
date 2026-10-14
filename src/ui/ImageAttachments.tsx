@@ -1,8 +1,10 @@
 import { useEffect, useState } from "react";
 import { X } from "lucide-react";
 import type { Attachment } from "../capabilities";
+import {useLanguage} from './Language';
 
 function AttachmentImage({ attachment }: { attachment: Attachment }) {
+  const {t}=useLanguage();
   const [source, setSource] = useState("");
   const [failed, setFailed] = useState(false);
   useEffect(() => {
@@ -25,7 +27,7 @@ function AttachmentImage({ attachment }: { attachment: Attachment }) {
   return source ? (
     <img src={source} alt={attachment.name} title={attachment.name} />
   ) : (
-    <span>{failed ? "Image unavailable" : "Loading image…"}</span>
+    <span>{failed ? t('Image unavailable','Bilden är inte tillgänglig') : t('Loading image…','Läser bild…')}</span>
   );
 }
 export default function ImageAttachments({
@@ -35,6 +37,7 @@ export default function ImageAttachments({
   attachments: Attachment[];
   remove?: (attachment: Attachment) => void;
 }) {
+  const {t}=useLanguage();
   if (!attachments.length) return null;
   return (
     <div className={remove ? "attachment-tray" : "message-images"}>
@@ -46,7 +49,7 @@ export default function ImageAttachments({
             <button
               className="icon"
               type="button"
-              aria-label={"Remove " + attachment.name}
+              aria-label={t('Remove ','Ta bort ') + attachment.name}
               onClick={() => remove(attachment)}
             >
               <X size={13} />

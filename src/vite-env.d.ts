@@ -8,12 +8,16 @@ interface Window {
     calendarDrive:(enabled:boolean)=>Promise<import('./lesson').CalendarStatus>;
     steer: (input:{taskId:string;chatId:string;userText:string;clientRequestId:string;attachmentIds?:string[]})=>Promise<string>;
     lessonRefine: (input:{id:string;model:string})=>Promise<import('./lesson').LessonSession>;
+    getQuestion:(taskId:string)=>Promise<import('./workQuestion').WorkQuestion|null>;
+    setAnimation:(enabled:boolean)=>Promise<boolean>;
+    answerQuestion:(input:{taskId:string;questionId:string;answer?:import('./workQuestion').WorkAnswer;cancel?:boolean})=>Promise<boolean>;
     lessonChat: (input:{id:string;model:string;question:string})=>Promise<{chatId:string;taskId:string}>;
     calendarCheck: ()=>Promise<import('./lesson').CalendarStatus>;
     calendarImport: ()=>Promise<import('./lesson').CalendarStatus|null>;
     lessonList: () => Promise<import('./lesson').LessonSession[]>;
     lessonCreate: (input: {mode:'lesson'|'transcription';language:'sv'|'en';title:string}) => Promise<import('./lesson').LessonSession>;
     lessonUpdate: (input: {id:string;title?:string;language?:'sv'|'en';subject?:string;taskId?:string;completed?:boolean}) => Promise<import('./lesson').LessonSession>;
+    lessonEditNotes:(input:{id:string;expectedVersion:number;notes:{overview:string;sections:{heading:string;points:string[]}[]}})=>Promise<import('./lesson').LessonSession>;
     lessonDelete: (id:string) => Promise<void>;
     lessonAudio: (input: import('./lesson').AudioInput) => Promise<{session:import('./lesson').LessonSession;error?:string}>;
     lessonRetry: (input: {id:string;audioId:string}) => Promise<{session:import('./lesson').LessonSession;error?:string}>;

@@ -20,6 +20,7 @@ app.whenReady().then(() => {
         .toString("base64"),
       workspace: dir,
       model: "Test-vision",
+      language:"en",
       capabilities: {
         allApps: false,
         launchApps: true,
@@ -485,5 +486,6 @@ Here is the calculation in code:
       { headers: { "Content-Type": "text/event-stream" } },
     );
   };
+  global.fetch=require('./work-provider-fixture.cjs')(global.fetch);
   require("../dist-electron/main.js");
 });

@@ -1,3 +1,4 @@
+import {userError} from '../userError';
 import { useEffect, useState } from "react";
 import type { Capabilities } from "../capabilities";
 
@@ -196,7 +197,7 @@ export default function DesktopSettings({
       </button>
       {error && (
         <p className="panel-error" role="alert">
-          {error}
+          {userError(error,swedish?'sv':'en')}
         </p>
       )}
     </div>

@@ -29,6 +29,10 @@ import WorkPanel from "./WorkPanel";
 import DesktopSettings from "./DesktopSettings";
 import TelegramSettings from "./TelegramSettings";
 import LessonWorkspace from "./LessonWorkspace";
+import {LanguageContext} from './Language';
+import {userError,userProgress} from '../userError';
+import QuestionCard from './QuestionCard';
+import './work-improvements.css';
 import VoiceInput from './VoiceInput';
 import ConnectionsSettings from './ConnectionsSettings';
 import './studio.css';
@@ -93,9 +97,11 @@ export default function App() {
     [keyInput, setKeyInput] = useState(""),
     [showHistory, setShowHistory] = useState(true),
     [rightPanel, setRightPanel] = useState(true),
-    [language, setLanguage] = useState<"en" | "sv">("en"),
+    [language, setLanguage] = useState<"en" | "sv">("sv"),
     [atomGame, setAtomGame] = useState<{ origin: { x: number; y: number } | null } | null>(null);
   const [lessonMode, setLessonMode] = useState<"lesson" | "transcription" | null>(null);
+  const [surpriseSeen,setSurpriseSeen]=useState(()=>localStorage.getItem('schoolwork-surprise-seen')==='1');
+  const [surpriseHint,setSurpriseHint]=useState(false);
   const modelRevision = useRef(0);
   const pendingModel = useRef<string | null>(null);
   const confirmedModel = useRef(defaults[0]);
@@ -117,6 +123,12 @@ export default function App() {
     stageKey = useRef("");
   const [clockNow, setClockNow] = useState(Date.now());
   const t = (en: string, sv: string) => (isSv ? sv : en);
+  useEffect(()=>{
+    if(!surpriseSeen&&loading&&status&&taskStartedAt.current&&clockNow-taskStartedAt.current>=60000){
+      setSurpriseHint(true);setSurpriseSeen(true);localStorage.setItem('schoolwork-surprise-seen','1');
+    }
+    if(!loading)setSurpriseHint(false);
+  },[loading,status,clockNow,surpriseSeen]);
   const rankedModels = rankTeachGPTModels([...models, settings.model].filter(m => !isSpeechModel(m)));
   const refresh = async () => {
     const revision = modelRevision.current;
@@ -127,7 +139,7 @@ export default function App() {
     if (revision === modelRevision.current && !pendingModel.current) confirmedModel.current = s.model;
     setSettings((previous: any) => ({ ...s, model: revision !== modelRevision.current || pendingModel.current ? pendingModel.current || previous.model : s.model }));
     setChats(c);
-    setLanguage(s.language === "sv" ? "sv" : "en");
+    setLanguage(s.language === "en" ? "en" : "sv");
   };
   const changeModel = (value: string) => {
     const revision = ++modelRevision.current;
@@ -169,6 +181,7 @@ export default function App() {
         void window.schoolwork.listChats(true).then(setChats);
       if (e.conversationId !== selectedId.current) return;
       if (e.type === "screenshot") return;
+      if (e.type === "heartbeat") return; // The running clock already shows liveness; retain the actual action and stage.
       if (e.type === "queued") {
         taskRef.current = e.taskId;
         setCurrentTaskId(e.taskId);
@@ -523,7 +536,7 @@ export default function App() {
     }
   };
   return (
-    <>
+    <LanguageContext.Provider value={language}>
     {!introReady&&<StartupIntro onComplete={()=>{setIntroReady(true);setIntroPreview(false);}} swedish={isSv} preview={introPreview}/>}
       <TaskNotices swedish={isSv} onOpen={conversationId=>{setLessonMode(null);void chooseChat({id:conversationId});}}/>
       <AtomGame open={atomGame!==null} swedish={isSv} origin={atomGame?.origin??null} onClose={()=>setAtomGame(null)}/>
@@ -531,7 +544,7 @@ export default function App() {
       <aside className={"sidebar " + (sidebarCollapsed ? "collapsed" : "")}>
         <div className="brand">
           <div className="brand-mark">
-            <Workflow size={19} />
+            <AtomWorking size={43} animated={settings.animateIcons!==false} respectReducedMotion={false}/>
           </div>
           <span>SchoolWork</span>
           <button
@@ -673,9 +686,6 @@ export default function App() {
         >
           {!messages.length ? (
             <div className="welcome">
-              <div className="welcome-orb">
-                <AtomWorking size={34} />
-              </div>
               <h1>
                 {t("What would you like to get done?", "Vad vill du få gjort?")}
               </h1>
@@ -772,18 +782,23 @@ export default function App() {
             </div>
           ) : (
             <div className="thread">
+              <QuestionCard taskId={currentTaskId} onStop={cancel}/>
               <ConversationTimeline conversationId={id} fallback={messages} swedish={isSv} running={loading} onUpdated={() => {if(stickToBottom.current)end.current?.scrollIntoView({behavior:'auto'});}} />
               {status && (
                 <div className="activity">
                   <span className="activity-icon" title={isSv ? "Spela stjärnfångst" : "Play star catch"}>
                     <AtomWorking
                       size={26}
+                      animated={settings.animateIcons!==false}
+                      respectReducedMotion={false}
                       title={isSv ? "Klicka för att spela stjärnfångst" : "Click to play star catch"}
                       onClick={(e) => {
                         const r = e.currentTarget.getBoundingClientRect();
+                        setSurpriseHint(false);setSurpriseSeen(true);localStorage.setItem('schoolwork-surprise-seen','1');
                         setAtomGame({ origin: { x: r.left + r.width / 2, y: r.top + r.height / 2 } });
                       }}
                     />
+                    {surpriseHint&&<span className="surprise-hint" role="status"><span>{t('Click for a surprise','Klicka för en överraskning')}</span><button aria-label={t('Dismiss','Stäng')} onClick={()=>setSurpriseHint(false)}><X size={12}/></button></span>}
                   </span>
                   <div>
                     <strong>
@@ -795,8 +810,8 @@ export default function App() {
                     </strong>
                     <small>
                       {status.type === "stream-progress"
-                        ? status.text.replace(/ · \d+s$/, "")
-                        : status.text}
+                        ? userProgress(status.text.replace(/ · \d+s$/, ""),language)
+                        : userProgress(status.text,language)}
                     </small>
                     <div className="activity-timers">
                       <span>
@@ -847,7 +862,7 @@ export default function App() {
                         "Det här steget kräver uppmärksamhet",
                       )}
                     </b>
-                    <p>{error}</p>
+                    <p>{userError(error,language)}</p>
                     <button
                       className="inline-btn"
                       onClick={() => setShowSettings(true)}
@@ -896,10 +911,10 @@ export default function App() {
         <div className="composer-wrap">
           {error && !messages.length && (
             <div className="panel-error" role="alert">
-              {error}
+              {userError(error,language)}
               <button
                 className="icon"
-                aria-label="Dismiss error"
+                aria-label={t('Dismiss error','Stäng felmeddelande')}
                 onClick={() => setError("")}
               >
                 <X size={16} />
@@ -1102,10 +1117,10 @@ export default function App() {
             </header>
             {error && (
               <p role="alert" className="panel-error">
-                {error}
+                {userError(error,language)}
               </p>
             )}
-            <div className="setting-block">
+            <div className="setting-block"><label><input type="checkbox" checked={settings.animateIcons!==false} onChange={e=>{const enabled=e.target.checked;setSettings((previous:any)=>({...previous,animateIcons:enabled}));void window.schoolwork.setAnimation(enabled).catch(error=>setError(error.message));}}/>{t('Animate icons','Animera ikoner')}</label></div><div className="setting-block">
               <UpdateNotice settings swedish={isSv}/>
             </div>
             <div className="setting-block">
@@ -1239,6 +1254,6 @@ export default function App() {
         <MemoryView close={() => setShowMemory(false)} language={language} />
       )}
     </div>}
-    </>
+    </LanguageContext.Provider>
   );
 }

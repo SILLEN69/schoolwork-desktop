@@ -1,3 +1,4 @@
+import {userError} from '../userError';
 import { useEffect, useState } from "react";
 import { Monitor, RefreshCw, Square } from "lucide-react";
 import type {
@@ -113,7 +114,7 @@ export default function DesktopPanel({
       </button>
       {error && (
         <p className="panel-error" role="alert">
-          {error}
+          {userError(error,swedish?'sv':'en')}
         </p>
       )}
       {displays.map((display, index) => (

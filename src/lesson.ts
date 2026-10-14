@@ -38,6 +38,7 @@ export type LessonSession = {
   subject?: string; subjectLocked?: boolean;
   refinedTranscript?: { text: string; revision: number }; linkedChatId?: string;
   boardSnapshots?: BoardSnapshot[];
+  notesVersion?:number;
   createdAt: number; updatedAt: number; revision: number;
   segments: TranscriptSegment[]; pending: PendingAudio[];
   analysis: Omit<LessonAnalysis, 'tasks'> & { tasks: LessonTask[] };

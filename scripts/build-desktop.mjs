@@ -1,5 +1,5 @@
 import { build } from 'esbuild';
-import {copyFile} from 'node:fs/promises';
+import {copyFile,mkdir} from 'node:fs/promises';
 import {execFileSync} from 'node:child_process';
 import {createRequire} from 'node:module';
 const require=createRequire(import.meta.url);
@@ -22,3 +22,8 @@ await build({
   define: { SCHOOLWORK_GOOGLE_CLIENT: JSON.stringify(clientId ? { clientId, clientSecret } : null), SCHOOLWORK_PROJECTOR_DEBUG: JSON.stringify(projectorDebug) },
 });
 await copyFile('electron/desktop-pointer.html','dist-electron/desktop-pointer.html');
+await mkdir('dist-opencode',{recursive:true});
+const runtime=process.platform==='win32'?'opencode.exe':'opencode';
+// The pinned npm launcher targets bin/opencode.exe on every OS (ELF on Linux).
+await copyFile('node_modules/@opencode/cli/bin/opencode.exe','dist-opencode/'+runtime);
+await copyFile('docs/licenses/OpenCode-MIT.txt','dist-opencode/LICENSE.txt');

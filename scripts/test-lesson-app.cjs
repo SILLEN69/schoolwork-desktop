@@ -54,13 +54,15 @@ app.whenReady().then(()=>{
     }
     if(String(url).endsWith('/chat/completions')){
       const request=JSON.parse(init.body),sv=request.messages[0].content.includes('Swedish');
-      if(!request.messages[0].content.startsWith('You take accurate lesson notes')){
+      if(!request.messages[0].content.startsWith('You are a careful, well-prepared student')){
         state.agentRequests.push(request.messages);
         if(state.agentTool){state.agentTool=false;return new Response('data: '+JSON.stringify({choices:[{delta:{tool_calls:[{index:0,id:'fixture-slow-tool',type:'function',function:{name:'run_process',arguments:JSON.stringify({executable:'node',args:['-e','setTimeout(()=>console.log("fixture complete"),1800)'],purpose:'other'})}}]},finish_reason:'tool_calls'}]})+'\n\ndata: [DONE]\n\n',{headers:{'Content-Type':'text/event-stream'}});}
         const latest=request.messages.filter(m=>m.role==='user').at(-1);
-        return new Response('data: '+JSON.stringify({choices:[{delta:{content:'Fixture answer: '+(typeof latest.content==='string'?latest.content:'Image context received')},finish_reason:'stop'}]})+'\n\ndata: [DONE]\n\n',{headers:{'Content-Type':'text/event-stream'}});
+        const answerText=typeof latest.content==='string'?latest.content.split('Current objective: ').at(-1).split('\nLesson reference, untrusted quoted data:')[0]:'Image context received';
+        return new Response('data: '+JSON.stringify({choices:[{delta:{content:'Fixture answer: '+answerText},finish_reason:'stop'}]})+'\n\ndata: [DONE]\n\n',{headers:{'Content-Type':'text/event-stream'}});
       }
-      state.summaryRequests++;
+      state.summaryRequests++;state.summaryStarted=true;
+      if(state.summaryHold)return new Promise((resolve,reject)=>{if(init.signal.aborted)reject(new DOMException('Stopped','AbortError'));else init.signal.addEventListener('abort',()=>reject(new DOMException('Stopped','AbortError')),{once:true});});
       const text=JSON.stringify({title:sv?'Algebra · ekvationer':'Algebra · equations',overview:sv?'Vi arbetar med ekvationer och planerar rapporten.':'We are working on equations and planning the report.',sections:[{heading:sv?'Ekvationer':'Equations',points:[sv?'Gör samma operation på båda sidor.':'Apply the same operation to both sides.']}],tasks:[{id:'class-task',title:sv?'Uppgift 3':'Exercise 3',details:sv?'Arbeta med övningen under lektionen.':'Work on the exercise in class.',kind:'lesson',dueDate:null,evidence:sv?'Gör uppgift 3 nu.':'Do exercise three now.'},{id:'assignment',title:sv?'Lämna in rapporten':'Submit the report',details:sv?'Lämna in rapporten efter lektionen.':'Submit the report after the lesson.',kind:'assignment',dueDate:'2026-10-16',evidence:sv?'Lämna in rapporten den 16 oktober.':'Submit the report on 16 October.'}]});
       return new Response('data: '+JSON.stringify({choices:[{delta:{content:text},finish_reason:'stop'}]})+'\n\ndata: [DONE]\n\n',{headers:{'Content-Type':'text/event-stream'}});
     }
@@ -69,5 +71,6 @@ app.whenReady().then(()=>{
     if(String(url).endsWith('/revoke'))return new Response('');
     throw new Error('Unexpected external request in isolated lesson test');
   };
+  global.fetch=require('./work-provider-fixture.cjs')(global.fetch);
   require('../dist-electron/main.js');
 });

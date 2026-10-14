@@ -10,7 +10,9 @@ if (!window.schoolwork) {
   window.schoolwork = {
     connectionList:async()=>[],connectionSave:desktopOnly,connectionRemove:desktopOnly,connectionTest:desktopOnly,calendarDrive:desktopOnly,
     steer:desktopOnly,lessonRefine:desktopOnly,lessonChat:desktopOnly,calendarCheck:desktopOnly,calendarImport:desktopOnly,
-    lessonList: async () => [], lessonCreate: desktopOnly, lessonUpdate: desktopOnly, lessonDelete: desktopOnly,
+    getQuestion:async()=>null,answerQuestion:desktopOnly,
+    setAnimation:async()=>true,
+    lessonList: async () => [], lessonCreate: desktopOnly, lessonUpdate: desktopOnly, lessonEditNotes:desktopOnly, lessonDelete: desktopOnly,
     lessonAudio: desktopOnly, lessonRetry: desktopOnly, lessonDiscard: desktopOnly, lessonCancel: desktopOnly, lessonAnalyse: desktopOnly,
     lessonLiveSignal: desktopOnly,
     lessonLivePrepare: desktopOnly,
@@ -93,7 +95,7 @@ if (!window.schoolwork) {
       model: localStorage.getItem("schoolwork-preview-model") || "Qwen3.8-27B",
       workspace: "Browser preview · desktop bridge unavailable",
       configured: false,
-      language: "en",
+      language: "sv",
     }),
     setKey: async () => {
       throw new Error(

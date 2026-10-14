@@ -87,6 +87,27 @@ it('uses the captured board image as summary context when the model has vision',
   expect(payload.boards[0].speech[0].text).toContain('Gör uppgift 3');
   expect(result.analysis.tasks).toHaveLength(2);
 });
+it('keeps user edits when an older AI summary arrives and revises notes with new lesson material without a board',async()=>{
+ let finish!:(r:Response)=>void;let ready!:()=>void;const requested=new Promise<void>(r=>ready=r);const bodies:any[]=[];
+ const fetcher=vi.fn(async(url:unknown,init?:RequestInit)=>{
+  if(String(url).endsWith('/audio/transcriptions'))return Response.json({text:'Gör uppgift 3 nu. Energy is conserved.'});
+  bodies.push(JSON.parse(String(init!.body)));ready();return new Promise<Response>(r=>finish=r);
+ }) as typeof fetch;
+ const lessons=new Lessons(db,root,()=> 'test',fetcher),s=lessons.create('lesson','sv','Test');await lessons.upload(audio(s.id));
+ const pending=lessons.analyse(s.id,'Qwen3.8-27B');await requested;
+ const edited=lessons.editNotes(s.id,0,{overview:'My precise notes',sections:[{heading:'Theory',points:['Energy is conserved.']}]});
+ finish(summary(JSON.stringify(notes)));const result=await pending;
+ expect(result.analysis.overview).toBe('My precise notes');expect(result.notesVersion).toBe(1);
+ expect(()=>lessons.editNotes(s.id,0,{overview:'stale',sections:[]})).toThrow(/changed/);
+ expect(bodies[0].messages[1].content).not.toContain('image_url');
+ expect(bodies[0].messages[0].content).toContain('formulas with symbols');
+ const second=audio(s.id);second.start=20;await lessons.upload(second);
+ const refresh=lessons.analyse(s.id,'Qwen3.8-27B');
+ await vi.waitFor(()=>expect(bodies.length).toBe(2));
+ expect(JSON.parse(bodies[1].messages[1].content).previous.overview).toBe(edited.analysis.overview);
+ finish(summary(JSON.stringify({...notes,overview:'Expanded energy theory'})));
+ expect((await refresh).analysis.overview).toBe('Expanded energy theory');
+});
 it('retries the summary without the board image when the provider rejects images',async()=>{
   const file=path.join(root,'board-2.jpg');await fs.writeFile(file,Buffer.from([0xff,0xd8,0xff,0xe0,1,2,3,4,5,6,7,8]));
   let completions=0;const rejected:string[]=[];
