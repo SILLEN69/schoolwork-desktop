@@ -116,6 +116,8 @@ try{
   await app.evaluate(()=>global.__lessonTest.blurAllWindows());
   assert.equal(await app.evaluate(()=>global.__lessonTest.mainWindowFocused()),false);
   await page.getByText('Fixture answer: New context: use blue',{exact:true}).waitFor({timeout:20000});
+  // A public streamed progress message can arrive before durable completion.
+  await waitIPC(page,async()=>{const chats=await window.schoolwork.listChats();return (await window.schoolwork.getChat(chats[0].id)).task?.state==='completed';});
   const steered=await page.evaluate(async()=>{const chats=await window.schoolwork.listChats();return window.schoolwork.getChat(chats[0].id);});
   assert(steered.messages.some(m=>m.role==='tool' && m.content.includes('fixture complete')));assert.equal(steered.task.state,'completed');
   pass('Work dictation fills editable text without sending; guidance arrives during a real tool run without cancelling it');

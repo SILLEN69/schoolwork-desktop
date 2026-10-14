@@ -1,3 +1,8 @@
+## Release gate correction — 0.12.0-beta.2
+
+- First release run 38610612403 stopped before packaging. Linux displayed public progress before the task completed; the fixture asserted too early. It now waits for durable completed state and retains the tool-result assertion. No acceptance gate was removed.
+- Source CI Linux passed. Windows Work fixture also needed to await the startup shell leaving its intentional inert state before typing; otherwise a slow runner discarded its simulated input. The fixture now waits for actual interactivity. Source and beta.1 tag are preserved; beta.2 is a new immutable release attempt. No beta.1 installer was published.
+
 ## Current: 0.12.0-beta.1 implementation and verification (14 October 2026)
 
 - OpenCode 2.0.28 backbone, native questions in both views, lesson study-note prompts/manual editing, independent speech/UI languages and user-facing error normalization are implemented.

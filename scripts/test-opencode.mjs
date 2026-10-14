@@ -2,7 +2,7 @@ import {_electron} from 'playwright';
 import fs from 'node:fs/promises';import path from 'node:path';import os from 'node:os';import assert from 'node:assert/strict';
 const data=await fs.mkdtemp(path.join(os.tmpdir(),'schoolwork-opencode-app-'));
 const env={...process.env,SCHOOLWORK_OPENCODE_TEST_DATA:data};delete env.ELECTRON_RUN_AS_NODE;
-let app;const start=async()=>{app=await _electron.launch({executablePath:path.resolve('node_modules/electron/dist',process.platform==='win32'?'electron.exe':'electron'),args:[path.resolve('scripts/test-opencode-app.cjs'),'--user-data-dir='+data],env});return app.firstWindow();};
+let app;const start=async()=>{app=await _electron.launch({executablePath:path.resolve('node_modules/electron/dist',process.platform==='win32'?'electron.exe':'electron'),args:[path.resolve('scripts/test-opencode-app.cjs'),'--user-data-dir='+data],env});const page=await app.firstWindow();await page.waitForFunction(()=>{const shell=document.querySelector('.shell');return shell&&!shell.inert;});return page;};
 try{
  let page=await start();
  await app.evaluate(()=>{global.__openCodeTest.hold=true;});
@@ -39,4 +39,3 @@ try{
  console.log('PASS: native OpenCode question is presented and answered through real SchoolWork IPC; the model receives Blue.');
  console.log('PASS: real SchoolWork + bundled OpenCode writes, pauses, restarts and resumes with the same model; a real Node assertion passes without duplicate user messages or file writes.');
 }catch(error){console.log('UI_FAILURE',await (await app.firstWindow()).evaluate(()=>({text:document.body.innerText.slice(-2500),input:document.querySelector('textarea')?.value})));throw error;}finally{await app?.close().catch(()=>{});}
-
