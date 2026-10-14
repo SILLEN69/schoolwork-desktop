@@ -8,6 +8,9 @@
 - Board opens a validated connected candidate despite unknown active state, verifies decoded video before capture, preserves observed readiness across fresh HTML checks and clears it when the viewer closes or stream changes. UI separates candidate availability from observed active video; diagnostics count references without exposing their keys.
 - Live verification used the actual saved receiver in a separate hidden read-only Electron viewer. A decoded frame arrived after initial connection and capture succeeded; the actual presentation image was visually inspected. No code join/delete, school server modification, production app closure or user-profile write occurred. The private frame and probe scripts stay under ignored work/.
 - Local proof: 54 focused tests, full Windows build and 10 Electron projector workflows passed. This fixes the observed waiting/capture failure; first-time join flash still needs a school server change for complete elimination.
+- Published v0.11.0-beta.9 via release run 38575200894 after hosted lesson/projector/unit/package/integrity gates passed. Source CI 38575194795 passed on Windows and Linux.
+- Downloaded both public packages and verified their SHA-256 manifest. Launched the extracted published beta.9 with an isolated profile: publisher Google configuration present, zero renderer errors, and successful live classroom capture through the real board:capture IPC. Readiness became active after decoding; stopping the monitor released the viewer. No model inference or real-account credential copying was required for this capture proof.
+- Copied the checksum-verified installer to the user's Downloads/SchoolWork-0.11.0-beta.9-x64-setup.exe. The production beta.8 app remains running; no active lesson/task was force-closed or updated.
 
 ## Projector beta.8 observation and temporal context — 14 October 2026
 
