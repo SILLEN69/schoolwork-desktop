@@ -10,6 +10,9 @@
 - Built unsigned local installer and portable beta.8 packages. Extracted portable app launched with an isolated profile, reported beta.8, exposed monitor IPC and beta diagnostics, validated bad codes and had zero renderer errors. Local build does not contain publisher Google configuration; use the normal credential-provisioned release workflow for distribution.
 - No live classroom code or real teacher stream was available. School API/account restrictions remain unchanged. No personal profile, active user task, school credentials or main branch was modified. Keep temporary diagnostics beta-only and remove them before main promotion.
 - OpenCode work remains uncommitted in the canonical checkout, separate from this projector package. Its checkpoint is work/OPENCODE_CHECKPOINT.md.
+- Published v0.11.0-beta.8 through the existing release workflow (38569395959). Source CI 38569005793 passed on Windows and Linux; hosted lesson, projector, unit, packaging and release-integrity gates passed.
+- Downloaded both public installer and portable assets and verified them against the release SHA-256 manifest. Extracted and launched the published portable app in an isolated profile: beta.8, publisher Google configuration present, monitor IPC and beta diagnostics present, invalid-code validation correct, zero renderer errors. This supersedes the unprovisioned local development package for distribution; it is not a clean-machine install or a live classroom test.
+- Canonical beta contains projector commit 3613eb3. OpenCode changes were checkpointed in a named Git stash and reapplied without conflicts; the combined TypeScript check and three OpenCode bridge tests passed. They are not in the beta.8 release.
 
 ## Projector beta.7 reliability and diagnostic work — 14 October 2026
 
