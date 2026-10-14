@@ -27,6 +27,11 @@ for(const marker of ['#verification-prefix','#verification-batch','#verification
     const until=Date.now()+25000;let chat;
     while(Date.now()<until){chat=await page.evaluate(owner=>window.schoolwork.getChat(owner),owner);if(['completed','waiting_retry','failed'].includes(chat.task?.state))break;await new Promise(resolve=>setTimeout(resolve,60));}
     const failed=marker==='#verification-recheck';
+    if(chat?.task?.state!==(failed?'waiting_retry':'completed')) {
+      // This isolated fixture contains synthetic inputs only. Surface actual
+      // child output so a hosted command failure is not reduced to a gate error.
+      console.error('RECOVERY_FIXTURE_TOOLS',JSON.stringify(chat?.messages.filter(message=>message.role==='tool').map(message=>JSON.parse(message.content))));
+    }
     assert.equal(chat?.task?.state,failed?'waiting_retry':'completed',chat?.task?.error||'Task did not reach its verified outcome');
     assert.equal(chat.messages.filter(message=>message.role==='user').length,1);
     const tools=chat.messages.filter(message=>message.role==='tool');

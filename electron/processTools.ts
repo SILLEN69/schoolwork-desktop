@@ -1,16 +1,27 @@
 import { spawn, type ChildProcess } from 'node:child_process';
 import crypto from 'node:crypto';
+import path from 'node:path';
+import {statSync} from 'node:fs';
 import { z } from 'zod';
 import { resolveFile, type FileContext } from './projectTools';
 
 const common = { cwd: z.string().max(4096).optional(), timeoutMs: z.number().int().min(1000).max(600000).default(120000) };
 type Session = { owner: string; child: ChildProcess; output: string; exitCode: number | null; running: boolean; cwd: string };
 const sessions = new Map<string, Session>();
-function batchLaunch(executable:string, args:string[]) {
+function batchLaunch(executable:string, args:string[],cwd:string) {
   // Batch launchers need cmd.exe. Preserve its outer quote pair and reject
   // metacharacters; avoid cold PowerShell startup just to launch a batch file.
   if ([executable,...args].some(value=>/[&|<>^%!"\r\n\0]/.test(value)))
     throw new Error('Windows batch arguments contain shell metacharacters. Use a native executable with separate arguments, or an explicit run_powershell command.');
+  // cmd can leave a PATH-resolved %0 relative, making npm.cmd's %~dp0 point at
+  // the task workspace. Resolve the launcher first, without invoking a shell.
+  if(!path.isAbsolute(executable)) {
+    const roots=/[\\/]/.test(executable)?[cwd]:[cwd,...(process.env.PATH||process.env.Path||'').split(path.delimiter)];
+    const resolved=roots.filter(Boolean).map(root=>path.resolve(root.replace(/^"|"$/g,''),executable)).find(file=>{try{return statSync(file).isFile();}catch{return false;}});
+    if(!resolved)throw new Error('Windows batch launcher was not found in the working directory or PATH. Use its full executable path.');
+    executable=resolved;
+  }
+  if(/[&|<>^%!"\r\n\0]/.test(executable))throw new Error('Windows batch executable path contains shell metacharacters.');
   const command='"'+[executable,...args].map(value=>'"'+value+'"').join(' ')+'"';
   return {executable:'cmd.exe',argv:['/d','/s','/c',command]};
 }
@@ -42,7 +53,7 @@ export async function executeProcess(name: keyof typeof processInputs, raw: unkn
   let argv = name === 'run_powershell' ? ['-NoLogo', '-NoProfile', '-NonInteractive', '-Command', `$ErrorActionPreference='Stop'; try { & { ${args.command}\n }; if ($LASTEXITCODE -ne $null) { exit $LASTEXITCODE } } catch { [Console]::Error.WriteLine($_); exit 1 }`] : args.args;
   const batchNative=process.platform==='win32' && name!=='run_powershell' && /\.(?:cmd|bat)$/i.test(executable);
   if (batchNative) {
-    ({executable,argv}=batchLaunch(executable,argv));
+    ({executable,argv}=batchLaunch(executable,argv,cwd));
   }
   // Windows PowerShell requires its module search path to initialize; retain it without inheriting credentials.
   const env = Object.fromEntries(['SystemRoot','WINDIR','TEMP','TMP','USERPROFILE','PATH','PATHEXT','APPDATA','LOCALAPPDATA','HOME','LANG','PSModulePath'].filter(k => process.env[k]).map(k => [k, process.env[k]! ]));

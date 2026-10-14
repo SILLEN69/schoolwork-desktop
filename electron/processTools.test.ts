@@ -1,4 +1,4 @@
-import { it, expect } from 'vitest';
+import { it, expect, vi } from 'vitest';
 import { executeProcess, stopOwnedProcesses } from './processTools';
 import fs from 'node:fs/promises';
 import os from 'node:os';
@@ -19,6 +19,16 @@ it('passes arguments without shell interpretation and streams real output', asyn
   const output: string[] = [];
   const r = await executeProcess('run_process', { executable: process.execPath, args: ['-e', 'console.log(process.argv[1])', 'spaces & symbols $value'] }, context(), text => output.push(text));
   expect(r.ok).toBe(true); expect(r.data.stdout).toContain('spaces & symbols $value'); expect(output.length).toBeGreaterThan(0);
+});
+it.skipIf(process.platform!=='win32')('resolves a PATH batch launcher before cmd so its own module directory is correct',async()=>{
+ const dir=await fs.mkdtemp(path.join(os.tmpdir(),'schoolwork path batch '));
+ const name='schoolwork-path-fixture.cmd';
+ try{
+  await fs.writeFile(path.join(dir,name),'@echo off\r\necho %~dp0\r\necho %~1\r\nexit /b 0\r\n');
+  vi.stubEnv('PATH',dir+path.delimiter+(process.env.PATH||process.env.Path||''));
+  const result=await executeProcess('run_process',{executable:name,args:['module path'],timeoutMs:10000},context(),()=>{});
+  expect(result.ok).toBe(true);expect(result.data.stdout).toContain(dir);expect(result.data.stdout).toContain('module path');
+ }finally{vi.unstubAllEnvs();await fs.rm(dir,{recursive:true,force:true});}
 });
 it('closes standard input when commands have no interactive input', async () => {
   const r = await executeProcess('run_process', { executable: process.execPath, args: ['-e', "process.stdin.resume(); process.stdin.on('end', () => console.log('stdin closed'));"], timeoutMs: 3000 }, context(), () => {});
