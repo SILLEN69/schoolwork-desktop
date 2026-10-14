@@ -1,3 +1,14 @@
+## Verified delivery: 0.12.0-beta.2 (14 October 2026)
+
+- Beta source/tag: 55328e4e8e5f1b6e5a5f0ada3e86b3c43ccab5ac. Source CI 38611506020 passed on Windows and Linux. Release run 38611510000 passed the Linux lesson gate, Windows unit/projector/Work gates, packaging and integrity checks. Main was not merged.
+- Public prerelease: https://github.com/SILLEN69/schoolwork-desktop/releases/tag/v0.12.0-beta.2 . Installer and portable were anonymously downloaded; all four SHA-256 entries and the installer SHA-512 update feed matched.
+- Installer SHA-256: dfee82f3cb1d7c326e9831a898c9493921a9808f1d6cea9fc4d69bf3edbdeafb. A verified copy is in Downloads/SchoolWork-0.12.0-beta.2-x64-setup.exe.
+- Extracted public portable contains matching OpenCode 2.0.28 and its license. Actual packaged startup verified beta.2, publisher Google configuration, removed welcome atom and moving brand atom.
+- With global Node removed from the child PATH, the packaged app used the existing protected school credential service and selected Qwen3.8-27B to write/read checked.js and run a real Node assertion. It completed in 23 seconds, with one user message and actual tool results. Earlier live audio-only notes tests preserved definitions, units, conditions, earlier theory and subsequent power/energy examples without invented assignments.
+- 243 unit tests across 41 files passed. Native question/answer, pause/restart/resume without duplicate writes, one-minute game hint/keyboard game launch, animation preferences, 15 lesson workflows, 10 projector workflows, agent recovery and launcher checks passed. Rare failures use deterministic fixtures; live tests cover Qwen, not every selectable school model.
+- Credential scan covered 53 staged source files and Git history. All 79 extracted package files were checked for the actual configured school credential and excluded profile/.env/database paths. Private live profiles, transcripts and diagnostic evidence remain under ignored work/ and were not published.
+- The original user profile and active installed app were not closed, migrated manually or overwritten. Install when user work can be stopped normally. Packages remain unsigned. Beta-only projector diagnostics still require removal before any main promotion.
+
 ## Release gate correction — 0.12.0-beta.2
 
 - First release run 38610612403 stopped before packaging. Linux displayed public progress before the task completed; the fixture asserted too early. It now waits for durable completed state and retains the tool-result assertion. No acceptance gate was removed.
