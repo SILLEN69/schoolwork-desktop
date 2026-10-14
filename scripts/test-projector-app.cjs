@@ -1,11 +1,12 @@
 // Real SchoolWork windows/IPC, isolated profile, simulated YeetCast identity and
 // code actions. Never contact a real classroom or log in a real school account.
-const {app,safeStorage,session,Notification}=require('electron');
+const {app,safeStorage,session,Notification,dialog}=require('electron');
 const fs=require('node:fs');const path=require('node:path');
 const data=process.env.SCHOOLWORK_PROJECTOR_TEST_DATA;
 if(!data)throw new Error('Use the projector verification script.');
 app.setPath('userData',data);app.getVersion=()=>require('../package.json').version;
 Notification.isSupported=()=>false;
+dialog.showSaveDialog=async()=>({canceled:false,filePath:path.join(data,'projector-export.json')});
 const state=global.__projectorTest={signedIn:false,code:'001234',active:true,offline:false,lookups:0,deletes:0,pushLoads:0,joined:0};
 app.whenReady().then(()=>{
  if(process.platform==='linux')safeStorage.setUsePlainTextEncryption(true);
@@ -25,7 +26,7 @@ app.whenReady().then(()=>{
    window.Livewire={getByName:()=>[cast]};document.getElementById('signin').onclick=async()=>{await fetch('/fixture/login');values.nameSet=true;};
   </script></body></html>`,{headers:{'Content-Type':'text/html'}});
  });
- session.fromPartition('schoolwork-board-view').protocol.handle('https',()=>new Response('<html><body style="background:#17372a;color:white;font:48px sans-serif"><h1>Classroom board fixture</h1><p>x² + y² = z²</p></body></html>',{headers:{'Content-Type':'text/html'}}));
+ session.fromPartition('schoolwork-board-view').protocol.handle('https',()=>new Response('<html><body style="margin:0;background:#17372a"><video autoplay muted playsinline style="width:100%;height:100%"></video><script>const c=document.createElement("canvas");c.width=1024;c.height=576;const x=c.getContext("2d");function draw(){x.fillStyle="#17372a";x.fillRect(0,0,c.width,c.height);x.fillStyle="white";x.font="48px sans-serif";x.fillText("Classroom board fixture",40,100);x.fillText("x² + y² = z²",40,200);}draw();setInterval(draw,100);document.querySelector("video").srcObject=c.captureStream(10);</script></body></html>',{headers:{'Content-Type':'text/html'}}));
  global.fetch=async(url)=>{
   if(String(url).startsWith('https://teachgpt.ssis.nu/api/v1/models'))return Response.json({data:[{id:'Qwen3.8-27B'}]});
   if(String(url)==='https://yeet.ssis.nu/receiver/42'){

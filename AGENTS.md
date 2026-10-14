@@ -8,3 +8,4 @@
 - Preserve technical detail, safety boundaries and exact error text; brevity must not remove meaning.
 - Start with `temp/HANDOFF.md` for the 12 October 2026 beta transfer. Root source is canonical; `temp/project/` is a frozen recovery snapshot.
 - Keep credentials and personal app data out of Git. Preserve TeachGPT inference, selected models, task progress and existing user data.
+- Before promoting projector work to main, remove the temporary projector diagnostics as requested by the owner. Follow `docs/projector-debug-removal.md`. Main/stable builds automatically disable this logging while removal is pending; keep the functional projector fixes.

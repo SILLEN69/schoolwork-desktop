@@ -2,7 +2,7 @@ import { it, expect, vi } from 'vitest';
 import vm from 'node:vm';
 vi.mock('electron',()=>({BrowserWindow:vi.fn()}));
 import {projectorJoinScript} from './projectorConnect';
-function fixture(values:Record<string,unknown>,valid=true) {
+function fixture(values:Record<string,unknown>,valid=true,formError?:string) {
   const calls:string[]=[];
   const cast={
     $get:(key:string)=>values[key],
@@ -10,7 +10,7 @@ function fixture(values:Record<string,unknown>,valid=true) {
     $call:async(name:string)=>{calls.push(name);if(name==='checkCode'&&valid){values.receiverId=42;values.senderId=5;}if(name==='deleteSender')values.senderId=0;},
   };
   const window={Livewire:{getByName:()=>[cast]},location:{reload:()=>calls.push('reload')}};
-  const context=vm.createContext({window,document:{getElementById:()=>null}});
+  const context=vm.createContext({window,document:{getElementById:()=>formError?{querySelector:(selector:string)=>({textContent:selector.includes('text-red-600')?formError:'Enter the six-digit code.'})}:null}});
   return {values,calls,run:()=>vm.runInContext(projectorJoinScript('001234'),context)};
 }
 it('uses the real code action and removes only its own temporary sender',async()=>{
@@ -34,4 +34,8 @@ it('reports invalid or expired codes and suspended accounts',async()=>{
 it('removes the previous sender before attempting a new code so a stale receiver cannot be accepted',async()=>{
   const f=fixture({nameSet:true,isGuest:false,senderId:9,receiverId:17},false);
   expect(await f.run()).toEqual({phase:'loading'});expect(f.calls).toEqual(['deleteSender','reload']);
+});
+it('shows the actual school form error instead of the generic instructional paragraph',async()=>{
+ const f=fixture({nameSet:true,isGuest:false,receiverId:0},false,'The provided code is invalid');
+ expect(await f.run()).toEqual({phase:'error',message:'The provided code is invalid'});
 });

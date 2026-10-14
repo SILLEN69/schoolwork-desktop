@@ -7,14 +7,12 @@ const common = { cwd: z.string().max(4096).optional(), timeoutMs: z.number().int
 type Session = { owner: string; child: ChildProcess; output: string; exitCode: number | null; running: boolean; cwd: string };
 const sessions = new Map<string, Session>();
 function batchLaunch(executable:string, args:string[]) {
-  // Batch launchers cannot be passed directly to CreateProcess. PowerShell's
-  // literal invocation preserves spaces; reject cmd metacharacters rather than
-  // accidentally giving an argument a second meaning inside the batch shell.
+  // Batch launchers need cmd.exe. Preserve its outer quote pair and reject
+  // metacharacters; avoid cold PowerShell startup just to launch a batch file.
   if ([executable,...args].some(value=>/[&|<>^%!"\r\n\0]/.test(value)))
     throw new Error('Windows batch arguments contain shell metacharacters. Use a native executable with separate arguments, or an explicit run_powershell command.');
-  const literal=(value:string)=>"'"+value.replace(/'/g,"''")+"'";
-  const script=`$ErrorActionPreference='Stop'; try { & ${literal(executable)} ${args.map(literal).join(' ')}; exit $LASTEXITCODE } catch { [Console]::Error.WriteLine($_); exit 1 }`;
-  return {executable:'powershell.exe',argv:['-NoLogo','-NoProfile','-NonInteractive','-EncodedCommand',Buffer.from(script,'utf16le').toString('base64')]};
+  const command='"'+[executable,...args].map(value=>'"'+value+'"').join(' ')+'"';
+  return {executable:'cmd.exe',argv:['/d','/s','/c',command]};
 }
 function killTree(child: ChildProcess) {
   if (!child.pid) return;
@@ -42,7 +40,8 @@ export async function executeProcess(name: keyof typeof processInputs, raw: unkn
   const bundledNode = args.executable === 'node' && !!process.versions.electron;
   let executable = name === 'run_powershell' ? 'powershell.exe' : bundledNode ? process.execPath : args.executable;
   let argv = name === 'run_powershell' ? ['-NoLogo', '-NoProfile', '-NonInteractive', '-Command', `$ErrorActionPreference='Stop'; try { & { ${args.command}\n }; if ($LASTEXITCODE -ne $null) { exit $LASTEXITCODE } } catch { [Console]::Error.WriteLine($_); exit 1 }`] : args.args;
-  if (process.platform==='win32' && name!=='run_powershell' && /\.(?:cmd|bat)$/i.test(executable)) {
+  const batchNative=process.platform==='win32' && name!=='run_powershell' && /\.(?:cmd|bat)$/i.test(executable);
+  if (batchNative) {
     ({executable,argv}=batchLaunch(executable,argv));
   }
   // Windows PowerShell requires its module search path to initialize; retain it without inheriting credentials.
@@ -52,7 +51,7 @@ export async function executeProcess(name: keyof typeof processInputs, raw: unkn
     if (!ctx.owner) throw new Error('Background processes require a conversation owner.');
     if ([...sessions.values()].filter(s => s.owner === ctx.owner && s.running).length >= 4) throw new Error('Stop an existing background process before starting another.');
     const sessionId = crypto.randomUUID();
-    const child = spawn(executable, argv, { cwd, env, shell: false, windowsHide: true, detached: process.platform !== 'win32' });
+    const child = spawn(executable, argv, { cwd, env, shell: false, windowsHide: true, windowsVerbatimArguments:batchNative, detached: process.platform !== 'win32' });
     const session: Session = { owner: ctx.owner, child, cwd, output: '', exitCode: null, running: true }; sessions.set(sessionId, session);
     const capture = (data: Buffer) => { session.output = (session.output + data.toString()).slice(-30000); };
     child.stdout.on('data', capture); child.stderr.on('data', capture);
@@ -65,7 +64,7 @@ export async function executeProcess(name: keyof typeof processInputs, raw: unkn
     return { ok: true, summary: 'Background process started. Read its output and verify the URL before claiming readiness.', data: { sessionId, pid: child.pid, cwd } };
   }
   return new Promise<any>((resolve, reject) => {
-    const child = spawn(executable, argv, { cwd, env, shell: false, windowsHide: true, detached: process.platform !== 'win32' });
+    const child = spawn(executable, argv, { cwd, env, shell: false, windowsHide: true, windowsVerbatimArguments:batchNative, detached: process.platform !== 'win32' });
     child.stdin.end(); // These tools supply no interactive input; signal EOF to commands such as PowerShell.
     let stdout = '', stderr = '', timedOut = false, cancelled = false, last = 0;
     const kill = () => {

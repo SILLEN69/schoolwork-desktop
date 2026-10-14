@@ -98,10 +98,13 @@ try{
   // has focus the chat already shows the result and no toast is sent. Defocus the
   // window at the main-process level so the fixture task's completion exercises
   // the dismissible-notice path.
-  await app.evaluate(()=>global.__lessonTest.blurAllWindows());
   await app.evaluate(()=>{global.__lessonTest.agentTool=true;});await page.locator('.send-btn').click();
   await page.waitForFunction(()=>document.body.textContent.includes('Running node'));
   await message.fill('New context: use blue');await page.locator('.send-btn').click();
+  // Playwright's input/click actions focus the real window again. Drop focus
+  // only AFTER the final steering click, before the asynchronous tool completes.
+  await app.evaluate(()=>global.__lessonTest.blurAllWindows());
+  assert.equal(await app.evaluate(()=>global.__lessonTest.mainWindowFocused()),false);
   await page.getByText('Fixture answer: New context: use blue',{exact:true}).waitFor({timeout:20000});
   const steered=await page.evaluate(async()=>{const chats=await window.schoolwork.listChats();return window.schoolwork.getChat(chats[0].id);});
   assert(steered.messages.some(m=>m.role==='tool' && m.content.includes('fixture complete')));assert.equal(steered.task.state,'completed');

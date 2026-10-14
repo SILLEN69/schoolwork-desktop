@@ -16,6 +16,7 @@ import { autoUpdater } from 'electron-updater';
 import { Lessons, audioInputSchema } from "./lessons";
 import { TeachGptLiveTranscription, liveSpeechModel } from './liveTranscription';
 import { Board } from "./yeetcast";
+import { ProjectorDiagnostics } from './projectorDiagnostics';
 import { GoogleCalendar } from "./calendar";
 import { publishedGoogleClient } from "./googleClient";
 import { DesktopPointer } from './desktopPointer';
@@ -143,6 +144,7 @@ let updates: Updates;
 let lessons: Lessons;
 const liveTranscription = new TeachGptLiveTranscription(key);
 let board: Board;
+let projectorLogs: ProjectorDiagnostics;
 let calendar: GoogleCalendar;
 const calendarWrites = new Set<string>();
 let updateTimer: ReturnType<typeof setInterval>|undefined;
@@ -2133,7 +2135,13 @@ function registerIpc() {
   ipcMain.handle('board:configure',(event,raw)=>{trusted(event);return board.configure(z.string().trim().max(500).parse(raw));});
   ipcMain.handle('board:cancel-connect',(event)=>{trusted(event);return board.cancelConnect();});
   ipcMain.handle('board:disconnect',(event)=>{trusted(event);return board.disconnect();});
-  ipcMain.handle('board:status',async (event)=>{trusted(event);return board.refresh();});
+  ipcMain.handle('board:status',async (event,raw)=>{trusted(event);return board.refresh(raw===undefined?false:z.boolean().parse(raw));});
+  ipcMain.handle('board:export-diagnostics',async(event)=>{
+    trusted(event);const report=await projectorLogs.export();
+    const saved=await dialog.showSaveDialog({defaultPath:'schoolwork-projector-beta.json',filters:[{name:'JSON',extensions:['json']}]});
+    if(saved.canceled||!saved.filePath)return null;
+    await fs.writeFile(saved.filePath,JSON.stringify(report,null,2),{mode:0o600});return saved.filePath;
+  });
   ipcMain.handle('board:open',async (event)=>{trusted(event);return board.open();});
   ipcMain.handle('board:hide',(event)=>{trusted(event);return board.hide();});
   ipcMain.handle('board:close',(event)=>{trusted(event);board.close();return true;});
@@ -2928,7 +2936,8 @@ else {
       setTimeout(()=>void updates.check(false),15000).unref();
       updateTimer=setInterval(()=>void updates.check(false),6*60*60*1000);updateTimer.unref();
     }
-    board = new Board(store, path.join(app.getPath('userData'), 'board'));
+    projectorLogs=new ProjectorDiagnostics(path.join(app.getPath('userData'),'diagnostics'),app.getVersion());
+    board = new Board(store, path.join(app.getPath('userData'), 'board'),fetch,undefined,projectorLogs.record,projectorLogs.enabled);
     lessons = new Lessons(store, path.join(app.getPath('userData'), 'lesson-audio'), key, fetch,
       (model) => visionProfiles()[model]?.status !== 'unsupported',
       (model) => saveVision(model, 'unsupported', 'Lesson board image was rejected by the provider.'));

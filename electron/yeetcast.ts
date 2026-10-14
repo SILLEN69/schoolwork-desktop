@@ -5,6 +5,7 @@ import { BrowserWindow } from 'electron';
 import type { SchoolWorkStore } from './storage';
 import { parseReceiverPage, normalizeReceiverUrl, projectorCode, readOnlyViewUrl, type BoardStatus, type YeetCastState } from '../src/yeetcast';
 import { ProjectorConnector } from './projectorConnect';
+import type { ProjectorTrace } from './projectorDiagnostics';
 
 /** View-only board viewer for the school's YeetCast projector pages
  *  (yeet.ssis.nu). The projector page is public; we read it, extract the
@@ -27,13 +28,17 @@ export class Board {
   private lastError: string | undefined;
   private lastChecked = 0;
   private generation = 0;
-  private connector = new ProjectorConnector();
+  private connector: ProjectorConnector;
+  private refreshController: AbortController | null = null;
+  private refreshGeneration = -1;
   constructor(
     private store: SchoolWorkStore,
     private root: string,
     private fetcher: typeof fetch = fetch,
-    private codeResolver: (code: string) => Promise<string> = code => this.connector.resolve(code),
-  ) {}
+    private codeResolver?: (code: string) => Promise<string>,
+    private trace: ProjectorTrace = ()=>{},
+    private diagnosticsAvailable = false,
+  ) {this.connector=new ProjectorConnector(trace);}
 
   get receiverUrl(): string {
     const saved = this.store.getMetadata('board:receiverUrl');
@@ -43,8 +48,12 @@ export class Board {
 
   async configure(raw: string): Promise<string> {
     const generation = ++this.generation;
+    this.refreshController?.abort();
+    this.trace('board.configure',{outcome:'started'});
     const code = projectorCode(raw);
-    const url = normalizeReceiverUrl(code ? await this.codeResolver(code) : raw);
+    let url:string;
+    try {url=normalizeReceiverUrl(code?await (this.codeResolver?this.codeResolver(code):this.connector.resolve(code)):raw);}
+    catch(error){this.trace('board.configure',{outcome:'failed',reason:code?'lookup_rejected':'invalid_input'});throw error;}
     if (generation !== this.generation) throw new Error('Projector connection cancelled.');
     this.closeWindow();
     this.store.setMetadata('board:receiverUrl', url);
@@ -52,10 +61,12 @@ export class Board {
     this.currentView = '';
     this.lastError = undefined;
     this.lastChecked = 0;
+    this.trace('board.configure',{outcome:'succeeded'});
     return url;
   }
-  cancelConnect(): boolean { this.generation++; this.connector.cancel(); return true; }
+  cancelConnect(): boolean { this.generation++;this.refreshController?.abort();this.connector.cancel();this.lastChecked=0;return true; }
   disconnect(): boolean {
+    this.trace('board.disconnect',{outcome:'succeeded'});
     this.cancelConnect(); this.closeWindow(); this.store.setMetadata('board:receiverUrl', '');
     this.state = null; this.currentView = ''; this.lastError = undefined; this.lastChecked = 0; return true;
   }
@@ -71,44 +82,52 @@ export class Board {
       windowOpen: Boolean(this.win && !this.win.isDestroyed() && this.win.isVisible()),
       lastChecked: this.lastChecked,
       error: this.lastError,
+      diagnosticsAvailable:this.diagnosticsAvailable,
     };
   }
 
   /** Read the projector page once. Cheap enough to run on demand and on a
    *  slow poll while the board window is open. */
-  async refresh(): Promise<BoardStatus> {
+  async refresh(force=false): Promise<BoardStatus> {
     const url = this.receiverUrl;
     if (!url) return this.status();
     // Short TTL so the UI poll and the window poll share one fetch.
-    if (this.lastChecked && Date.now() - this.lastChecked < 8_000) return this.status();
-    if (this.refreshing) { await this.refreshing; if (url !== this.receiverUrl) return this.refresh(); return this.status(); }
+    if (!force&&this.lastChecked && Date.now() - this.lastChecked < 8_000) return this.status();
+    if (this.refreshing&&this.refreshGeneration===this.generation) { await this.refreshing; if (url !== this.receiverUrl) return this.refresh(force); return this.status(); }
     const generation = this.generation;
-    this.refreshing = (async () => {
+    const controller=new AbortController();this.refreshController=controller;this.refreshGeneration=generation;
+    const started=Date.now();
+    const operation = (async () => {
       try {
         const response = await this.fetcher(url, {
           headers: { Accept: 'text/html' },
           redirect: 'error',
-          signal: AbortSignal.timeout(15_000),
+          signal: AbortSignal.any([controller.signal,AbortSignal.timeout(15_000)]),
         });
+        this.trace('board.refresh',{httpStatus:response.status,durationMs:Date.now()-started});
         if (!response.ok) throw new Error(response.status === 404 ? 'This projector is no longer available. Connect using its current code.' : `Could not check the projector (HTTP ${response.status}). Try again.`);
         const html = await response.text();
         if (generation !== this.generation) return;
         const parsed = parseReceiverPage(html);
+        this.trace('board.refresh',{outcome:parsed?'succeeded':'failed',...(parsed?{active:parsed.active,connections:parsed.connections,senderCount:parsed.senders.length}:{reason:'parse_failed'})});
         this.lastError = parsed ? undefined : 'Could not read this projector. Connect using the current code shown on its screen.';
         if (parsed) this.adopt(parsed);
         else this.adopt({receiverUri:'',active:false,connections:false,senders:[]});
       } catch (error) {
         if (generation !== this.generation) return;
+        this.trace('board.refresh',{outcome:'failed',reason:'network',durationMs:Date.now()-started});
         this.lastError = error instanceof Error && error.message.includes('projector') ? error.message : 'Could not reach the projector. Check your connection and try again.';
         this.adopt({receiverUri:'',active:false,connections:false,senders:[]});
       } finally {
         if (generation === this.generation) this.lastChecked = Date.now();
       }
     })();
+    this.refreshing=operation;
     try {
-      await this.refreshing;
+      await operation;
     } finally {
-      this.refreshing = null;
+      if(this.refreshing===operation)this.refreshing=null;
+      if(this.refreshController===controller)this.refreshController=null;
     }
     return this.status();
   }
@@ -124,7 +143,9 @@ export class Board {
 
   /** Open the floating board window on the active cast's read-only view. */
   async open(): Promise<BoardStatus> {
+    const generation=this.generation;
     const status = (await this.refresh()) as BoardStatus;
+    if(generation!==this.generation)throw new Error('Projector connection changed. Open the selected board again.');
     if (status.error || !status.active || !status.viewUrl) {
       throw new Error(
         status.error || (status.configured
@@ -148,24 +169,30 @@ export class Board {
       this.win.webContents.session.setDisplayMediaRequestHandler((_request, callback) => callback({}));
       this.win.webContents.setWindowOpenHandler(() => ({action:'deny'}));
       this.win.webContents.on('will-navigate', (event, url) => { if (!readOnlyViewUrl(url)) event.preventDefault(); });
+      this.win.webContents.on('will-redirect',(event,url)=>{if(!readOnlyViewUrl(url))event.preventDefault();});
+      this.win.webContents.on('did-fail-load',(_event,code,_description,_url,mainFrame)=>{if(mainFrame&&code!==-3)this.trace('board.view',{outcome:'failed',reason:'stream_load',netError:code});});
       this.win.setMenuBarVisibility(false);
       this.win.on('closed', () => {
         this.win = null;
         this.stopPolling();
       });
     }
-    if (this.win.webContents.getURL() !== status.viewUrl) {
-      try { await this.win.webContents.loadURL(status.viewUrl); }
-      catch { this.closeWindow(); throw new Error('Could not open the board stream. Check your connection and try again.'); }
+    const viewer=this.win;
+    if (viewer.webContents.getURL() !== status.viewUrl) {
+      this.trace('board.view',{outcome:'started'});
+      try { await viewer.webContents.loadURL(status.viewUrl); }
+      catch { if(this.win===viewer)this.closeWindow();this.trace('board.view',{outcome:'failed',reason:'stream_load'});throw new Error('Could not open the board stream. Check your connection and try again.'); }
     }
-    this.win.show();
-    this.win.focus();
+    if(generation!==this.generation||this.win!==viewer||viewer.isDestroyed()||status.viewUrl!==this.currentView)throw new Error('Projector connection changed. Open the selected board again.');
+    viewer.show();viewer.focus();
+    this.trace('board.view',{outcome:'opened'});
     this.startPolling();
     return this.status();
   }
 
   hide(): boolean {
     if (this.win && !this.win.isDestroyed()) this.win.hide();
+    this.trace('board.view',{outcome:'hidden'});
     return this.status().windowOpen;
   }
 
@@ -194,13 +221,20 @@ export class Board {
   /** Capture the board window to a JPEG under the board root. Returns the
    *  file path, or null when no board window is visible. */
   async capture(): Promise<string | null> {
+    await this.refresh(true);
     if (!this.state?.active || !this.win || this.win.isDestroyed() || !this.win.isVisible() || this.win.isMinimized()) return null;
     if (this.win.webContents.getURL() !== this.currentView) return null;
-    const image = await this.win.webContents.capturePage();
-    if (image.isEmpty()) return null;
+    const viewer=this.win,generation=this.generation,view=this.currentView;
+    const media=await viewer.webContents.executeJavaScript(`(()=>{const videos=[...document.querySelectorAll('video')];const ready=videos.find(v=>v.readyState>=2&&v.videoWidth>0&&v.videoHeight>0);return {videoCount:videos.length,readyState:ready?.readyState||0};})()`);
+    if(media?.readyState<2||!media?.videoCount){this.trace('board.capture',{outcome:'not_ready',reason:'no_video_frame',videoCount:Number(media?.videoCount)||0,readyState:Number(media?.readyState)||0});throw new Error('The board video is still connecting. Wait for the picture in the board window, then capture again.');}
+    const image = await viewer.webContents.capturePage();
+    if(generation!==this.generation||this.win!==viewer||view!==this.currentView||viewer.isDestroyed()||!viewer.isVisible()){this.trace('board.capture',{outcome:'stale',reason:'selection_changed'});return null;}
+    if (image.isEmpty()) {this.trace('board.capture',{outcome:'failed',reason:'empty_image'});return null;}
     await fs.mkdir(this.root, { recursive: true, mode: 0o700 });
     const file = path.join(this.root, 'board-' + Date.now() + '-' + crypto.randomBytes(3).toString('hex') + '.jpg');
     await fs.writeFile(file, image.toJPEG(78), { mode: 0o600 });
+    if(generation!==this.generation||view!==this.currentView){await fs.unlink(file).catch(()=>{});return null;}
+    this.trace('board.capture',{outcome:'succeeded'});
     return file;
   }
 

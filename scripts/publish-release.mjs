@@ -5,6 +5,8 @@ import releaseConfiguration from './release-config.cjs';
 const repo=process.env.GITHUB_REPOSITORY || 'SILLEN69/schoolwork-desktop';
 const version=JSON.parse(readFileSync('package.json','utf8')).version;
 const {notes,manifest,prerelease}=releaseConfiguration.releaseConfig(version);
+const notesHeadline=readFileSync(notes,'utf8').split(/\r?\n/)[0].replace(/^#\s+/,'').trim();
+const releaseTitle=notesHeadline.startsWith('SchoolWork '+version)&&notesHeadline.length<=200?notesHeadline:`SchoolWork ${version}`;
 const tag=process.env.RELEASE_TAG || process.env.GITHUB_REF_NAME || `v${version}`;
 if(!/^[\w.-]+\/[\w.-]+$/.test(repo)||tag!==`v${version}`)throw new Error('Repository/tag does not match this package.');
 function gh(args){
@@ -20,7 +22,7 @@ if(ids.length>1||ids.some(id=>!/^\d+$/.test(id)))throw new Error('Ambiguous rele
 const names=[`SchoolWork-${version}-x64-setup.exe`,`SchoolWork-${version}-x64-portable.exe`,`SchoolWork-${version}-x64-setup.exe.blockmap`,manifest,`SHA256SUMS-${tag}.txt`];
 const files=names.map(name=>`release/${name}`);
 if(!ids.length){
- gh(['release','create',tag,...files,notes,'docs/workflow-0.10.md','--repo',repo,'--title',`SchoolWork ${version}${prerelease?' — Google sign-in beta':''}`,'--notes-file',notes,'--draft','--verify-tag',...(prerelease?['--prerelease','--latest=false']:[])]);
+ gh(['release','create',tag,...files,notes,'docs/workflow-0.10.md','--repo',repo,'--title',releaseTitle,'--notes-file',notes,'--draft','--verify-tag',...(prerelease?['--prerelease','--latest=false']:[])]);
  const createdIds=gh(['api',`repos/${repo}/releases?per_page=100`,'--paginate','--jq',`.[] | select(.tag_name == "${tag}") | .id`]).split(/\r?\n/).filter(Boolean);
  if(createdIds.length!==1||!/^\d+$/.test(createdIds[0]))throw new Error('Created draft could not be located.');
  ids.push(createdIds[0]);

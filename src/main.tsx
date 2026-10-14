@@ -23,6 +23,7 @@ if (!window.schoolwork) {
     boardHide: async () => false,
     boardClose: async () => true,
     boardCapture: desktopOnly,
+    boardExportDiagnostics: desktopOnly,
     calendarStatus: async () => ({configured:false,connected:false,connecting:false,calendarId:'primary'}),
     calendarConfigure: desktopOnly, calendarConnect: desktopOnly, calendarCancelConnect: desktopOnly, calendarDisconnect: desktopOnly, calendarAdd: desktopOnly,
     updateStatus: async () => ({phase:'unsupported',currentVersion:'preview',message:'Updates are available in the installed app.'}),

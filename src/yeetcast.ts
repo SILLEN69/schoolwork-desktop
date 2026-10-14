@@ -5,7 +5,7 @@ export type YeetCastSenders = { name: string; sending: boolean }[];
 export type YeetCastState = { receiverUri: string; active: boolean; connections: boolean; senders: YeetCastSenders };
 export type BoardStatus = {
   configured: boolean; receiverUrl: string; active: boolean; connections: boolean;
-  senders: YeetCastSenders; viewUrl: string | null; windowOpen: boolean; lastChecked: number; error?: string;
+  senders: YeetCastSenders; viewUrl: string | null; windowOpen: boolean; lastChecked: number; error?: string; diagnosticsAvailable?: boolean;
 };
 export function projectorCode(raw: string): string | null {
   const value = raw.trim().replace(/[\s-]/g, '');

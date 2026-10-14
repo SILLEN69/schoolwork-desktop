@@ -94,12 +94,12 @@ export default function LessonWorkspace({ initialMode, summaryModel, configured,
   };
   const stopLive = () => { liveGeneration.current++; const session = liveSession.current; liveSession.current = null; if (session) void session.stop(); setLiveStatus('idle'); setLiveText(''); setLiveError(''); };
   const stop = () => { stopLive(); recorder.current?.stop(); recorder.current = null; setRecording(false); setStarting(false); };
-  const boardLoad = () => window.schoolwork.boardStatus().then(s => { if (mounted.current) setBoard(s); }).catch(() => {});
+  const boardLoad = (force=false) => window.schoolwork.boardStatus(force).then(s => { if (mounted.current) setBoard(s); }).catch(e => {if(mounted.current)setBoardNote(errorText(e));});
   useEffect(() => { void boardLoad(); const timer = setInterval(() => void boardLoad(), 10_000); return () => clearInterval(timer); }, []);
   const boardConfigureSubmit = async () => {
     if (!boardUrlInput.trim() || boardBusy) return; setBoardBusy(true); setBoardNote('');
     try { await window.schoolwork.boardConfigure(boardUrlInput.trim()); if(mounted.current){setBoardConfig(false);setBoardUrlInput('');} await boardLoad(); }
-    catch (e) { setBoardNote(errorText(e)); } finally { if (mounted.current) setBoardBusy(false); }
+    catch (e) { if(mounted.current)setBoardNote(errorText(e)); } finally { if (mounted.current) setBoardBusy(false); }
   };
   const boardToggle = async () => {
     if (boardBusy) return; setBoardBusy(true); setBoardNote('');
@@ -238,10 +238,11 @@ export default function LessonWorkspace({ initialMode, summaryModel, configured,
           </form> : <>
             <button className="lesson-outline" disabled={boardBusy} onClick={() => { setBoardUrlInput(''); setBoardConfig(true); }}><Settings2 size={14}/>{t('Byt projektor', 'Change projector')}</button>
             <button className="lesson-outline" disabled={boardBusy} onClick={() => {void window.schoolwork.boardDisconnect().then(()=>boardLoad()).catch(e=>setBoardNote(errorText(e)));}}>{t('Koppla från', 'Disconnect')}</button>
-            <button className="lesson-outline" disabled={boardBusy} onClick={() => void boardLoad()}><RefreshCw size={14}/>{t('Uppdatera', 'Refresh')}</button>
+            <button className="lesson-outline" disabled={boardBusy} onClick={() => void boardLoad(true)}><RefreshCw size={14}/>{t('Uppdatera', 'Refresh')}</button>
             <button className="lesson-outline" disabled={!board?.viewUrl || boardBusy} onClick={() => void boardToggle()}><Tv size={14}/>{board?.windowOpen ? t('Dölj fönstret', 'Hide window') : t('Visa tavlan', 'Show board')}</button>
             <button className="lesson-primary" disabled={!board?.windowOpen || !current || boardBusy} onClick={() => void boardCapture()}><Camera size={14}/>{t('Fotografera tavlan', 'Capture board')}</button>
           </>}
+          {board?.diagnosticsAvailable && <button className="lesson-outline" onClick={()=>void window.schoolwork.boardExportDiagnostics().then(file=>{if(file&&mounted.current)setBoardNote(t('Anslutningsloggen har sparats.','Connection log saved.'));}).catch(e=>setBoardNote(errorText(e)))}>{t('Spara anslutningslogg','Save connection log')}</button>}
         </div>
       </section>
       <nav className="lesson-tabs" aria-label={t('Lektionens innehåll','Lesson content')}>{([['notes',t('Anteckningar','Notes')],['tasks',t('Uppgifter','Tasks')],['transcript',t('Transkript','Transcript')]] as const).map(([tab,label])=><button key={tab} aria-pressed={view===tab} onClick={()=>setView(tab)}>{label}{tab==='tasks' && <span>{lessonTasks.length+assignments.length}</span>}</button>)}{current && <select aria-label={t('Ämne','Subject')} value={current.subject || 'Övrigt'} onChange={e=>void perform(()=>window.schoolwork.lessonUpdate({id:current.id,subject:e.target.value}))}>{lessonSubjects.map(s=><option key={s}>{s}</option>)}</select>}</nav>

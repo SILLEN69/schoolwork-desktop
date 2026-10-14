@@ -27,7 +27,9 @@ jobs:
       - name: Verify assets, type-check and build (no publisher credentials)
         run: npm run build
       - run: npm test -- --maxWorkers=4
-      - run: node --test scripts/check-release-config.cjs scripts/check-startup-assets.test.mjs scripts/build-native.test.mjs
+      - run: node --test scripts/check-release-config.cjs scripts/check-startup-assets.test.mjs scripts/build-native.test.mjs scripts/projector-debug-config.test.cjs
+      - if: runner.os == 'Windows'
+        run: node scripts/test-projector.mjs
       - if: runner.os == 'Windows'
         run: node scripts/test-agent-recovery.mjs
       - if: runner.os == 'Windows'

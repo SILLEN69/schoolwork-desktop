@@ -69,6 +69,12 @@ jobs:
         run: npm run build
       - name: Run unit tests including Windows-specific checks
         run: npm test -- --maxWorkers=4
+      - name: Verify projector setup and beta-only diagnostic policy
+        run: |
+          node --test scripts/projector-debug-config.test.cjs
+          if ($LASTEXITCODE -ne 0) { throw 'Projector logging policy failed.' }
+          node scripts/test-projector.mjs
+          if ($LASTEXITCODE -ne 0) { throw 'Projector setup verification failed.' }
       - name: Package installer and portable app without publishing
         run: node scripts/package-win.mjs
       - name: Verify update manifest and generate SHA-256 checksums

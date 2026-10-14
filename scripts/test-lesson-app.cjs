@@ -8,9 +8,19 @@ app.setPath('userData',data);
 app.commandLine.appendSwitch('use-fake-device-for-media-stream');
 app.commandLine.appendSwitch('use-fake-ui-for-media-stream');
 global.__lessonTest={audioModels:[],summaryRequests:0,calendarWrites:0,agentRequests:[],agentTool:false,modelSaveDelay:0,settingsDelay:0,rejectModel:false,failAudio:false};
-// Lets the test drop OS focus (completion toast only renders while the user is away).
-global.__lessonTest.blurAllWindows=()=>{require('electron').BrowserWindow.getAllWindows().forEach(w=>w.blur());};
-global.__lessonTest.focusAllWindows=()=>{require('electron').BrowserWindow.getAllWindows().forEach(w=>{if(w.isMinimized())w.restore();w.focus();});};
+// A real owned second window models the user being away. blur() alone may leave
+// the only Windows window foreground; no production focus API is mocked.
+let awayWindow;
+global.__lessonTest.blurAllWindows=async()=>{
+ const {BrowserWindow}=require('electron');
+ if(!awayWindow||awayWindow.isDestroyed()){
+  awayWindow=new BrowserWindow({width:240,height:120,title:'SchoolWork lesson fixture — away',autoHideMenuBar:true,webPreferences:{sandbox:true,nodeIntegration:false,contextIsolation:true}});
+  await awayWindow.loadURL('about:blank');
+ }
+ awayWindow.show();awayWindow.focus();
+};
+global.__lessonTest.mainWindowFocused=()=>require('electron').BrowserWindow.getAllWindows().some(w=>w!==awayWindow&&w.isFocused());
+global.__lessonTest.focusAllWindows=()=>{awayWindow?.destroy();awayWindow=null;require('electron').BrowserWindow.getAllWindows().forEach(w=>{if(w.isMinimized())w.restore();w.focus();});};
 shell.openExternal=async(url)=>{if(String(url).startsWith('https://accounts.google.com/')){global.__lessonTest.oauthUrl=url;return;}throw new Error('Unexpected browser launch in isolated test');};
 const handle=ipcMain.handle.bind(ipcMain);
 ipcMain.handle=(channel,listener)=>handle(channel,async(...args)=>{

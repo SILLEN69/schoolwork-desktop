@@ -24,3 +24,11 @@ Verified against [the school's YeetCast source](https://git.ssis.nu/SSIS/yeetcas
 The automated projector suite runs the real SchoolWork renderer, IPC and connection/view windows with simulated school identity, code lookup and streams. It checks leading zeroes, expired codes, rotating codes, sender cleanup, blocked push streams, hide/show, cancellation and disconnect. A separate anonymous live check confirmed that the real YeetCast component is recognized and its Google login reaches an account-entry page.
 
 No current classroom code was available on 13 October 2026. A real signed-in classroom lookup and teacher video stream remain unverified. School account access, guest authorization, the projector being online and network access to YeetCast/VDO remain service prerequisites; the app cannot bypass them.
+
+## Beta troubleshooting (14 October 2026)
+
+After attempting to connect, use **Save connection log / Spara anslutningslogg** beside the board controls. The exported JSON records sanitized connection phases, timing, cleanup, receiver HTTP status and viewer/frame readiness. Share that JSON when reporting a classroom failure; do not send your school password or API key. The underlying bounded journal stays in the local app profile and is never uploaded automatically.
+
+Capturing now requires a loaded video frame, not merely an opened browser window. If SchoolWork says the video is still connecting, wait until the picture appears in **Show board**, then try again. **Refresh** explicitly bypasses the eight-second status cache. Switching or disconnecting cancels old reads and rejects outdated window/image operations.
+
+This logging is temporary and beta-only. [Remove it before main promotion](projector-debug-removal.md); main/stable builds also disable it automatically.

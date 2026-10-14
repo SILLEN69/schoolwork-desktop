@@ -21,6 +21,7 @@ try{
  pass('a spaced six-digit code resolves through normal sign-in, stores the receiver, deletes its temporary sender and never loads a push stream');
  await app.evaluate(()=>{global.__projectorTest.code='654321';});
  await board.getByRole('button',{name:'Visa tavlan'}).click();await board.getByRole('button',{name:'Dölj fönstret'}).waitFor();
+ const viewer=app.windows().find(w=>w.url().startsWith('https://vdo.ninja/'));assert.ok(viewer);await viewer.waitForFunction(()=>document.querySelector('video')?.readyState>=2);
  await board.getByRole('button',{name:'Dölj fönstret'}).click();await board.getByRole('button',{name:'Visa tavlan'}).waitFor();
  await board.getByRole('button',{name:'Visa tavlan'}).click();await board.getByRole('button',{name:'Dölj fönstret'}).waitFor();
  assert.equal(await app.evaluate(()=>global.__projectorTest.lookups),1);pass('rotating the code does not disconnect the remembered projector; hide and show both work');
@@ -38,5 +39,14 @@ try{
  await board.getByRole('button',{name:'Avbryt',exact:true}).click();await board.getByRole('button',{name:'Anslut',exact:true}).waitFor();
  assert.equal((await page.evaluate(()=>window.schoolwork.boardStatus())).configured,false);pass('cancel closes pending sign-in and disconnect removes the saved projector');
  assert.equal(errors.length,0,errors.join(' | '));pass('no renderer errors');
+ if((await page.evaluate(()=>window.schoolwork.boardStatus())).diagnosticsAvailable){
+ await board.getByRole('button',{name:'Spara anslutningslogg'}).click();await board.getByRole('status').filter({hasText:'Anslutningsloggen har sparats.'}).waitFor();
+ const report=JSON.parse(await fs.readFile(path.join(data,'projector-export.json'),'utf8'));
+ assert.ok(report.events.some(e=>e.event==='connect.phase'&&e.details.phase==='signin'));
+ assert.ok(report.events.some(e=>e.event==='connect.finish'&&e.details.outcome==='succeeded'));
+ assert.ok(report.events.some(e=>e.event==='board.capture'&&e.details.outcome==='succeeded'));
+ assert.ok(!JSON.stringify(report).includes('https://'));assert.ok(!JSON.stringify(report).includes('Teacher'));
+ pass('beta connection log exports real lifecycle events without codes, stream URLs or identities');
+ }else{assert.equal(await board.getByRole('button',{name:'Spara anslutningslogg'}).count(),0);pass('stable/main builds contain no projector diagnostic control');}
  await fs.writeFile(path.join(shots,'results.json'),JSON.stringify({results,services:'simulated',profileIsolated:true},null,2));
 }finally{await app?.close().catch(()=>{});}
